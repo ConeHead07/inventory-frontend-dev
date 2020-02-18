@@ -14,6 +14,20 @@ export class DataService {
 
   }
 
+  getClient(clientID: number): ClientModel | null {
+    const clients = this.getClientList();
+    const fclients = clients.filter( client => client.mid === clientID);
+    console.log( { clientID, clients, fclients });
+    return fclients.length ? fclients[0] : null;
+  }
+
+  getBuilding(bldgID: number, clientID: number): BuildingModel | null {
+    const bldgs = this.getBuildingList(clientID);
+    const fbldgs = bldgs.filter( bldg => bldg.gid === bldgID);
+    console.log( { bldgID, clientID, bldgs, fbldgs });
+    return fbldgs.length ? fbldgs[0] : null;
+  }
+
   public getClientList(): ClientModel[] {
 
     return [

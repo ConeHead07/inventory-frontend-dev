@@ -1,5 +1,5 @@
 <p>invent-form works!</p>
-<div class="row">
+<div class="row mb-3">
   <div class="form-group col-4">
     <label for="kunde">KundeModel</label>
     <input id="kunde" class="form-control" [readOnly]="true" [attr.value]="kundeName">
@@ -14,7 +14,7 @@
   </div>
 </div>
 
-<div class="row">
+<div class="row mb-5">
   <div class="col-6">
     <app-progressbar [shortTitle]="'Gesamt'" [title]="'Fortschrittsanzeige gesamt'" [value]="45.5" [total]="145"></app-progressbar>
   </div>
@@ -23,12 +23,19 @@
   </div>
 </div>
 
-<div class="form-group row">
-    <label for="raumNr" class="col-3 col-sm-3 col-md-2 col-lg-2">Raum-Nr</label>
-    <div class="col">
-      <input  id="raumNr" type="text" class="form-control">
+<div class="form-group row mt-5">
+  <label for="raumNr" class="col-3 col-sm-3 col-md-2 col-lg-2">Raum-Nr</label>
+  <div class="col input-group">
+    <input id="raumNr" type="text" class="form-control" placeholder="Raumnr" aria-label="Raumnummer">
+    <div class="input-group-append">
+      <button class="btn btn-outline-success" type="button">...</button>
     </div>
+  </div>
 </div>
+
+
+
+
 <div class="form-group row">
     <label for="raumBez" class="col-3 col-sm-3 col-md-2 col-lg-2">Raum-Bez.</label>
     <div class="col">
@@ -37,14 +44,20 @@
 </div>
 <div class="form-group row">
     <label for="elmBarcode" class="col-3 col-sm-3 col-md-2 col-lg-2">Barcode</label>
-    <div class="col">
-      <input  id="elmBarcode" readonly type="text" class="form-control">
+    <div class="col input-group">
+      <input id="elmBarcode" readonly type="text" class="form-control" placeholder="Barcode" aria-label="Barcode">
+      <div class="input-group-append">
+        <button class="btn btn-outline-success" type="button">...</button>
+      </div>
     </div>
 </div>
 <div class="form-group row">
     <label for="elmArtBez" class="col-3 col-sm-3 col-md-2 col-lg-2">Artike-Bez.</label>
-    <div class="col">
-      <input  id="elmArtBez" type="text" class="form-control">
+    <div class="col input-group">
+      <input id="elmArtBez" readonly type="text" class="form-control" placeholder="Artikelbezeichnung" aria-label="Artikelbezeichnung">
+      <div class="input-group-append">
+        <button class="btn btn-outline-success" type="button">...</button>
+      </div>
     </div>
 </div>
 <div class="form-group row">

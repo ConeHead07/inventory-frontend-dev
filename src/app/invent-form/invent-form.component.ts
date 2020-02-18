@@ -1,24 +1,11 @@
-import { Component, OnInit } from '@angular/core';
+import {Component, OnDestroy, OnInit} from '@angular/core';
+import {ActivatedRoute} from '@angular/router';
+import {DataService} from '../inventory/service/data.service';
+import {ClientModel} from '../inventory/models/client.model';
+import {BuildingModel} from '../inventory/models/building.model';
+import {RoomModel} from '../inventory/models/room.model';
+import {InventarModel} from '../inventory/models/inventar.model';
 
-
-interface Kunde {
-  Name: string;
-}
-
-interface Gebaeude {
-  Adresse: string;
-}
-
-interface Raum {
-  Name: string;
-  Nr: string;
-}
-
-interface InventarObjekt {
-  barcode: string;
-  Bezeichnung: string;
-  ArtikelTyp: string;
-}
 
 interface RaumStatus {
   hasTotal: boolean;
@@ -31,22 +18,48 @@ interface RaumStatus {
   templateUrl: './invent-form.component.html',
   styleUrls: ['./invent-form.component.scss']
 })
-export class InventFormComponent implements OnInit {
+export class InventFormComponent implements OnInit, OnDestroy {
 
-  public kunde: Kunde;
-  public gebaeude: Gebaeude;
-  public raum: Raum;
-  public invObject: InventarObjekt;
+  public kunde?: ClientModel;
+  public gebaeude?: BuildingModel;
+  public raum?: RoomModel;
+
+  public invObject: InventarModel;
   public raumStatus: RaumStatus;
 
-  public kundeName = '';
-  public adresse ? = '';
-  public raumNr?: string;
+  private clientID: number;
+  private buildingID: number;
+  private routingSubscription: any;
 
-  constructor() { }
+  constructor(
+    private route: ActivatedRoute,
+    private dataService: DataService) {}
 
   ngOnInit() {
+    this.routingSubscription = this.route.params.subscribe(params => {
+      this.clientID = parseInt( params.clientid,  10 );
+      this.buildingID = parseInt( params.buildingid, 10 );
 
+      this.kunde = this.dataService.getClient( this.clientID );
+      this.gebaeude = this.dataService.getBuilding( this.buildingID, this.clientID );
+      console.log({params, kunde: this.kunde, gebaeude: this.gebaeude });
+    });
+  }
+
+  get kundeName(): string {
+    return this.kunde ? this.kunde.Mandant : '';
+  }
+
+  get adresse(): string {
+    return this.gebaeude ? this.gebaeude.Gebaeude : '';
+  }
+
+  get raumNr(): string {
+    return this.raum ? this.raum.nr : '';
+  }
+
+  ngOnDestroy(): void {
+    this.routingSubscription.unsubscribe();
   }
 
 }

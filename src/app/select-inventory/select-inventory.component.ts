@@ -1,16 +1,17 @@
-import {Component, OnInit, ViewChild} from '@angular/core';
+import {Component, OnDestroy, OnInit, ViewChild} from '@angular/core';
 import { ClientModel   } from '../inventory/models/client.model';
 import { BuildingModel } from '../inventory/models/building.model';
 import { DataService   } from '../inventory/service/data.service';
 import {EventService} from '../event.service';
 import {NgForm} from '@angular/forms';
+import {ActivatedRoute, Router} from '@angular/router';
 
 @Component({
   selector: 'app-select-inventory',
   templateUrl: './select-inventory.component.html',
   styleUrls: ['./select-inventory.component.scss']
 })
-export class SelectInventoryComponent implements OnInit {
+export class SelectInventoryComponent implements OnInit, OnDestroy {
 
   @ViewChild('f', {static: false })
   selectForm: NgForm;
@@ -24,7 +25,13 @@ export class SelectInventoryComponent implements OnInit {
   private clients: ClientModel[];
   private buildings: BuildingModel[];
 
-  constructor(private dataService: DataService, private eventService: EventService) {}
+  private routingSubscription: any;
+
+  constructor(
+    private dataService: DataService,
+    private eventService: EventService,
+    private route: ActivatedRoute,
+    private router: Router) {}
 
   get progressAmount(): number {
     if (typeof this.doneElements !== 'number' || this.doneElements <= 0) {
@@ -40,6 +47,14 @@ export class SelectInventoryComponent implements OnInit {
 
   ngOnInit() {
     this.clients = this.dataService.getClientList();
+
+    this.routingSubscription = this.route.params.subscribe(params => {
+      console.log({params});
+    });
+  }
+
+  ngOnDestroy() {
+    this.routingSubscription.unsubscribe();
   }
 
   clientChanged(clientIdx) {
@@ -51,9 +66,18 @@ export class SelectInventoryComponent implements OnInit {
 
   onSubmit() {
     console.log( this.selectForm );
+
+    // Simple Way to navigate
+    this.router.navigateByUrl( '/form-inventory');
+
+    // More Control for navigate
+    this.router.navigate( [
+      '/form-inventory', this.client.mid, this.building.gid
+    ]);
   }
 
-  buildingChanged(building: BuildingModel) {
+  buildingChanged(buildingListIdx: number) {
+    this.building = this.buildings[ buildingListIdx ];
   }
 
 }

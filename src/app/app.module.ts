@@ -28,9 +28,9 @@ const appRoutes: Routes = [
   { path: 'auth', component: AuthComponent },
   { path: 'test', component: TestComponent },
   { path: 'select-inventory', component: SelectInventoryComponent },
-  { path: 'form-inventory', component: InventFormComponent }
+  { path: 'form-inventory/:clientid/:buildingid', component: InventFormComponent }
 ];
-
+//,  { path: '**', component: NotFoundComponent }
 
 @NgModule({
   declarations: [
