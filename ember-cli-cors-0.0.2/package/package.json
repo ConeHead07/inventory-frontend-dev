@@ -1,0 +1,32 @@
+{
+  "name": "ember-cli-cors",
+  "version": "0.0.3",
+  "directories": {
+    "doc": "doc",
+    "test": "tests"
+  },
+  "scripts": {
+    "build": "ember build",
+    "start": "ember server",
+    "test": "ember try:testall"
+  },
+  "engines": {
+    "node": ">= 0.10.0"
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {},
+  "description": "Sets the Access-Control-Allow-Origin header of all resources to *.",
+  "keywords": [
+    "ember-addon"
+  ],
+  "dependencies": {},
+  "ember-addon": {
+    "configPath": "tests/dummy/config",
+    "before": [
+      "serve-files-middleware",
+      "history-support-middleware",
+      "proxy-server-middleware"
+    ]
+  }
+}

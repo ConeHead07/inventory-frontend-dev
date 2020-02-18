@@ -1,0 +1,49 @@
+
+
+<form (ngSubmit)="onSubmit()" #f="ngForm">
+
+  <div class="form-group">
+    <label for="ctrlKunde">Auswahl KundeModel</label>
+    <select
+        class="form-control"
+        id="client"
+        name="client"
+        ngModel
+        (change)="clientChanged($event.target.value)"
+        required>
+      <option *ngFor="let _client of clients; let i = index" [attr.data-index]="i" [value]="i">
+        {{ _client.Mandant }}
+      </option>
+    </select>
+  </div>
+
+  <div>{{ client?.Mandant }}</div>
+
+  <div class="form-group">
+    <label for="ctrlStandort">Auswahl Standort</label>
+
+    <select
+      class="form-control"
+      id="building"
+      name="building"
+      ngModel
+      (change)="buildingChanged($event.target.value)"
+      required>
+      <option *ngFor="let _bldg of buildings; let i = index" [attr.data-index]="i" [value]="i">{{_bldg.Gebaeude}}</option>
+    </select>
+  </div>
+
+  <div class="form-group">
+    <app-progressbar [title]="'Anzahl Elemente'" [value]="45.5" [total]="145"></app-progressbar>
+  </div>
+
+  <div class="row">
+    <div class="col col-sm-6 offset-sm-6">
+      <button [disabled]="false && !f.valid" class="btn btn-primary w-100">Starten</button>
+  </div>
+  </div>
+</form>
+
+
+
+<div style="display: none"><p>select-inventory works!</p></div>

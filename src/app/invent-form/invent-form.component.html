@@ -1,0 +1,55 @@
+<p>invent-form works!</p>
+<div class="row">
+  <div class="form-group col-4">
+    <label for="kunde">KundeModel</label>
+    <input id="kunde" class="form-control" [readOnly]="true" [attr.value]="kundeName">
+  </div>
+  <div class="form-group col-4">
+    <label for="adresse">Adresse</label>
+    <input id="adresse" class="form-control" [readOnly]="true" [attr.value]="adresse">
+  </div>
+  <div class="form-group col-4">
+    <label for="raum">Raum</label>
+    <input id="raum" class="form-control" [readOnly]="true" [attr.value]="raumNr">
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-6">
+    <app-progressbar [shortTitle]="'Gesamt'" [title]="'Fortschrittsanzeige gesamt'" [value]="45.5" [total]="145"></app-progressbar>
+  </div>
+  <div class="col-6">
+    <app-progressbar [shortTitle]="'Raum'"  [title]="'Fortschrittsanzeige Raum'" [value]="45.5" [total]="145"></app-progressbar>
+  </div>
+</div>
+
+<div class="form-group row">
+    <label for="raumNr" class="col-3 col-sm-3 col-md-2 col-lg-2">Raum-Nr</label>
+    <div class="col">
+      <input  id="raumNr" type="text" class="form-control">
+    </div>
+</div>
+<div class="form-group row">
+    <label for="raumBez" class="col-3 col-sm-3 col-md-2 col-lg-2">Raum-Bez.</label>
+    <div class="col">
+      <input  id="raumBez" type="text" class="form-control">
+    </div>
+</div>
+<div class="form-group row">
+    <label for="elmBarcode" class="col-3 col-sm-3 col-md-2 col-lg-2">Barcode</label>
+    <div class="col">
+      <input  id="elmBarcode" readonly type="text" class="form-control">
+    </div>
+</div>
+<div class="form-group row">
+    <label for="elmArtBez" class="col-3 col-sm-3 col-md-2 col-lg-2">Artike-Bez.</label>
+    <div class="col">
+      <input  id="elmArtBez" type="text" class="form-control">
+    </div>
+</div>
+<div class="form-group row">
+    <label for="elmArtTyp" class="col-3 col-sm-3 col-md-2 col-lg-2">Artikel-Typ</label>
+    <div class="col">
+      <input  id="elmArtTyp" type="text" class="form-control">
+    </div>
+</div>

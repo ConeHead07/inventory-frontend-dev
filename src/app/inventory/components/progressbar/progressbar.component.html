@@ -1,0 +1,26 @@
+<label>
+  <span class="d-none d-md-inline">{{title}}: </span>
+  <span class="d-inline d-md-none">{{short}}: </span>
+  {{totalText}}
+</label>
+<div>
+
+  <div class="progress progress-elemente" [ngClass]="{'bg-danger' : total > 0}">
+    <div class="progress-bar bg-success" [ngClass]="type" role="progressbar" [style.width]="progressAmount + '%'">
+    </div>
+    <span class="progress-text">{{donePercentText}}</span>
+  </div>
+
+  <div class="row">
+    <div class="col-6 text-success">
+      <span class="d-none d-md-inline">
+        Erledigt </span>{{doneAmountText}}
+    </div>
+    <div class="col-6 text-danger text-right">
+      <span class="d-none d-md-inline">
+        Rest </span>{{restAmountText}}
+    </div>
+  </div>
+
+</div>
+

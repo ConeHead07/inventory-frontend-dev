@@ -1,0 +1,28 @@
+{
+  'user' : [
+    { 'uid':  1, 'user':  'admin' },
+    { 'uid':  2, 'user':  'frank' }
+  ],
+
+  'kunden': [
+    { 'mid':  1, 'firma':  'AXA'}
+  ],
+
+  'gebaeude': [
+
+  ],
+
+  'raeume': [
+
+  ],
+
+  'objekte': [
+
+  ],
+
+  'global': {
+    'katalog': [
+
+    ]
+  }
+}
