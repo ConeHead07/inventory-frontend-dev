@@ -22,6 +22,10 @@ import { InventFormComponent } from './invent-form/invent-form.component';
 import { InventoryProgressDirective } from './inventory-progress.directive';
 import { ProgressbarComponent } from './inventory/components/progressbar/progressbar.component';
 import {AuthInterceptorService} from "./auth/auth-interceptor.service";
+import { SelectCreateRaumComponent } from './invent-form/modals/select-create-raum/select-create-raum.component';
+import { SelectCreateArtikelComponent } from './invent-form/modals/select-create-artikel/select-create-artikel.component';
+import { CreateArtikelImageComponent } from './invent-form/modals/create-artikel-image/create-artikel-image.component';
+import { ShowArtikelImageComponent } from './invent-form/modals/show-artikel-image/show-artikel-image.component';
 
 const appRoutes: Routes = [
   { path: '', component: AuthComponent },
@@ -42,7 +46,11 @@ const appRoutes: Routes = [
     NgbheaderComponent,
     InventFormComponent,
     InventoryProgressDirective,
-    ProgressbarComponent
+    ProgressbarComponent,
+    SelectCreateRaumComponent,
+    SelectCreateArtikelComponent,
+    CreateArtikelImageComponent,
+    ShowArtikelImageComponent
   ],
   imports: [
     BrowserModule,

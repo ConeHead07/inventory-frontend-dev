@@ -55,7 +55,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
   }
 
   get raumNr(): string {
-    return this.raum ? this.raum.nr : '';
+    return this.raum ? this.raum.Raum : '';
   }
 
   ngOnDestroy(): void {
