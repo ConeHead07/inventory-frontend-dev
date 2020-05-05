@@ -1,1 +1,87 @@
-<p>select-create-artikel works!</p>
+<div class="modal-header p-0" style="padding:0.1rem">
+  <div class="btn-group row no-gutters w-100">
+    <button class="btn btn-primary col-10 text-left pl-3" (click)="showSearchForm($event)($event)">
+      <fa-icon [icon]="faSearch"></fa-icon> Artikel suchen
+    </button>
+    <button type="button" class="btn btn-danger col-2" (click)="activeModal.dismiss('Cross click')">
+      <span aria-hidden="true">&times;</span>
+    </button>
+  </div>
+</div>
+<div class="modal-header">
+  <h4 class="modal-title" id="modal-basic-title">Neuen Artikel anlegen</h4>
+</div>
+<div class="modal-body">
+  <form #myForm="ngForm">
+    <div class="form-group" [ngClass]="{
+        'has-error': bezeichnung.dirty && (bezeichnung.invalid || bezeichnungExistsStatus === 1),
+        'has-info': bezeichnung.dirty && bezeichnungExistsStatus === -1
+        }">
+      <label for="Bezeichnung">Artike-Bez: </label>
+      <div class="input-group">
+        <input id="Bezeichnung" class="form-control" placeholder="Bezeichnung"
+               name="Bezeichnung"
+               [(ngModel)]="artikelDaten.Bezeichnung"
+               #bezeichnung="ngModel"
+               (change)="checkIfArtikelExistsGlobal()"
+               required
+        >
+      </div>
+      <div *ngIf="bezeichnung.valid">
+        <div *ngIf="bezeichnungExistsStatus===-1" class="help-block">Artikelngabe wird geprüft</div>
+        <div *ngIf="bezeichnungExistsStatus===1" class="help-block">Artikel existiert bereits</div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="typ">Artikel-Typ: </label>
+      <div class="input-group">
+        <input id="typ" class="form-control" placeholder="Typ"
+               name="typ"
+               [(ngModel)]="artikelDaten.Typ"
+               #typ="ngModel"
+        >
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="Hersteller">Hersteller: </label>
+      <div class="input-group">
+        <input id="Hersteller" class="form-control" placeholder="Hersteller"
+               name="Hersteller"
+               [(ngModel)]="artikelDaten.Hersteller"
+               #typ="ngModel"
+        >
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="Groesse">Abmessungen: </label>
+      <div class="input-group">
+        <input id="Groesse" class="form-control" placeholder="Groesse"
+               name="Groesse"
+               [(ngModel)]="artikelDaten.Groesse"
+               #typ="ngModel"
+        >
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="Farbe">Farbe: </label>
+      <div class="input-group">
+        <input id="Farbe" class="form-control" placeholder="Farbe"
+               name="Farbe"
+               [(ngModel)]="artikelDaten.Farbe"
+               #typ="ngModel"
+        >
+      </div>
+    </div>
+  </form>
+  <p>select-create-artikel works!</p>
+  <pre>{{closeResult}}</pre>
+</div>
+<div class="modal-footer">
+  <button type="button" class="btn btn-outline-dark" (click)="activeModal.close('Close click')">Close</button>
+  <button type="button" class="btn btn-outline-dark" (click)="onSubmit($event)" [disabled]="!formIsValid || !myForm.form.valid">Artikel anlegen</button>
+  <div *ngIf="formError" class="alert-danger"> {{formError}} </div>
+</div>

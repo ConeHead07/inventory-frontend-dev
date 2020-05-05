@@ -17,6 +17,9 @@ export class AuthComponent implements OnInit {
   @Input() username: string;
   @Input() password: string;
 
+  @Input() onlineStatusMessage: string;
+  @Input() onlineStatus: string;
+
   public form = {
     email: null,
     password: null,
@@ -29,16 +32,22 @@ export class AuthComponent implements OnInit {
   }
 
   onLoginSubmit() {
-    console.log('onLoginSubmit', this.form);
+    console.log('onLoginSubmit #32', this.form);
 
     let authObs: Observable<AuthResponseData>;
 
     let url = '';
     const email = this.form.email;
     const password = this.form.password;
-    url = 'http://127.0.0.1:8040/auth/login/';
+    const originDomain = (window && window.location && window.location.origin)
+      ? window.location.origin.split(':').slice(0, 2).join(':')
+      : 'http://127.0.0.1';
+
+    url = originDomain + ':8040/auth/login/';
+    console.log('onLoginSubmit #44', { url });
 
     authObs = this.authService.login(email, password);
+    console.log('onLoginSubmit #47', { url });
 
     this.isLoading = true;
     authObs.subscribe(
@@ -55,6 +64,7 @@ export class AuthComponent implements OnInit {
         this.isLoading = false;
       }
     );
+    console.log('onLoginSubmit #63', { url });
   }
 
 }

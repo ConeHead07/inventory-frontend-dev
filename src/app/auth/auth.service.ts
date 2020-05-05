@@ -2,18 +2,19 @@ import { Injectable } from '@angular/core';
 import {HttpClient, HttpErrorResponse} from '@angular/common/http';
 import {Router} from '@angular/router';
 import {catchError, tap } from 'rxjs/operators';
-import { throwError, BehaviorSubject} from 'rxjs';
+import { throwError } from 'rxjs';
 
 import { User } from './user.model';
+import {BasedataService} from '../basedata.service';
 
 export interface AuthResponseData {
   kind: string;
-  idToken: string;
+  auth_identifier: number;
+  access_token: string;
+  expires_in: number;
   email: string;
   refreshToken: string;
-  expiresIn: string;
-  localId: string;
-  registered?: boolean;
+  clientDeviceId: number;
 }
 
 @Injectable({
@@ -21,19 +22,30 @@ export interface AuthResponseData {
 })
 export class AuthService {
 
-  user = new BehaviorSubject<User>(null);
+  user = null;
 
-  private url = 'http://127.0.0.1:8040/auth/login/';
+  private url = ':8040/auth/login/';
 
-  constructor(private http: HttpClient, private router: Router) {}
+  constructor(private http: HttpClient, private router: Router, private baseData: BasedataService) {
+
+    console.log('#29 AuthService.constructor', 'this.url: ', this.url);
+    const originDomain = (window && window.location && window.location.origin)
+      ? window.location.origin.split(':').slice(0, 2).join(':')
+      : 'http://127.0.0.1';
+
+    this.url = originDomain + this.url;
+    console.log('#34 AuthService.constructor', {originDomain}, 'this.url: ', this.url);
+  }
 
   login(email: string, password: string) {
+    console.log('#37 AuthService.login', {email, password}, 'this.url: ', this.url);
     return this.http.post<AuthResponseData>(
       this.url,
       {
         email,
         password,
-        returnSecureToken: true
+        returnSecureToken: true,
+        clientDeviceId: this.getClientDeviceId()
       }
     )
       .pipe(
@@ -42,28 +54,61 @@ export class AuthService {
           console.log('AuthService.login', {resData});
           this.handleAuthentication(
             email,
-            resData.localId,
-            resData.idToken,
-            +resData.expiresIn
+            resData.auth_identifier,
+            resData.access_token,
+            +resData.expires_in,
+            +resData.clientDeviceId
           );
         })
       );
   }
 
-
-
   private handleAuthentication(
     email: string,
-    userId: string,
+    userId: number,
     token: string,
-    expiresIn: number
+    expiresIn: number,
+    clientDeviceId: number
   ) {
-    console.log('AuthService.handleAuthentication', {email, userId, token, expiresIn});
     const expirationDate = new Date(new Date().getTime() + expiresIn * 1000);
-    const user = new User(email, userId, token, expirationDate);
-    this.user.next(user);
-    // this.autoLogout(expiresIn * 1000);
-    localStorage.setItem('userData', JSON.stringify(user));
+    this.user = new User(email, userId, token, expirationDate);
+
+    this.setUserData( this.user );
+    this.setClientDeviceId( clientDeviceId );
+  }
+
+  private setUserData(userData: User): void {
+    this.baseData.setCurrentUser( this.user );
+    localStorage.setItem('userData', JSON.stringify(userData));
+  }
+
+  public setClientDeviceId(devid: number): void {
+    this.baseData.setCurrentDevice( devid );
+  }
+
+  public getClientDeviceId(): number {
+    return this.baseData.getCurrentDeviceId() || 0;
+  }
+
+  public getUser(): User | null {
+    if (this.user instanceof User) {
+      return this.user;
+    }
+
+    const userData = JSON.parse( localStorage.getItem('userData') );
+
+    if (userData && 'email' in userData && 'id' in userData && 'uToken' in userData && 'uTokenExpirationDate' in userData) {
+      return new User(userData.email, userData.id, userData.uToken, userData.uTokenExpirationDate);
+    }
+
+    return null;
+  }
+
+  public getUserToken(): string {
+    if (this.user instanceof User) {
+      return this.user.token;
+    }
+    return '';
   }
 
   private handleError(errorRes: HttpErrorResponse) {

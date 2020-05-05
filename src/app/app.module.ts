@@ -21,20 +21,42 @@ import { NgbheaderComponent } from './ngbheader/ngbheader.component';
 import { InventFormComponent } from './invent-form/invent-form.component';
 import { InventoryProgressDirective } from './inventory-progress.directive';
 import { ProgressbarComponent } from './inventory/components/progressbar/progressbar.component';
-import {AuthInterceptorService} from "./auth/auth-interceptor.service";
+import { AuthInterceptorService } from './auth/auth-interceptor.service';
 import { SelectCreateRaumComponent } from './invent-form/modals/select-create-raum/select-create-raum.component';
 import { SelectCreateArtikelComponent } from './invent-form/modals/select-create-artikel/select-create-artikel.component';
 import { CreateArtikelImageComponent } from './invent-form/modals/create-artikel-image/create-artikel-image.component';
 import { ShowArtikelImageComponent } from './invent-form/modals/show-artikel-image/show-artikel-image.component';
+import { SelectSearchRaumComponent } from './invent-form/modals/select-search-raum/select-search-raum.component';
+import { SelectSearchArtikelComponent } from './invent-form/modals/select-search-artikel/select-search-artikel.component';
+import { ApiService } from './api.service';
+import { StatusCheckComponent } from './status-check/status-check.component';
+
+// Scanner-Detection
+import { ScannerDetectionModule } from 'ngx-scanner-detection';
+
+// the scanner
+import { ZXingScannerModule } from '@zxing/ngx-scanner';
+import { ScannerComponent } from './invent-form/modals/scanner/scanner.component';
+import { ScannerinputDirective } from './scannerinput.directive';
+import { ScannerdetectionComponent } from './inventory/components/scannerdetection/scannerdetection.component';
+
 
 const appRoutes: Routes = [
   { path: '', component: AuthComponent },
   { path: 'auth', component: AuthComponent },
   { path: 'test', component: TestComponent },
   { path: 'select-inventory', component: SelectInventoryComponent },
-  { path: 'form-inventory/:clientid/:buildingid', component: InventFormComponent }
+  { path: 'form-inventory/:clientid/:buildingid', component: InventFormComponent },
+  { path: 'form-inventory/:clientid/:buildingid/:roomid', component: InventFormComponent }
 ];
-//,  { path: '**', component: NotFoundComponent }
+
+async function persist() {
+  return navigator.storage && navigator.storage.persist && await navigator.storage.persist();
+}
+if ('localStorage' in window && localStorage.getItem('ClientDeviceId') === null) {
+  localStorage.setItem('ClientDeviceId', JSON.stringify(0) );
+}
+persist();
 
 @NgModule({
   declarations: [
@@ -50,7 +72,13 @@ const appRoutes: Routes = [
     SelectCreateRaumComponent,
     SelectCreateArtikelComponent,
     CreateArtikelImageComponent,
-    ShowArtikelImageComponent
+    ShowArtikelImageComponent,
+    ScannerComponent,
+    ScannerinputDirective,
+    ScannerdetectionComponent,
+    SelectSearchRaumComponent,
+    SelectSearchArtikelComponent,
+    StatusCheckComponent
   ],
   imports: [
     BrowserModule,
@@ -58,14 +86,25 @@ const appRoutes: Routes = [
     NgbModule,
     HttpClientModule,
     RouterModule.forRoot( appRoutes ),
-    FontAwesomeModule
+    FontAwesomeModule,
+    ZXingScannerModule
+  ],
+  entryComponents: [
+    CreateArtikelImageComponent,
+    ShowArtikelImageComponent,
+    ScannerComponent,
+    SelectCreateArtikelComponent,
+    SelectCreateRaumComponent,
+    SelectSearchRaumComponent,
+    SelectSearchArtikelComponent
   ],
   providers: [
     {
       provide: HTTP_INTERCEPTORS,
       useClass: AuthInterceptorService,
       multi: true
-    }
+    },
+    ApiService
   ],
   bootstrap: [AppComponent]
 })
@@ -74,6 +113,6 @@ export class AppModule {
   constructor() {
     library.add( faSquare, faCheckSquare, faBarcode, faUser, faKey,
       farSquare, farCheckSquare,
-      faStackOverflow, faGithub, faMedium)
+      faStackOverflow, faGithub, faMedium);
   }
 }

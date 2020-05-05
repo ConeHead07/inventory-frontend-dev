@@ -1,2403 +1,432 @@
-import { Injectable } from '@angular/core';
-import { ClientModel } from '../models/client.model';
-import { BuildingModel } from '../models/building.model';
+import {Injectable} from '@angular/core';
+import {ApiService} from '../../api.service';
+import {
+  DBDIArtikel,
+  DBDIGebaeude,
+  DBDIInventar,
+  DBDIInventuren,
+  DBDIInventurenUser,
+  DBDIMandanten,
+  DBDIObjektKatalogGlobal,
+  DBDIObjektKatalogMandant,
+  DBDIRaeume,
+  DBDIRaumGebaeude,
+  DexieService,
+  IUnionLookupAssignedObject,
+  LookupAssignedInventar, LookupAssignedRoom,
+  LookupNoMatches,
+  LookupResultType
+} from '../../dexie.service';
+import {User} from '../../auth/user.model';
+import {ConnectionService, ConnectionState} from '../../connection-service.service';
 
+export interface LoadApiDataResult {
+  success: boolean;
+  errorMsg?: string;
+  total?: number;
+  inserts?: number;
+  debug?: any;
+}
+
+export interface InventarData {
+  inventar: DBDIInventar;
+  artikelRef: DBDIObjektKatalogMandant;
+  artikelData: DBDIObjektKatalogGlobal;
+}
+
+export enum InventarDataResultError {
+  InventarNotFound = 1,
+  ArtikelRefNotFound,
+  ArtikelDataNotFound
+}
+
+export interface InventarDataResult {
+  success: boolean;
+  errorMsg?: string;
+  errorCode?: InventarDataResultError;
+  inventarData?: InventarData;
+}
+
+export interface ApiCollectionDataResponse<T> {
+  rows: T[];
+}
 @Injectable({
   providedIn: 'root'
 })
 export class DataService {
 
-  constructor() { }
+  currentState: ConnectionState;
 
-  public function;
+  constructor(
+    private api: ApiService,
+    private dexie: DexieService,
+    private connectionService: ConnectionService) {
+    this.currentState = connectionService.getCurrentState();
+    this.connectionService.monitor().subscribe((currentState: ConnectionState) => {
+      console.log('#43 DataService network status has changed', { currentState });
+      this.currentState = currentState;
+    });
+  }
+
   getSelectedRoom() {
 
   }
 
-  getClient(clientID: number): ClientModel | null {
-    const clients = this.getClientList();
+  async getUserAssignedInventories(uid: number): Promise<DBDIInventuren[]>  {
+    console.log('#52 getUserAssignedInventories loadUserAssignedInventories');
+    let userInventuren: DBDIInventuren[] = [];
+
+    if (this.currentState.hasInternetAccess) {
+      console.log('#56 getUserAssignedInventories loadUserAssignedInventories');
+      await this.loadUserAssignedInventories();
+    } else {
+      console.log(
+        '#59 getUserAssignedInventories no InternetAccess. Cannot call loadUserAssignedInventories',
+        { 'this.currentState': this.currentState, 'this.currentState.hasInternetAccess': this.currentState.hasInternetAccess });
+    }
+
+    await Promise.all([
+      this.dexie.inventuren.toArray(),
+      this.dexie.inventurenUser.where('uid').equals(uid).toArray()
+    ]).then( (results) => {
+      const inv = results[0];
+      const jobids = results[1].map( (itm) => itm.jobid );
+
+      userInventuren = inv.filter( (itm) => jobids.indexOf(itm.jobid) !== -1 );
+      console.log('#72 getUserAssignedInventories', { inv, jobids, userInventuren } );
+    });
+    return userInventuren;
+  }
+
+
+  loadInventurSelection() {
+
+  }
+
+  async loadUserAssignedInventories(): Promise<boolean>  {
+    let meAuthUser: User;
+    let inventurenUser: DBDIInventurenUser[] = [];
+
+    // jobidsByAuthUser
+    await Promise.all([
+      this.api.get<any>( 'auth/me').toPromise().then( (usr: User) => {
+        meAuthUser = usr;
+      }),
+      this.api.get<DBDIInventurenUser[]>( 'api/inventur/jobidsByAuthUser').toPromise().then( (list: DBDIInventurenUser[]) => {
+        inventurenUser = list;
+      }),
+      this.api.get<DBDIMandanten[]>( 'api/inventur/clientsByAuthUser').toPromise().then( (list: DBDIMandanten[]) => {
+        list.forEach( item => {
+          console.log('add mandant to db', { item});
+          this.dexie.mandanten.put( item );
+        });
+      }),
+      this.api.get<DBDIGebaeude[]>( 'api/inventur/gebaeudeByAuthUser').toPromise().then( (list: DBDIGebaeude[]) => {
+        list.forEach( item => {
+          console.log('add gebaeude to db', { item});
+          this.dexie.gebaeude.put( item );
+        });
+      }),
+      this.api.get<DBDIInventuren[]>( 'api/inventur/listByAuthUser').toPromise().then( (list: DBDIInventuren[]) => {
+        list.forEach( (item: DBDIInventuren) => {
+          this.dexie.inventuren.put(item);
+        });
+      })
+    ]);
+
+    await this.dexie.inventurenUser.where('uid').equals(meAuthUser.id).delete();
+    inventurenUser.forEach( (item: DBDIInventurenUser) => {
+      this.dexie.inventurenUser.add(item);
+    });
+
+    return true;
+  }
+
+  async loadClientList(): Promise<any> {
+    return this.api.get<any>( 'api/mandant').subscribe( (list: DBDIMandanten[]) => {
+      console.log( 'SelectInventoryComponent', 'loadClientList', {list });
+
+      this.dexie.mandanten.clear();
+      list.forEach( (item: DBDIMandanten) => {
+        console.log({ called: 'loadClientList', item });
+        this.dexie.mandanten.put(item);
+      });
+    });
+  }
+
+  async loadGebaeudeListByClientId(mid: number): Promise<boolean> {
+    await this.api.get<any>( 'api/mandant/' + mid + '/gebaeude').subscribe( (list: DBDIGebaeude[]) => {
+      console.log( 'SelectInventoryComponent', 'loadClientList', {list });
+
+      this.dexie.gebaeude.where('mid').equals(mid)
+        .delete()
+        .then( () => {
+          list.forEach( async (item: DBDIGebaeude) => {
+            console.log({ called: 'loadGebaeudeList', item });
+            await this.dexie.gebaeude.put(item);
+          });
+        });
+    });
+
+    return true;
+  }
+
+  loadRaeumeListByGebaeudeId(gid: number): void {
+    this.api.get<any>( 'api/gebaeude/' + gid + '/raeume').subscribe( (list: DBDIRaeume[]) => {
+      console.log( 'SelectInventoryComponent', 'loadClientList', {list });
+
+      this.dexie.raeume.where('gid').equals(gid).delete();
+      list.forEach( (item: DBDIRaeume) => {
+        console.log({ called: 'loadClientList', item });
+        this.dexie.raeume.put(item);
+      });
+    });
+  }
+
+  loadInventar(gid: number): void {
+    this.api.get<any>( 'api/gebaeude/' + gid + '/raeume').subscribe( (list: DBDIRaeume[]) => {
+      console.log( 'SelectInventoryComponent', 'loadClientList', {list });
+
+      this.dexie.raeume.where('gid').equals(gid).delete();
+      list.forEach( (item: DBDIRaeume) => {
+        console.log({ called: 'loadClientList', item });
+        this.dexie.raeume.put(item);
+      });
+    });
+  }
+
+  async loadInventurDataByInventurId(id: number): Promise<LoadApiDataResult[]> {
+    const tables = {
+      gebaeude: 'pending',
+      raeume: 'pending',
+      inventar: 'pending',
+      objektkatalogglobal: 'pending',
+      objektkatalogmandant: 'pending'
+    };
+    const tblStatus = (table, status) => {
+      tables[ table ] = status;
+      console.log( tables );
+    };
+
+    return await Promise.all([
+      this.loadTableDataByUrl<DBDIGebaeude>( 'gebaeude', `api/inventur/${id}/gebaeude`, tblStatus),
+      this.loadTableDataByUrl<DBDIRaeume>( 'raeume', `api/inventur/${id}/raeume`, tblStatus),
+      this.loadTableDataByUrl<DBDIInventar>( 'inventar', `api/inventur/${id}/inventar`, tblStatus),
+      this.loadTableDataByUrl<DBDIObjektKatalogGlobal>( 'objektKatalogGlobal', `api/inventur/${id}/katalog`, tblStatus),
+      this.loadTableDataByUrl<DBDIObjektKatalogMandant>( 'objektKatalogMandant', `api/inventur/${id}/artikelids`, tblStatus)
+    ]);
+  }
+
+  async loadTableDataByUrl<T>(table: string, url: string, cbTblStatus?: any, options?: object): Promise<LoadApiDataResult> {
+    if (cbTblStatus) {
+      cbTblStatus(table, 'downloading');
+    }
+
+    console.log({ function: 'loadTableDataByUrl', table, url, cbTblStatus, options });
+
+    return await this.api.get<any>( url).toPromise().then( (data: ApiCollectionDataResponse<T>) => {
+      console.log( 'Retrieved Data ', table, ' for processing!');
+      if (cbTblStatus) {
+        cbTblStatus(table, 'process import ' + data.rows.length );
+        cbTblStatus(table, 'total: ' + data.rows.length );
+      }
+
+      let inserts = 0;
+      const total = data.rows.length;
+      const stepSize = parseInt((data.rows.length / 10).toString(), 10);
+
+      data.rows.forEach( (item: T, i) => {
+        if (table === 'raeume') {
+          console.log({ called: 'load item' + table, item });
+        }
+        if (  ( ( i + 1 ) % stepSize === 0 || (i + 1) === total) && cbTblStatus ) {
+          cbTblStatus(table, i + 1);
+        }
+        this.dexie.table( table ).put(item);
+        inserts += 1;
+      });
+      console.log( 'Finished Importprocess Data ', table );
+
+      if (cbTblStatus) {
+        cbTblStatus(table, 'finished');
+      }
+
+      return {
+        success: true,
+        errorMsg: '',
+        total,
+        inserts
+      } as LoadApiDataResult;
+    });
+  }
+
+  async getClient(clientID: number): Promise<DBDIMandanten> | null {
+    const clients = await this.getClientList();
     const fclients = clients.filter( client => client.mid === clientID);
     console.log( { clientID, clients, fclients });
     return fclients.length ? fclients[0] : null;
   }
 
-  getBuilding(bldgID: number, clientID: number): BuildingModel | null {
-    const bldgs = this.getBuildingList(clientID);
+  async getBuilding(bldgID: number, clientID: number): Promise<DBDIGebaeude> | null {
+    const bldgs = await this.getBuildingList(clientID);
     const fbldgs = bldgs.filter( bldg => bldg.gid === bldgID);
     console.log( { bldgID, clientID, bldgs, fbldgs });
     return fbldgs.length ? fbldgs[0] : null;
   }
 
-  public getClientList(): ClientModel[] {
-
-    return [
-            {
-              mid: 1,
-              uid: 1400,
-              Mandant: 'Vodafone',
-              created_at: new Date(new Date('2020-02-01 21:38:44')),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: 0
-            },
-            {
-              mid: 3,
-              uid: 1100,
-              Mandant: 'Rheienergie',
-              created_at: new Date(new Date('2020-02-01 21:38:44')),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: 0
-            },
-            {
-              mid: 4,
-              uid: 1300,
-              Mandant: 'Manpower',
-              created_at: new Date(new Date('2020-02-01 21:38:44')),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: 0
-            },
-            {
-              mid: 5,
-              uid: 1200,
-              Mandant: 'APO Bank',
-              created_at: new Date(new Date('2020-02-01 21:38:44')),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: 0
-            },
-            {
-              mid: 6,
-              uid: 1500,
-              Mandant: 'Rheinmetall',
-              created_at: new Date(new Date('2020-02-01 21:38:44')),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: 0
-            },
-            {
-              mid: 10,
-              uid: 1600,
-              Mandant: 'APO-Data',
-              created_at: new Date(new Date('2020-02-05 08:27:00')),
-              modified_at: new Date(new Date('2020-02-01 21:43:36')),
-              created_uid: 0,
-              modified_uid: 0
-            },
-            {
-              mid: 11,
-              uid: 1000,
-              Mandant: 'RTL-Köln',
-              created_at: new Date(new Date('2020-02-05 08:27:00')),
-              modified_at: new Date(new Date('2020-02-01 21:43:36')),
-              created_uid: 0,
-              modified_uid: 0
-            },
-            {
-              mid: 12,
-              uid: 1700,
-              Mandant: 'Mertens',
-              created_at: new Date(new Date('2020-02-05 08:27:00')),
-              modified_at: new Date(new Date('2020-02-01 21:43:36')),
-              created_uid: 0,
-              modified_uid: 0
-            }
-    ];
+  async getClientList(): Promise<DBDIMandanten[]>  {
+    return await this.dexie.mandanten.toArray();
   }
 
-  getBuildingList(clientID: number): BuildingModel[] {
-    return [
-            {
-              gid: 1,
-              mid: 1,
-              Gebaeude: '11.1',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 2,
-              mid: 1,
-              Gebaeude: '11.3',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 3,
-              mid: 1,
-              Gebaeude: '11_1',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 4,
-              mid: 1,
-              Gebaeude: '11_2',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 5,
-              mid: 1,
-              Gebaeude: '12',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 6,
-              mid: 1,
-              Gebaeude: 'A',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 7,
-              mid: 1,
-              Gebaeude: 'B',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 8,
-              mid: 1,
-              Gebaeude: 'C',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 9,
-              mid: 1,
-              Gebaeude: 'Campus',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 10,
-              mid: 1,
-              Gebaeude: 'Hochhaus',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 11,
-              mid: 1,
-              Gebaeude: 'RHEINENERGIE',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 12,
-              mid: 2,
-              Gebaeude: 'Standard',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 13,
-              mid: 3,
-              Gebaeude: '10',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 14,
-              mid: 3,
-              Gebaeude: '11',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 15,
-              mid: 3,
-              Gebaeude: '11.1',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 16,
-              mid: 3,
-              Gebaeude: '11.2',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 17,
-              mid: 3,
-              Gebaeude: '11.3',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 18,
-              mid: 3,
-              Gebaeude: '11.3/E071.1S',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 19,
-              mid: 3,
-              Gebaeude: '11.4',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 20,
-              mid: 3,
-              Gebaeude: '11.5',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 21,
-              mid: 3,
-              Gebaeude: '11.6',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 22,
-              mid: 3,
-              Gebaeude: '11_1',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 23,
-              mid: 3,
-              Gebaeude: '11_2',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 24,
-              mid: 3,
-              Gebaeude: '11_3',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 25,
-              mid: 3,
-              Gebaeude: '11_4',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 26,
-              mid: 3,
-              Gebaeude: '11_5',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 27,
-              mid: 3,
-              Gebaeude: '11_6',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 28,
-              mid: 3,
-              Gebaeude: '12',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 29,
-              mid: 3,
-              Gebaeude: '13',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 30,
-              mid: 3,
-              Gebaeude: '14',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 31,
-              mid: 3,
-              Gebaeude: '20',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 32,
-              mid: 3,
-              Gebaeude: '21',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 33,
-              mid: 3,
-              Gebaeude: '22',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 34,
-              mid: 3,
-              Gebaeude: '23',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 35,
-              mid: 3,
-              Gebaeude: '24',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 36,
-              mid: 3,
-              Gebaeude: '30',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 37,
-              mid: 3,
-              Gebaeude: '31',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 38,
-              mid: 3,
-              Gebaeude: '32',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 39,
-              mid: 3,
-              Gebaeude: '33',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 40,
-              mid: 3,
-              Gebaeude: '33/A 110',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 41,
-              mid: 3,
-              Gebaeude: '34',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 42,
-              mid: 3,
-              Gebaeude: '35',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 43,
-              mid: 3,
-              Gebaeude: '36',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 44,
-              mid: 3,
-              Gebaeude: '38',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 45,
-              mid: 3,
-              Gebaeude: '38/E01',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 46,
-              mid: 3,
-              Gebaeude: '39',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 47,
-              mid: 3,
-              Gebaeude: '40',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 48,
-              mid: 3,
-              Gebaeude: '40/122',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 49,
-              mid: 3,
-              Gebaeude: '41',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 50,
-              mid: 3,
-              Gebaeude: '41/E 16',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 51,
-              mid: 3,
-              Gebaeude: '42',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 52,
-              mid: 3,
-              Gebaeude: '50',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 53,
-              mid: 3,
-              Gebaeude: '51',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 54,
-              mid: 3,
-              Gebaeude: '52',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 55,
-              mid: 3,
-              Gebaeude: '53',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 56,
-              mid: 3,
-              Gebaeude: '54',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 57,
-              mid: 3,
-              Gebaeude: '60',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 58,
-              mid: 3,
-              Gebaeude: '61',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 59,
-              mid: 3,
-              Gebaeude: '64',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 60,
-              mid: 3,
-              Gebaeude: '66',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 61,
-              mid: 3,
-              Gebaeude: '68',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 62,
-              mid: 3,
-              Gebaeude: '70',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 63,
-              mid: 3,
-              Gebaeude: '70/E02',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 64,
-              mid: 3,
-              Gebaeude: '81',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 65,
-              mid: 3,
-              Gebaeude: '83',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 66,
-              mid: 3,
-              Gebaeude: '99',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 67,
-              mid: 3,
-              Gebaeude: 'Außenflächen',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 68,
-              mid: 3,
-              Gebaeude: 'HLS131 42',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 69,
-              mid: 3,
-              Gebaeude: 'KUZ',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 70,
-              mid: 3,
-              Gebaeude: 'SSH',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 71,
-              mid: 3,
-              Gebaeude: 'Standard',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 72,
-              mid: 4,
-              Gebaeude: 'Aachen',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 73,
-              mid: 4,
-              Gebaeude: 'Aschaffenburg',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 74,
-              mid: 4,
-              Gebaeude: 'Augsburg',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 75,
-              mid: 4,
-              Gebaeude: 'Bautzen',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 76,
-              mid: 4,
-              Gebaeude: 'Berlin',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 77,
-              mid: 4,
-              Gebaeude: 'Biberach',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 78,
-              mid: 4,
-              Gebaeude: 'Bielefeld',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 79,
-              mid: 4,
-              Gebaeude: 'Brandenburg',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 80,
-              mid: 4,
-              Gebaeude: 'Braunschweig',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 81,
-              mid: 4,
-              Gebaeude: 'Bremen',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 82,
-              mid: 4,
-              Gebaeude: 'Chemnitz',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 83,
-              mid: 4,
-              Gebaeude: 'Coburg',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 84,
-              mid: 4,
-              Gebaeude: 'Cottbus',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 85,
-              mid: 4,
-              Gebaeude: 'Deggendorf',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 86,
-              mid: 4,
-              Gebaeude: 'Dessau',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 87,
-              mid: 4,
-              Gebaeude: 'Dortmund',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 88,
-              mid: 4,
-              Gebaeude: 'Dresden',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 89,
-              mid: 4,
-              Gebaeude: 'Düsseldorf',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 90,
-              mid: 4,
-              Gebaeude: 'Einbeck',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 91,
-              mid: 4,
-              Gebaeude: 'Eisenach',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 92,
-              mid: 4,
-              Gebaeude: 'Erfurt',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 93,
-              mid: 4,
-              Gebaeude: 'Eschborn',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 94,
-              mid: 4,
-              Gebaeude: 'Frankfurt a.M.',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 95,
-              mid: 4,
-              Gebaeude: 'Freiburg',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 96,
-              mid: 4,
-              Gebaeude: 'Friedberg',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 97,
-              mid: 4,
-              Gebaeude: 'Fulda',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 98,
-              mid: 4,
-              Gebaeude: 'Gießen',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 99,
-              mid: 4,
-              Gebaeude: 'Goslar',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 100,
-              mid: 4,
-              Gebaeude: 'Göttingen',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 101,
-              mid: 4,
-              Gebaeude: 'Halberstadt',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 102,
-              mid: 4,
-              Gebaeude: 'Haldensleben',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 103,
-              mid: 4,
-              Gebaeude: 'Halle',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 104,
-              mid: 4,
-              Gebaeude: 'Hamburg',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 105,
-              mid: 4,
-              Gebaeude: 'Hanau',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 106,
-              mid: 4,
-              Gebaeude: 'Hann. Múnden',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 107,
-              mid: 4,
-              Gebaeude: 'Hannover',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 108,
-              mid: 4,
-              Gebaeude: 'Heidelberg',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 109,
-              mid: 4,
-              Gebaeude: 'Heidenheim',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 110,
-              mid: 4,
-              Gebaeude: 'Heilbad Heiligenstad',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 111,
-              mid: 4,
-              Gebaeude: 'Henningsdorf',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 112,
-              mid: 4,
-              Gebaeude: 'Jena',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 113,
-              mid: 4,
-              Gebaeude: 'Karlsruhe',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 114,
-              mid: 4,
-              Gebaeude: 'Kassel',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 115,
-              mid: 4,
-              Gebaeude: 'Kaufbeuren',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 116,
-              mid: 4,
-              Gebaeude: 'Kempten',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 117,
-              mid: 4,
-              Gebaeude: 'Köln',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 118,
-              mid: 4,
-              Gebaeude: 'Lahr',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 119,
-              mid: 4,
-              Gebaeude: 'Landsberg',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 120,
-              mid: 4,
-              Gebaeude: 'Landshut',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 121,
-              mid: 4,
-              Gebaeude: 'Leipzig',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 122,
-              mid: 4,
-              Gebaeude: 'Lindenberg',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 123,
-              mid: 4,
-              Gebaeude: 'Ludwigsburg',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 124,
-              mid: 4,
-              Gebaeude: 'Lörrach',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 125,
-              mid: 4,
-              Gebaeude: 'Magdeburg',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 126,
-              mid: 4,
-              Gebaeude: 'Mainz',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 127,
-              mid: 4,
-              Gebaeude: 'Mannheim',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 128,
-              mid: 4,
-              Gebaeude: 'Memmingen',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 129,
-              mid: 4,
-              Gebaeude: 'München',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 130,
-              mid: 4,
-              Gebaeude: 'Nienburg',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 131,
-              mid: 4,
-              Gebaeude: 'Nordhausen',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 132,
-              mid: 4,
-              Gebaeude: 'Nürnberg',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 133,
-              mid: 4,
-              Gebaeude: 'Potsdam',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 134,
-              mid: 4,
-              Gebaeude: 'Rastatt',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 135,
-              mid: 4,
-              Gebaeude: 'Ravensburg',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 136,
-              mid: 4,
-              Gebaeude: 'Regensburg',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 137,
-              mid: 4,
-              Gebaeude: 'Rudolstadt',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 138,
-              mid: 4,
-              Gebaeude: 'Saarbrücken',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 139,
-              mid: 4,
-              Gebaeude: 'Schongau',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 140,
-              mid: 4,
-              Gebaeude: 'Schweinfurt',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 141,
-              mid: 4,
-              Gebaeude: 'Schwerin',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 142,
-              mid: 4,
-              Gebaeude: 'Standard',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 143,
-              mid: 4,
-              Gebaeude: 'Stuttgart',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 144,
-              mid: 4,
-              Gebaeude: 'Suhl',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 145,
-              mid: 4,
-              Gebaeude: 'Trier',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 146,
-              mid: 4,
-              Gebaeude: 'Ulm',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 147,
-              mid: 4,
-              Gebaeude: 'Wangen',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 148,
-              mid: 4,
-              Gebaeude: 'Wiesbaden',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 149,
-              mid: 4,
-              Gebaeude: 'Wolfsburg',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 150,
-              mid: 4,
-              Gebaeude: 'Worms',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 151,
-              mid: 4,
-              Gebaeude: 'Zwickau',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 152,
-              mid: 5,
-              Gebaeude: 'AWE00D0A1-',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 153,
-              mid: 5,
-              Gebaeude: 'AWE00D0A1-A114',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 154,
-              mid: 5,
-              Gebaeude: 'AWE00D0A1-A126',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 155,
-              mid: 5,
-              Gebaeude: 'AWE00D0A1-A130',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 156,
-              mid: 5,
-              Gebaeude: 'AWE00D0A1-A138',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 157,
-              mid: 5,
-              Gebaeude: 'AWE00D0A2-',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 158,
-              mid: 5,
-              Gebaeude: 'AWE00D0A3-',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 159,
-              mid: 5,
-              Gebaeude: 'AWE00D0A4-',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 160,
-              mid: 5,
-              Gebaeude: 'AWE00D0A4-A450',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 161,
-              mid: 5,
-              Gebaeude: 'AWE00D0A4-A453',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 162,
-              mid: 5,
-              Gebaeude: 'AWE00D0A4-A456',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 163,
-              mid: 5,
-              Gebaeude: 'AWE00D0AE-',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 164,
-              mid: 5,
-              Gebaeude: 'AWE00D0B1-',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 165,
-              mid: 5,
-              Gebaeude: 'AWE00D0B2-',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 166,
-              mid: 5,
-              Gebaeude: 'AWE00D0B2-B204',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 167,
-              mid: 5,
-              Gebaeude: 'AWE00D0B2-B208',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 168,
-              mid: 5,
-              Gebaeude: 'AWE00D0B2-B213',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 169,
-              mid: 5,
-              Gebaeude: 'AWE00D0B2-B251',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 170,
-              mid: 5,
-              Gebaeude: 'AWE00D0B2-B255',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 171,
-              mid: 5,
-              Gebaeude: 'AWE00D0B4-',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 172,
-              mid: 5,
-              Gebaeude: 'AWE00D0B4-B403',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 173,
-              mid: 5,
-              Gebaeude: 'AWE00D0B4-B406',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 174,
-              mid: 5,
-              Gebaeude: 'AWE00D0B4-B409',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 175,
-              mid: 5,
-              Gebaeude: 'AWE00D0B5-',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 176,
-              mid: 5,
-              Gebaeude: 'AWE00D0B5-B511',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 177,
-              mid: 5,
-              Gebaeude: 'AWE00D0B5-B513',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 178,
-              mid: 5,
-              Gebaeude: 'AWE00D0B5-B515',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 179,
-              mid: 5,
-              Gebaeude: 'AWE00D0B5-B524',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 180,
-              mid: 5,
-              Gebaeude: 'AWE00D0B5-B526',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 181,
-              mid: 5,
-              Gebaeude: 'AWE00D0B5-B529',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 182,
-              mid: 5,
-              Gebaeude: 'AWE00D0B5-B531',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 183,
-              mid: 5,
-              Gebaeude: 'AWE00D0B5-B540',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 184,
-              mid: 5,
-              Gebaeude: 'AWE00D0B5-B542',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 185,
-              mid: 5,
-              Gebaeude: 'AWE00D0B5-B545',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 186,
-              mid: 5,
-              Gebaeude: 'AWE00D0B5-B548',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 187,
-              mid: 5,
-              Gebaeude: 'AWE00D0BE-',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 188,
-              mid: 5,
-              Gebaeude: 'AWE00D0C1-',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 189,
-              mid: 5,
-              Gebaeude: 'AWE00D0C2-',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 190,
-              mid: 5,
-              Gebaeude: 'AWE00D0C3-',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 191,
-              mid: 5,
-              Gebaeude: 'AWE00D0C3-C308',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 192,
-              mid: 5,
-              Gebaeude: 'AWE00D0C3-C310',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 193,
-              mid: 5,
-              Gebaeude: 'AWE00D0C3-C316',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 194,
-              mid: 5,
-              Gebaeude: 'AWE00D0C4-',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 195,
-              mid: 5,
-              Gebaeude: 'AWE00D0C6-',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 196,
-              mid: 5,
-              Gebaeude: 'AWE00D0CE-',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 197,
-              mid: 5,
-              Gebaeude: 'AWE00D0D1-',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 198,
-              mid: 5,
-              Gebaeude: 'AWE00D0D2-',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 199,
-              mid: 5,
-              Gebaeude: 'AWE00D0D2-D210',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 200,
-              mid: 5,
-              Gebaeude: 'AWE00D0D3-',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 201,
-              mid: 5,
-              Gebaeude: 'AWE00D0D3-D352',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 202,
-              mid: 5,
-              Gebaeude: 'AWE00D0D3-D359',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 203,
-              mid: 5,
-              Gebaeude: 'AWE00D0D3-D366',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 204,
-              mid: 5,
-              Gebaeude: 'AWE00D0D4-',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 205,
-              mid: 5,
-              Gebaeude: 'AWE00D0D4-D425',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 206,
-              mid: 5,
-              Gebaeude: 'AWE00D0DE-',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 207,
-              mid: 5,
-              Gebaeude: 'AWE00D0E1-',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 208,
-              mid: 5,
-              Gebaeude: 'AWE00D0E2-',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 209,
-              mid: 5,
-              Gebaeude: 'AWE00D0E3-',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 210,
-              mid: 5,
-              Gebaeude: 'AWE00D0E4-',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 211,
-              mid: 5,
-              Gebaeude: 'AWE00D0E4-E458',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 212,
-              mid: 5,
-              Gebaeude: 'AWE00D0E4-E462',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 213,
-              mid: 5,
-              Gebaeude: 'AWE00D0E5-',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 214,
-              mid: 5,
-              Gebaeude: 'AWE00D0E6-',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 215,
-              mid: 5,
-              Gebaeude: 'AWE00D0EE-',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 216,
-              mid: 5,
-              Gebaeude: 'AWE00D0U1-',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 217,
-              mid: 5,
-              Gebaeude: 'AWE00K1EG-Riehler Str. 34',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 218,
-              mid: 5,
-              Gebaeude: 'AWE00K1O1-Riehler Str. 34',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 219,
-              mid: 5,
-              Gebaeude: 'AWE00K1O2-Riehler Str. 34',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 220,
-              mid: 5,
-              Gebaeude: 'AWE00K1O3-Riehler Str. 34',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 221,
-              mid: 5,
-              Gebaeude: 'AWE00K1O4-Riehler Str. 34',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 222,
-              mid: 5,
-              Gebaeude: 'AWE00K1O5-Riehler Str. 34',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 223,
-              mid: 5,
-              Gebaeude: 'AWE00K1U2-Riehler Str. 34',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 224,
-              mid: 5,
-              Gebaeude: 'AWE00K2EG-Riehler Str. 36',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 225,
-              mid: 5,
-              Gebaeude: 'AWE00K2U1-Riehler Str. 36',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 226,
-              mid: 10,
-              Gebaeude: 'Beispielgebäude',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 227,
-              mid: 10,
-              Gebaeude: 'Düsseldorf',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 228,
-              mid: 10,
-              Gebaeude: 'Hannover',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            },
-            {
-              gid: 229,
-              mid: 12,
-              Gebaeude: 'Willich',
-              Adresse: '',
-              created_at: new Date('2020-02-02 01:48:32'),
-              modified_at: null,
-              created_uid: 0,
-              modified_uid: null
-            }
-    ].filter( b => b.mid === clientID);
+  getFullArtikelData(link: DBDIObjektKatalogMandant, globalData: DBDIObjektKatalogGlobal): DBDIArtikel {
+    return {...globalData, ...link} as DBDIArtikel;
+  }
+
+  getFullRaumData(raum: DBDIRaeume, gebaeude: DBDIGebaeude): DBDIRaumGebaeude {
+    const raumGebaeudeData: DBDIRaumGebaeude = {...raum, ...gebaeude};
+    return raumGebaeudeData;
+  }
+
+  public async getArtikelRef(mcid: number): Promise<DBDIObjektKatalogMandant> {
+    return this.dexie.objektKatalogMandant.get( mcid );
+  }
+
+  public async getArtikelData(gcid: number): Promise<DBDIObjektKatalogGlobal> {
+    return this.dexie.objektKatalogGlobal.get( gcid );
+  }
+
+  public async getArtikel(id: number): Promise<DBDIArtikel> {
+    console.log('getArtikel by id', id);
+    const artikelLink = await this.dexie.objektKatalogMandant.get( { mcid: id } );
+    const artikelData = await this.dexie.objektKatalogMandant.get( { mcid: artikelLink.mcid } );
+    return this.getFullArtikelData(artikelLink, artikelData);
+  }
+
+  public async getInventarRef(ivid: number): Promise<DBDIInventar> {
+    return this.dexie.inventar.get(ivid);
+  }
+
+  public async getInventarData(ivid: number): Promise<InventarDataResult> {
+    const inventarRef = await this.dexie.inventar.get( ivid );
+    if (!inventarRef) {
+      return { success: false, errorCode: InventarDataResultError.InventarNotFound };
+    }
+    const artikelRef = await this.dexie.objektKatalogMandant.get( inventarRef.mcid );
+    if (!artikelRef) {
+      return { success: false, errorCode: InventarDataResultError.ArtikelRefNotFound };
+    }
+    const artikelData = await this.dexie.objektKatalogGlobal.get (artikelRef.gcid );
+
+    if (!artikelData) {
+      return { success: false, errorCode: InventarDataResultError.ArtikelDataNotFound };
+    }
+
+    return {
+      success: true,
+      inventarData: {
+        inventar: inventarRef,
+        artikelRef,
+        artikelData
+      }
+    };
+  }
+
+  public getRaum(id: number) {
+    console.log('getRaum by id', id);
+
+    let raum: DBDIRaeume;
+    return this.dexie.raeume.get( {rid: id})
+      .then( (data: DBDIRaeume) => {
+        raum = data;
+        const gid = raum.gid;
+        return this.dexie.gebaeude.get({ gid });
+      })
+      .then( (gebaeude: DBDIGebaeude) => this.getFullRaumData(raum, gebaeude));
+  }
+
+  public getRaeumeByGebaeudeId(gid: number): Promise<DBDIRaeume[]> {
+    console.log('Search in rooms by gid', gid);
+    return this.dexie.raeume.where({ gid }).toArray();
+  }
+
+  public async getArtikelListByClientId(mid: number): Promise<DBDIArtikel[]> {
+    console.log('Search in Global Katalog by mid', mid);
+
+    const artikelRefs = await this.dexie.objektKatalogMandant
+      .where({ mid }).toArray();
+
+    const artikelData = await Promise.all(artikelRefs.map( ref => this.dexie.objektKatalogGlobal.get( ref.gcid )));
+
+    return artikelRefs.map( (ref, i) => ({...artikelData[i], ...ref}) );
+  }
+
+  public async barcodeLookup(barcode: string, mid: number): Promise<IUnionLookupAssignedObject> {
+    console.log('#364 barcodeLookup', {barcode, mid});
+
+    const lookupInventar = await this.getInventarByBarcode(barcode, mid);
+
+    if (lookupInventar.type === LookupResultType.Inventar) {
+      return lookupInventar;
+    }
+
+    // Otherwise return the Result of Raum-Lookup
+    return this.getRaumByBarcode(barcode, mid);
+  }
+
+  async getInventarByBarcode(barcode: string, useMid?: number): Promise<LookupAssignedInventar|LookupNoMatches> {
+    const db = this.dexie;
+
+    console.log('#380 barcodeLookup in inventar', { barcode, useMid });
+    const inventarMatches = await db.inventar
+      .where( { code: barcode } )
+      .toArray();
+    console.log('#383 barcodeLookup in inventar', { inventarMatches });
+
+    for (const inventar of inventarMatches) {
+      const artikelRef = await db.objektKatalogMandant.get(inventar.mcid);
+      console.log('#387 barcodeLookup in inventar', { artikelRef });
+      if (!useMid || artikelRef.mid === useMid) {
+        const artikelData = await db.objektKatalogGlobal.get(artikelRef.gcid);
+        console.log('#389 barcodeLookup in inventar', { artikelData });
+
+        return {
+          type: LookupResultType.Inventar,
+          inventar,
+          artikelRef,
+          artikelData
+        };
+      }
+    }
+    console.log('#398 barcodeLookup in inventar', 'No-Match');
+
+    return {
+      type: LookupResultType.NoMatch
+    };
+  }
+
+  async getRaumByBarcode(barcode: string, useMid?: number): Promise<LookupAssignedRoom|LookupNoMatches> {
+    const db = this.dexie;
+
+    console.log('#412 barcodeLookup in raeume', { barcode, useMid});
+    const raumMatches = await db.raeume.where( { code: barcode } ).toArray();
+
+    for (const raum of raumMatches) {
+      const gebaeude = await db.gebaeude.get(raum.gid);
+
+      return {
+        type: LookupResultType.Raum,
+        raum,
+        gebaeude
+      };
+    }
+
+    console.log('#232 barcodeLookup NOT FOUND', { barcode, useMid});
+    return { type: LookupResultType.NoMatch };
+  }
+
+  async getBuildingList(clientID: number): Promise<DBDIGebaeude[]> {
+    const list = await this.dexie.gebaeude.where({mid: clientID}).toArray();
+    console.log('#336 async getBuildingList', list);
+    return list;
   }
 }

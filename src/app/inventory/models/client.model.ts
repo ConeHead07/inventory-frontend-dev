@@ -1,4 +1,4 @@
-export interface ClientModel {
+export interface DBDIMandanten {
   mid: number;
   uid?: number;
   Mandant: string;

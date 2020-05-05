@@ -1,6 +1,6 @@
 <div class="row mb-1">
   <div class="form-group col-4">
-    <label for="kunde">KundeModel</label>
+    <label for="kunde">Mandant</label>
     <input id="kunde" class="form-control" [readOnly]="true" [attr.value]="kundeName">
   </div>
   <div class="form-group col-4">
@@ -10,24 +10,35 @@
   <div class="form-group col-4">
     <label for="raum">Raum</label>
     <input id="raum" class="form-control" [readOnly]="true" [attr.value]="raumNr">
+    {{ gebaeudeId }}
   </div>
 </div>
 
 <div class="row mb-4">
   <div class="col-6">
-    <app-progressbar [shortTitle]="'Gesamt'" [title]="'Fortschrittsanzeige gesamt'" [value]="45.5" [total]="145"></app-progressbar>
+    <app-progressbar [shortTitle]="'Gesamt'" [title]="'Fortschrittsanzeige gesamt'" [value]="jobProgress.done" [total]="jobProgress.total"></app-progressbar>
   </div>
   <div class="col-6">
-    <app-progressbar [shortTitle]="'Raum'"  [title]="'Fortschrittsanzeige Raum'" [value]="45.5" [total]="145"></app-progressbar>
+    <app-progressbar [shortTitle]="'Raum'"  [title]="'Fortschrittsanzeige Raum'" [value]="raumProgress.done" [total]="raumProgress.total"></app-progressbar>
+  </div>
+</div>
+
+<div class="form-group row mt-4">
+  <label for="raumCode" class="col-4 col-sm-3 col-md-2 col-lg-2">Raum-Barcode</label>
+  <div class="col input-group">
+    <input id="raumCode" type="text" class="form-control" [value]="formInventar.RaumBarcode" (input)="onRaumBarcodeInput( $event )" placeholder="Raum-Barcode" aria-label="Raumcode">
+    <div class="input-group-append">
+      <button class="btn btn-outline-success" type="button" (click)="openScanner()"><fa-icon [icon]="faSearch"></fa-icon></button>
+    </div>
   </div>
 </div>
 
 <div class="form-group row mt-4">
   <label for="raumNr" class="col-4 col-sm-3 col-md-2 col-lg-2">Raum-Nr</label>
   <div class="col input-group">
-    <input id="raumNr" type="text" class="form-control" placeholder="Raumnr" aria-label="Raumnummer">
+    <input id="raumNr" type="text" [value]="formInventar.Raum" class="form-control" placeholder="Raumnr" aria-label="Raumnummer">
     <div class="input-group-append">
-      <button class="btn btn-outline-success" type="button">...</button>
+      <button class="btn btn-outline-success" type="button" (click)="openSelectSearchRaum()">...</button>
     </div>
   </div>
 </div>
@@ -38,32 +49,32 @@
 <div class="form-group row">
     <label for="raumBez" class="col-4 col-sm-3 col-md-2 col-lg-2">Raum-Bez.</label>
     <div class="col">
-      <input  id="raumBez" type="text" class="form-control">
+      <input  id="raumBez" type="text" [value]="formInventar.Raumbezeichnung" class="form-control">
     </div>
 </div>
 
 <div class="form-group row">
     <label for="elmBarcode" class="col-4 col-sm-3 col-md-2 col-lg-2">Barcode</label>
     <div class="col input-group">
-      <input id="elmBarcode" readonly type="text" class="form-control" placeholder="Barcode" aria-label="Barcode">
+      <input id="elmBarcode" readonly type="text" [value]="formInventar.Barcode" class="form-control" placeholder="Barcode" aria-label="Barcode">
       <div class="input-group-append">
-        <button class="btn btn-outline-success" type="button">...</button>
+        <button class="btn btn-outline-success" type="button" (click)="openScanner()">...</button>
       </div>
     </div>
 </div>
 <div class="form-group row">
-  <label for="elmArtBez" class="col-4 col-sm-3 col-md-2 col-lg-2">Artike<span class="d-none d-md-inline">-Bez.</span></label>
+  <label for="elmArtBez" class="col-4 col-sm-3 col-md-2 col-lg-2">Artikel<span class="d-none d-md-inline">-Bez.</span></label>
     <div class="col input-group">
-      <input id="elmArtBez" readonly type="text" class="form-control" placeholder="Artikelbezeichnung" aria-label="Artikelbezeichnung">
+      <input id="elmArtBez" readonly type="text" [value]="formInventar.Bezeichnung" class="form-control" placeholder="Artikelbezeichnung" aria-label="Artikelbezeichnung">
       <div class="input-group-append">
-        <button class="btn btn-outline-success" type="button">...</button>
+        <button class="btn btn-outline-success" type="button" (click)="openSelectCreateArtikel()">...</button>
       </div>
     </div>
 </div>
 <div class="form-group row">
     <label for="elmArtTyp" class="col-3 col-sm-3 col-md-2 col-lg-2"><span class="d-none d-md-inline">Artikel-</span>Typ</label>
     <div class="col">
-      <input  id="elmArtTyp" type="text" class="form-control">
+      <input  id="elmArtTyp" type="text" [value]="formInventar.Typ" class="form-control">
     </div>
 </div>
 
@@ -71,13 +82,22 @@
   <label for="elmArtTyp" class="col-3 col-sm-3 col-md-2 col-lg-2">Bild</label>
   <div class="col">
     <div class="btn-group btn-group-lg" role="group" aria-label="Large button group">
-      <button type="button" class="btn btn-success"> + Neu</button>
-      <button type="button" class="btn btn-info"> anzeigen</button>
+      <button type="button" class="btn btn-success" (click)="openCreateArtikelImage()"> + Neu</button>
+      <button type="button" class="btn btn-info" (click)="openShowArtikelImage()"> anzeigen</button>
     </div>
   </div>
 </div>
 
-<app-select-create-raum></app-select-create-raum>
+<div class="row">
+  <div class="col">
+    <button (click)="simulateScanner()">Scanner Simulation</button><br>
+    <input #inputSimulateBarcode>
+  </div>
 
-<test></test>
-
+  <div class="row">
+<app-scannerdetection (scanned)="handleScanData($event)" [config]="scanDetectorConfig">
+  <h4>Detected Barcode (Zeit: {{ lastScanDetectTime | date:'hh:mm:ss' }})</h4>
+  <textarea #input2 [ngClass]="lastScanDetectClass"></textarea>
+</app-scannerdetection>
+  </div>
+</div>

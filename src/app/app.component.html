@@ -5,5 +5,8 @@
       <router-outlet></router-outlet>
     </div>
   </div>
+  <app-status-check></app-status-check>
+  <button *ngIf="!heartBeatState" (click)="setHeartBeatState(true)">Enable HeartBeat Check</button>
+  <button *ngIf="heartBeatState" (click)="setHeartBeatState(false)">Disable HeartBeat Check</button>
 </div>
 

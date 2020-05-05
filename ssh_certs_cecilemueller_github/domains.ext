@@ -1,0 +1,16 @@
+authorityKeyIdentifier=keyid,issuer
+basicConstraints=CA:FALSE
+keyUsage = digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment
+subjectAltName = @alt_names
+[alt_names]
+DNS.1 = localhost
+DNS.2 = inventory.local
+DNS.3 = inventory-app.local
+DNS.4 = inventory-api.local
+DNS.5 = mytime.local
+DNS.6 = tourenplanung.local
+DNS.7 = inventory.localhost
+DNS.8 = inventory-app.localhost
+DNS.9 = inventory-api.localhost
+DNS.10 = mytime.localhost
+DNS.11 = tourenplanung.localhost

@@ -1,4 +1,4 @@
-export interface BuildingModel {
+export interface DBDIGebaeude {
   gid: number;
   mid: number;
   Gebaeude: string;
