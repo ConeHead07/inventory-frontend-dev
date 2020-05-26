@@ -1047,6 +1047,11 @@
   dependencies:
     defer-to-connect "^1.0.1"
 
+"@types/browser-image-compression@^1.0.1":
+  version "1.0.1"
+  resolved "https://registry.yarnpkg.com/@types/browser-image-compression/-/browser-image-compression-1.0.1.tgz#af984c2d22c0e3fd1f33ab8bba9bebcf44675b92"
+  integrity sha512-WjmYq0kGKDs1rBNlrb3WG9/03RXnM6/zvmo93r3uoDa8y19tJ04JWZOJmRdjDph0FtU0kNJMhUrnceFynOQxGQ==
+
 "@types/events@*":
   version "3.0.0"
   resolved "https://registry.yarnpkg.com/@types/events/-/events-3.0.0.tgz#2862f3f58a9a7f7c3e78d79f130dd4d71c25c2a7"
@@ -1381,6 +1386,13 @@ amdefine@>=0.0.4:
   version "1.0.1"
   resolved "https://registry.yarnpkg.com/amdefine/-/amdefine-1.0.1.tgz#4a5282ac164729e93619bcfd3ad151f817ce91f5"
   integrity sha1-SlKCrBZHKek2Gbz9OtFR+BfOkfU=
+
+angular-cropperjs@^1.0.2:
+  version "1.0.2"
+  resolved "https://registry.yarnpkg.com/angular-cropperjs/-/angular-cropperjs-1.0.2.tgz#c5a69cae5946e7ce7deedfdf593c90d905f53dd2"
+  integrity sha512-S+fy+bJUdQ1BCcAJ1yQHxJiPM5yhfeQXzjvSjNqPfrvB/pWKXyDLtVu2jl5Z4QW6WhH/vQPu5wBn4/KxXIMdEw==
+  dependencies:
+    tslib "^1.9.0"
 
 ansi-align@^3.0.0:
   version "3.0.0"
@@ -1768,6 +1780,11 @@ bluebird@^3.3.0, bluebird@^3.5.1, bluebird@^3.5.3, bluebird@^3.5.5:
   resolved "https://registry.yarnpkg.com/bluebird/-/bluebird-3.7.2.tgz#9f229c15be272454ffa973ace0dbee79a1b0c36f"
   integrity sha512-XpNj6GDQzdfW+r2Wnn7xiSAd7TM3jzkxGXBGTtWKuSXv1xUV+azxAm8jdWZN06QTQk+2N2XB9jRDkvbmQmcRtg==
 
+blueimp-canvas-to-blob@^3.16.0:
+  version "3.25.0"
+  resolved "https://registry.yarnpkg.com/blueimp-canvas-to-blob/-/blueimp-canvas-to-blob-3.25.0.tgz#cc2fd0dbbf19d80ba9de12756a2af7e8df37d15a"
+  integrity sha512-qVuE742p2dnm0Uj1khN71nW8f8lBCLUCTCU4UfR9XoNvOmc3nMmjolGkXBAQodUVK+gFm7pjzbeMrK7RU1dRhw==
+
 bn.js@^4.0.0, bn.js@^4.1.0, bn.js@^4.1.1, bn.js@^4.4.0:
   version "4.11.8"
   resolved "https://registry.yarnpkg.com/bn.js/-/bn.js-4.11.8.tgz#2cde09eb5ee341f484746bb0309b3253b1b1442f"
@@ -1855,6 +1872,11 @@ brorand@^1.0.1:
   version "1.1.0"
   resolved "https://registry.yarnpkg.com/brorand/-/brorand-1.1.0.tgz#12c25efe40a45e3c323eb8675a0a0ce57b22371f"
   integrity sha1-EsJe/kCkXjwyPrhnWgoM5XsiNx8=
+
+browser-image-compression@^1.0.11:
+  version "1.0.11"
+  resolved "https://registry.yarnpkg.com/browser-image-compression/-/browser-image-compression-1.0.11.tgz#cecf24d142b4dbfea3a73e56c188cab8e4833f9d"
+  integrity sha512-d77jadMHL5y8koLOLaP62KPjPVTpEeQVht/iU7YwZz2nQXTujJ/vdzTFZeYmCbYtuO2BKZiV9Gh8J2Lqhzl7/A==
 
 browserify-aes@^1.0.0, browserify-aes@^1.0.4:
   version "1.2.0"
@@ -2405,6 +2427,14 @@ compression@^1.7.4:
     safe-buffer "5.1.2"
     vary "~1.1.2"
 
+compressorjs@^1.0.6:
+  version "1.0.6"
+  resolved "https://registry.yarnpkg.com/compressorjs/-/compressorjs-1.0.6.tgz#75c55e2c3d797afeaa3084bd0cbf03e8374e4b6d"
+  integrity sha512-HgaDx4AGCjJOyOt08JsGO9VLJIHwy8guZDU1OG2jtuz77MG8PQr+reKt5J6aYZCajVIKXsFXJreZeEmk6lXFmA==
+  dependencies:
+    blueimp-canvas-to-blob "^3.16.0"
+    is-blob "^2.0.1"
+
 concat-map@0.0.1:
   version "0.0.1"
   resolved "https://registry.yarnpkg.com/concat-map/-/concat-map-0.0.1.tgz#d8a96bd77fd68df7793a73036a3ba0d5405d477b"
@@ -2613,6 +2643,11 @@ create-hmac@^1.1.0, create-hmac@^1.1.2, create-hmac@^1.1.4:
     ripemd160 "^2.0.0"
     safe-buffer "^5.0.1"
     sha.js "^2.4.8"
+
+cropperjs@^1.5.6:
+  version "1.5.6"
+  resolved "https://registry.yarnpkg.com/cropperjs/-/cropperjs-1.5.6.tgz#82faf432bec709d828f2f7a96d1179198edaf0e2"
+  integrity sha512-eAgWf4j7sNJIG329qUHIFi17PSV0VtuWyAu9glZSgu/KlQSrfTQOC2zAz+jHGa5fAB+bJldEnQwvJEaJ8zRf5A==
 
 cross-spawn@^5.0.1:
   version "5.1.0"
@@ -4322,6 +4357,11 @@ is-binary-path@~2.1.0:
   dependencies:
     binary-extensions "^2.0.0"
 
+is-blob@^2.0.1:
+  version "2.1.0"
+  resolved "https://registry.yarnpkg.com/is-blob/-/is-blob-2.1.0.tgz#e36cd82c90653f1e1b930f11baf9c64216a05385"
+  integrity sha512-SZ/fTft5eUhQM6oF/ZaASFDEdbFVe89Imltn9uZr03wdKMcWNVYSMjQPFtg05QuNkt5l5c135ElvXEQG0rk4tw==
+
 is-buffer@^1.1.5:
   version "1.1.6"
   resolved "https://registry.yarnpkg.com/is-buffer/-/is-buffer-1.1.6.tgz#efaa2ea9daa0d7ab2ea13a97b2b8ad51fefbe8be"
@@ -5570,6 +5610,13 @@ ngx-scanner-detection@^0.0.7:
   version "0.0.7"
   resolved "https://registry.yarnpkg.com/ngx-scanner-detection/-/ngx-scanner-detection-0.0.7.tgz#dbf40be08393cc14fe1e9d44391d327699fc35cd"
   integrity sha512-BEJuSqFDj1oQks4sAKpwVQTsSm7hxYtwCm2cFhxLNKUVKzsRpW+mlYldrDe7yuXM/DAmBbubgwWiyQwZoIwFOg==
+  dependencies:
+    tslib "^1.9.0"
+
+ngx-webcam@0.2.6:
+  version "0.2.6"
+  resolved "https://registry.yarnpkg.com/ngx-webcam/-/ngx-webcam-0.2.6.tgz#a2ae07a0024d9cb72fbd6f0fc4a3cf617030a6ea"
+  integrity sha512-syf8YwjOswRyTq55Cw7rrjFAmdtkmVs5BGiifuudqYC9u8hVGMYiZNalVqTbNp7DMh8zy7qRzuACnJhKhbnmRA==
   dependencies:
     tslib "^1.9.0"
 

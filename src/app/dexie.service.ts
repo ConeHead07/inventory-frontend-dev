@@ -29,71 +29,93 @@ export class DexieService extends Dexie {
   objektKatalogGlobal: Dexie.Table<DBDIObjektKatalogGlobal, number>;
   objektKatalogMandant: Dexie.Table<DBDIObjektKatalogMandant, number>;
   raeume: Dexie.Table<DBDIRaeume, number>;
+  images: Dexie.Table<DBDIImages, number>;
   uploads: Dexie.Table<DBDIUploads, number>;
   users: Dexie.Table<DBDIUsers, number>;
+  objektbuchBarcodesLookup: Dexie.Table<DBDIObjektbuchBarcodesLookup, number>;
+
+  barcodeLookup: Dexie.Table<DBDIBarcodeLookup, string>;
+  variables: Dexie.Table<DBDIVariables, string>;
 
   dbVersion = 1;
+  stopClientLogForServerLoad = false;
 
   constructor(private syncClient: DexieSyncClientService, private baseData: BasedataService) {
-     super('LocalInventory'); // , { addons: [ relationships ] });
-     Dexie.Syncable.registerSyncProtocol('inventorySync', this.syncClient );
+    super('merTensIventory'); // , { addons: [ relationships ] });
+    Dexie.Syncable.registerSyncProtocol('inventorySync', this.syncClient );
 
-     this.version(1).stores({
-       clientChangeLog:
-         '++id,table,type,key,jobid,sync_done',
-       devices:
-         '++id,name,user_agent',
-       gebaeude:
-         '++gid,mid,mandanten_id,Gebaeude,Adresse',
-       hersteller:
-         '++hid,Hersteller,created_at,created_uid,created_jobid,created_device_id',
-       inventar:
-         '++ivid,mcid,uuid,hash,code,rid,rid_alt,rid_neu,' +
-         'jobid,invid,iv_nr,' +
-         'created_at,modified_at,created_uid,modified_uid,' +
-         'created_jobid,modified_jobid,' +
-         'created_device_id,modified_device_id',
-       inventuren:
-         '++jobid,mid,gid,Titel,Start,aktiviert,AbgeschlossenAm',
-       inventurenUser:
-         '++jobid,uid',
-       lieferant:
-         '++hid,Lieferant',
-       mandanten:
-         '++mid,Mandant',
-       objektKatalogGlobal:
-         '++gcid,uuid,hash,code,hid,lid,Bezeichnung,Produktnr,Typ,Gruppe,Kategorie,Farbe,Groesse,AnlagenNr,' +
-         'GeraetNr,FibuNr,Flaeche,Gewicht,Baujahr,Kst,' +
-         'created_at,modified_at,created_uid,modified_uid,created_jobid,modified_jobid,' +
-         'created_device_id,modified_device_id',
-       objektKatalogMandant:
-         '++mcid,gcid,code,mid,created_at,modified_at,created_uid,modified_uid,' +
-         'created_jobid,modified_jobid,' +
-         'created_device_id,modified_device_id',
-       raeume:
-         '++rid,gid,uuid,hash,code,raumid,Raum,Raumbezeichnung,Etage,current_jobid,current_jobstatus',
-       uploads:
-         '++id,uuid,mid,standort,importkey,filename,filesize,checksum,stat,errors',
-       users:
-         '++id,name,email,password',
+    const DXVersion = this.version(11).stores({
+      clientChangeLog:
+       '++id,table,type,key,jobid,sync_done',
+      devices:
+       '++id,name,user_agent',
+      gebaeude:
+       '++gid,mid,mandanten_id,Gebaeude,Adresse',
+      hersteller:
+       '++hid,Hersteller,created_at,created_uid,created_jobid,created_device_id',
+      images:
+        '++id,uuid,name,type,size,width,height,gcuuid,url,created_jobid,modified_jobid',
+      inventar:
+        '++ivid,mcid,uuid,mcuuid,code,[rid+jobid],rid,rid_alt,rid_neu,jobid,invid,iv_nr',
+      inventuren:
+       '++jobid,mid,gid,Titel,Start,aktiviert,AbgeschlossenAm',
+      inventurenUser:
+       '++jobid,uid',
+      lieferant:
+       '++hid,Lieferant',
+      mandanten:
+       '++mid,Mandant',
+      objektKatalogGlobal:
+       '++gcid,uuid,hash,code,hid,lid,Bezeichnung,Produktnr,Typ,Gruppe,Kategorie,Farbe,Groesse,AnlagenNr,' +
+       'GeraetNr,FibuNr,Flaeche,Gewicht,Baujahr,Kst',
+      objektKatalogMandant:
+       '++mcid,uuid,gcid,gcuuid,code,mid',
+      raeume:
+       '++rid,gid,uuid,hash,code,raumid,Raum,Raumbezeichnung,Etage,current_jobid,current_jobstatus',
+      uploads:
+       '++id,uuid,mid,standort,importkey,filename,filesize,checksum,stat,errors',
+      users:
+       '++id,name,email,password',
+      objektbuchBarcodesLookup:
+        '&code',
+      variables:
+        '&name,value',
+      barcodeLookup:
+        '&code,table,updateHelper,[table+updateHelper]'
+    });
+    this.version(12).stores({
+      hersteller:
+        '++hid,uuid,Hersteller,created_at,created_uid,created_jobid,created_device_id',
+      objektKatalogGlobal:
+        '++gcid,uuid,hash,code,hid,huuid,lid,Bezeichnung,Produktnr,Typ,Gruppe,Kategorie,Farbe,Groesse,AnlagenNr,' +
+        'GeraetNr,FibuNr,Flaeche,Gewicht,Baujahr,Kst',
+    });
+    this.version(13).stores({
+      raeume:
+        '++rid,gid,[rid+gid],uuid,hash,code,raumid,Raum,Raumbezeichnung,Etage,current_jobid,current_jobstatus'
+    });
 
-     });
-     this.version(2).stores({});
+    const validLogTables = [
+      'hersteller',
+      'inventar',
+      'images',
+      'objektKatalogGlobal',
+      'objektKatalogMandant',
+      'raeume'
+    ];
 
-     const validLogTables = [
-      'Hersteller',
-      'Inventar',
-      'ObjektKatalogGlobal',
-      'ObjektKatalogMandant',
-      'Raeume'
-     ];
-
-     this.on( 'changes', changes => {
+    this.on( 'changes', changes => {
+       if (this.stopClientLogForServerLoad) {
+         console.log('Change is disable for Server-Load');
+         return;
+       }
        changes.forEach( change => {
 
          if (validLogTables.indexOf(change.table) === -1 || change.table === this.clientChangeLog.name) {
+           console.log('Change is disabled for table ', change.table);
            return;
          }
+         console.log('Write ChangeLog for table ', change.table, { change });
 
          const chlog = {
            timestamp: new Date(),
@@ -131,6 +153,15 @@ export class DexieService extends Dexie {
   }
 }
 
+export interface DBDITableWithBarcode {
+  code?: string;
+}
+
+export enum DBDIRaumEditStatus {
+  Init = 0,
+  Started = 1,
+  Closed = 2
+}
 /**
  * @PREFIX DBDI DataBasaDataInterface
  */
@@ -177,6 +208,7 @@ export interface DBDIGebaeude {
 
 export interface DBDIHersteller {
   hid?: number;
+  uuid?: string;
   Hersteller: string;
   created_at?: Date;
   updated_at?: Date;
@@ -188,13 +220,15 @@ export interface DBDIHersteller {
   modified_device_id?: number;
 }
 
-export interface DBDIInventar {
+export interface DBDIInventar extends DBDITableWithBarcode {
   ivid?: number;
   mcid: number;
   uuid?: string;
+  mcuuid?: string;
   hash?: string;
   code?: string;
   rid: number;
+  ruuid?: number;
   rid_alt?: number;
   rid_neu?: number;
   Bezeichnung?: string;
@@ -254,12 +288,13 @@ export interface DBDIMandanten {
   modified_uid?: number;
 }
 
-export interface DBDIObjektKatalogGlobal {
+export interface DBDIObjektKatalogGlobal extends DBDITableWithBarcode {
   gcid?: number;
   uuid?: string;
   hash?: string;
   code?: string;
   hid?: number;
+  huuid?: string;
   lid?: number;
   Bezeichnung?: string;
   Produktnr?: string;
@@ -286,9 +321,11 @@ export interface DBDIObjektKatalogGlobal {
   modified_device_id?: number;
 }
 
-export interface DBDIObjektKatalogMandant {
+export interface DBDIObjektKatalogMandant extends DBDITableWithBarcode {
   mcid?: number;
+  uuid?: string;
   gcid?: number;
+  gcuuid?: string;
   code?: string;
   mid: number;
   created_at: Date;
@@ -301,7 +338,7 @@ export interface DBDIObjektKatalogMandant {
   modified_device_id?: number;
 }
 
-export interface DBDIRaeume {
+export interface DBDIRaeume extends DBDITableWithBarcode {
   rid?: number;
   gid: number;
   uuid?: string;
@@ -312,7 +349,7 @@ export interface DBDIRaeume {
   Raumbezeichnung?: string;
   Etage?: string;
   current_jobid?: number;
-  current_jobstatus?: number;
+  current_jobstatus?: DBDIRaumEditStatus;
   created_at: Date;
   modified_at?: Date;
   created_uid: number;
@@ -320,6 +357,27 @@ export interface DBDIRaeume {
   created_device_id?: number;
   modified_device_id?: number;
   created_jobid?: number;
+  modified_jobid?: number;
+}
+
+export interface DBDIImages {
+  id?: number;
+  uuid: string;
+  name: string;
+  size: number;
+  width: number;
+  height: number;
+  type: string;
+  gcuuid: string;
+  url?: string;
+  data_binary?: string;
+  data_url?: string;
+  revnr: number;
+  created_at: Date;
+  created_uid: number;
+  created_jobid: number;
+  modified_at?: Date;
+  modified_uid?: number;
   modified_jobid?: number;
 }
 
@@ -351,26 +409,90 @@ export interface DBDIUsers {
   updated_at?: Date;
 }
 
+export interface DBDIObjektbuchBarcodesLookup {
+  code: string;
+  table: string;
+  key: string;
+  id: number;
+  uuid: string;
+  updateHelper: number;
+}
+
 /**
  * END SQL-GENERATED Interfaces
  */
+export interface DBDIVariables {
+  name: string;
+  value?: any;
+}
 
-export interface DBDIArtikel extends DBDIObjektKatalogMandant, DBDIObjektKatalogGlobal {}
+export interface DBDIBarcodeLookup {
+  code: string;
+  table: string;
+  key: string;
+  id?: number;
+  uuid: string;
+  updateHelper?: number;
+}
+
+export enum LookupResultTable {
+  None,
+  Any,
+  Inventar,
+  Raeume,
+  ObjektKatalogGlobal,
+  ObjektKatalogMandant,
+  Objektbuch
+}
+
+export interface BarcodeLookupSimpleResult {
+  barcode: string;
+  foundRef?: DBDIBarcodeLookup;
+  success: boolean;
+  lookupResultTable: LookupResultTable;
+  data: null|DBDIInventar|DBDIObjektKatalogGlobal|DBDIObjektKatalogMandant|DBDIRaeume|DBDIObjektbuchBarcodesLookup;
+  inventar?: DBDIInventar;
+  gebaeude?: DBDIGebaeude;
+  raum?: DBDIRaeume;
+  artikelData?: DBDIObjektKatalogGlobal;
+  artikelRef?: DBDIObjektKatalogMandant;
+  image?: DBDIImages;
+}
+
+export interface DBDIArtikel extends DBDIObjektKatalogMandant, DBDIObjektKatalogGlobal {
+  mcuuid?: string;
+}
 
 export interface DBDIRaumGebaeude extends DBDIRaeume, DBDIGebaeude {}
 
 export enum LookupResultType {
   NoMatch,
   Inventar,
-  Raum
+  Raum,
+  ObjektBuchArtikel,
+  ObjektBuchRaum
 }
 
 export interface LookupResult {
   type: LookupResultType;
+  count?: number;
 }
 
 export interface LookupNoMatches extends LookupResult {
   type: LookupResultType.NoMatch;
+  count?: 0;
+}
+
+export interface LookupAssignedObjektbuchArtikel extends LookupResult {
+  type: LookupResultType.ObjektBuchArtikel;
+  artikelRef: DBDIObjektKatalogMandant;
+  artikelData: DBDIObjektKatalogGlobal;
+}
+
+export interface LookupAssignedObjektbuchRaum extends LookupResult {
+  type: LookupResultType.ObjektBuchRaum;
+  raum: DBDIRaeume;
+  gebaeude: DBDIGebaeude;
 }
 
 export interface LookupAssignedInventar extends LookupResult {
@@ -386,4 +508,8 @@ export interface LookupAssignedRoom extends LookupResult {
   gebaeude: DBDIGebaeude;
 }
 
-export type IUnionLookupAssignedObject = LookupAssignedInventar | LookupAssignedRoom | LookupNoMatches;
+export type IUnionLookupAssignedObject = LookupAssignedInventar |
+  LookupAssignedRoom |
+  LookupAssignedObjektbuchArtikel |
+  LookupAssignedObjektbuchRaum |
+  LookupNoMatches;

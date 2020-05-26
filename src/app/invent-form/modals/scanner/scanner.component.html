@@ -1,23 +1,50 @@
 <div class="modal-header">
-  <h4 class="modal-title">Hi there!</h4>
+  <h6 class="modal-title">Barcode scannen!</h6>
   <button type="button" class="close" aria-label="Close" (click)="activeModal.dismiss('Cross click')">
     <span aria-hidden="true">&times;</span>
   </button>
 </div>
 <div class="modal-body">
 
-  <zxing-scanner [torch]="torchEnabled" [(device)]="currentDevice" (scanSuccess)="onCodeResult($event)"
-                 [formats]="formatsEnabled" [tryHarder]="tryHarder" (permissionResponse)="onHasPermission($event)"
-                 (camerasFound)="onCamerasFound($event)" (torchCompatible)="onTorchCompatible($event)">
-  </zxing-scanner>
+  <div class="scanner-view-port">
+    <zxing-scanner [style.height]="'5rem'" [torch]="torchEnabled" [(device)]="currentDevice" (scanSuccess)="onCodeResult($event)"
+                   [formats]="formatsEnabled" [tryHarder]="tryHarder" (permissionResponse)="onHasPermission($event)"
+                   (camerasFound)="onCamerasFound($event)" (torchCompatible)="onTorchCompatible($event)">
+    </zxing-scanner>
+    <div id="ScannerFocusRedLine"></div>
+  </div>
+  <input #bcInputTest><button (click)="bctest(bcInputTest.value)"><fa-icon [icon]="faCheck"></fa-icon></button>
 
-  <section class="results" *ngIf="qrResultString">
+  <section class="results" [hidden]="!scannedBarcode">
     <div>
       <small>Result</small>
-      <strong>{{ qrResultString }}</strong>
+      <span>{{ scannedUnchangedPart }}</span><span id="barcodeChangedPart" #barcodeChangedPart>{{ scannedChangedPart }}</span><br>
     </div>
-    <button ngbButton (click)="clearResult()">&times;</button>
   </section>
+  <div *ngIf="scanResultCurrent">
+    <div>{{ scanResultCurrent.barcode }}</div>
+    <div>{{ scanResultCurrent.typToString }}</div>
+    <div>{{ scanResultCurrent.infos }}</div>
+    <div *ngIf="scanResultCurrent.image">
+      <img [src]="scanResultCurrent.image.data_url" style="max-width:100%;max-height:50vh">
+    </div>
+    <button ngbButton (click)="applyResult()"><fa-icon [icon]="faCheck"></fa-icon></button>
+    <button ngbButton (click)="clearResult()"><fa-icon [icon]="faBan"></fa-icon></button>
+  </div>
+  <div *ngIf="scanResultHistory.length > 0">
+    <div *ngFor="let item of scanResultHistory" class="row">
+      <div class="col-6">{{ item.barcode }}</div>
+      <div class="col-6">{{ item.typToString }}</div>
+      <div class="col">{{ item.infos }}</div>
+      <div *ngIf="item.image" class="col-2">
+        <img [src]="item.image.data_url" style="max-width:100%;max-height:50px">
+      </div>
+      <div class="col-6">
+        <span class="btn btn-sm" (click)="applyHistoryResult(item)"><fa-icon [icon]="faCheck"></fa-icon></span>
+        <span class="btn btn-sm" (click)="removeResult(item)"><fa-icon [icon]="faBan"></fa-icon></span>
+      </div>
+    </div>
+  </div>
 
 </div>
 <div class="modal-footer">

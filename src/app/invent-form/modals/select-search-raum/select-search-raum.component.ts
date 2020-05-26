@@ -94,7 +94,7 @@ export class SelectSearchRaumComponent implements OnInit {
 
     this.dataService.getRaeumeByGebaeudeId( this.gid )
       .then( raeume2 => {
-        console.log('process fetched raeume', raeume2 );
+        console.log('process fetched raeume', raeume2.length );
         const raeume3: RaumOption[] = raeume2.map<RaumOption>( raum => {
           const itm = { id: raum.rid, name: raum.Raum };
           const rOpt: RaumOption = { ...itm, ...raum};

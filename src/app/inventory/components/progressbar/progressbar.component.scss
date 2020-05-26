@@ -6,9 +6,7 @@
 .progress-text{
   position:absolute;
   top:0;
-  left:0;
-  width:100%;
-  text-align:center;
+  left: calc(50% - 1rem);
   color:#fff;
   line-height: calc(1.5em + 0.75rem + 2px);
 }

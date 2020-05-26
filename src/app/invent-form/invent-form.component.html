@@ -1,41 +1,91 @@
-<div class="row mb-1">
+<div class="row no-gutters mb-1">
   <div class="form-group col-4">
-    <label for="kunde">Mandant</label>
+    <label for="kunde" class="mb-0">Mandant</label>
     <input id="kunde" class="form-control" [readOnly]="true" [attr.value]="kundeName">
   </div>
-  <div class="form-group col-4">
-    <label for="adresse">Adresse</label>
+  <div class="form-group col-4 px-1">
+    <label for="adresse" class="mb-0">Adresse</label>
     <input id="adresse" class="form-control" [readOnly]="true" [attr.value]="adresse">
   </div>
   <div class="form-group col-4">
-    <label for="raum">Raum</label>
+    <label for="raum" class="mb-0">Raum</label>
     <input id="raum" class="form-control" [readOnly]="true" [attr.value]="raumNr">
-    {{ gebaeudeId }}
   </div>
 </div>
 
 <div class="row mb-4">
   <div class="col-6">
-    <app-progressbar [shortTitle]="'Gesamt'" [title]="'Fortschrittsanzeige gesamt'" [value]="jobProgress.done" [total]="jobProgress.total"></app-progressbar>
+    <app-progressbar [shortTitle]="'Gesamt'" [title]="'Fortschrittsanzeige gesamt'"
+                     [sendDoneClick]="true"
+                     (clickedDone)="showGesamtDone()"
+                     [sendRestClick]="true"
+                     (clickedRest)="showGesamtRest()"
+                     [value]="jobProgress.done" [total]="jobProgress.total"></app-progressbar>
   </div>
   <div class="col-6">
-    <app-progressbar [shortTitle]="'Raum'"  [title]="'Fortschrittsanzeige Raum'" [value]="raumProgress.done" [total]="raumProgress.total"></app-progressbar>
+    <app-progressbar [shortTitle]="'Raum'"  [title]="'Fortschrittsanzeige Raum'"
+                     [sendDoneClick]="true"
+                     (clickedDone)="showRaumDone()"
+                     [sendRestClick]="true"
+                     (clickedRest)="showRaumRest()"
+                     [value]="raumProgress.done" [total]="raumProgress.total"></app-progressbar>
   </div>
 </div>
 
-<div class="form-group row mt-4">
-  <label for="raumCode" class="col-4 col-sm-3 col-md-2 col-lg-2">Raum-Barcode</label>
-  <div class="col input-group">
-    <input id="raumCode" type="text" class="form-control" [value]="formInventar.RaumBarcode" (input)="onRaumBarcodeInput( $event )" placeholder="Raum-Barcode" aria-label="Raumcode">
+<div class="row mt-4">
+  <label for="raumCode" class="col-8"><strong>Raumdaten</strong></label>
+
+  <div class="col-4 text-right">
+    <div #myDrop="ngbDropdown" ngbDropdown>
+      <button [ngClass]="{
+        'btn-outline-success': raumEditStatus === 2,
+        'btn-outline-info': raumEditStatus === 1,
+        'btn-outline-secondary': raumEditStatus === 0
+        }" class="btn btn-sm dropdown-toggle"
+              type="button" data-toggle="dropdown" aria-haspopup="true"
+              (click)="$event.stopPropagation(); myDrop.open();"
+              aria-expanded="false">
+        <ng-container [ngSwitch]="raumEditStatus">
+          <fa-icon *ngSwitchCase="2" [icon]="faCheck"></fa-icon>
+          <fa-icon *ngSwitchCase="1" [icon]="faDoorOpen"></fa-icon>
+          <fa-icon *ngSwitchDefault [icon]="faDoorClosed"></fa-icon>
+        </ng-container>
+      </button>
+      <div class="dropdown-menu dropdown-menu-right" [style.right]="0" ngbDropdownMenu>
+        <button ngbDropdownItem class="dropdown-item"
+                (click)="setRaumEditStatusClosed()"><fa-icon [attr.class]="'text-success'" [icon]="faCheck"></fa-icon>
+          Fertig
+        </button>
+        <button ngbDropdownItem class="dropdown-item"
+                (click)="setRaumEditStatusStarted()"><fa-icon [attr.class]="'text-info'" [icon]="faDoorOpen"></fa-icon>
+          In Arbeit
+        </button>
+        <button *ngIf="raumProgress.done === 0" ngbDropdownItem class="dropdown-item"
+                (click)="setRaumEditStatusUntouched()"><fa-icon [attr.class]="'text-secondary'" [icon]="faDoorClosed"></fa-icon>
+          Noch nicht begonnen
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="form-group row">
+  <div class="col input-group mb-1">
+    <div class="input-group-prepend">
+      <span class="input-group-text">BCode</span>
+    </div>
+    <input id="raumCode" #raumBarcode type="text"
+           class="form-control" [value]="formInventar.RaumBarcode" (input)="onRaumBarcodeInput( $event )" placeholder="Raum-Barcode" aria-label="Raumcode">
     <div class="input-group-append">
-      <button class="btn btn-outline-success" type="button" (click)="openScanner()"><fa-icon [icon]="faSearch"></fa-icon></button>
+      <button class="btn btn-outline-success" type="button" (click)="openScanner(raumBarcode)"><fa-icon [icon]="faCamera"></fa-icon></button>
     </div>
   </div>
 </div>
 
-<div class="form-group row mt-4">
-  <label for="raumNr" class="col-4 col-sm-3 col-md-2 col-lg-2">Raum-Nr</label>
-  <div class="col input-group">
+<div class="form-group row">
+  <div class="col input-group mb-1">
+    <div class="input-group-prepend">
+      <span class="input-group-text">Nr</span>
+    </div>
     <input id="raumNr" type="text" [value]="formInventar.Raum" class="form-control" placeholder="Raumnr" aria-label="Raumnummer">
     <div class="input-group-append">
       <button class="btn btn-outline-success" type="button" (click)="openSelectSearchRaum()">...</button>
@@ -43,48 +93,74 @@
   </div>
 </div>
 
-
-
-
 <div class="form-group row">
-    <label for="raumBez" class="col-4 col-sm-3 col-md-2 col-lg-2">Raum-Bez.</label>
-    <div class="col">
-      <input  id="raumBez" type="text" [value]="formInventar.Raumbezeichnung" class="form-control">
+  <div class="col input-group mb-1">
+    <div class="input-group-prepend">
+      <span class="input-group-text">Bez.</span>
     </div>
+    <!-- div class="col" -->
+      <input  id="raumBez" type="text" [value]="formInventar.Raumbezeichnung"
+              placeholder="Raumbezeichnung" class="form-control">
+    <!-- /div -->
+  </div>
 </div>
 
+<div class="row mt-4">
+  <label for="raumCode" class="col"><strong>Inventar-Daten</strong></label>
+</div>
 <div class="form-group row">
-    <label for="elmBarcode" class="col-4 col-sm-3 col-md-2 col-lg-2">Barcode</label>
-    <div class="col input-group">
-      <input id="elmBarcode" readonly type="text" [value]="formInventar.Barcode" class="form-control" placeholder="Barcode" aria-label="Barcode">
+    <div class="col input-group mb-1">
+      <div class="input-group-prepend">
+        <span class="input-group-text">BCode</span>
+      </div>
+      <input id="elmBarcode" #invBarcode readonly
+             required
+             [ngClass]="{'bg-danger': !formInventar.Barcode.length}" type="text"
+             [attr.value]="formInventar.Barcode" class="form-control"
+             placeholder="Warte auf Barcode ..." aria-label="Barcode">
       <div class="input-group-append">
-        <button class="btn btn-outline-success" type="button" (click)="openScanner()">...</button>
+        <button class="btn btn-outline-success" type="button" (click)="openScanner(invBarcode)">
+          <fa-icon [icon]="faCamera"></fa-icon>
+        </button>
       </div>
     </div>
 </div>
 <div class="form-group row">
-  <label for="elmArtBez" class="col-4 col-sm-3 col-md-2 col-lg-2">Artikel<span class="d-none d-md-inline">-Bez.</span></label>
-    <div class="col input-group">
-      <input id="elmArtBez" readonly type="text" [value]="formInventar.Bezeichnung" class="form-control" placeholder="Artikelbezeichnung" aria-label="Artikelbezeichnung">
+    <div class="col input-group mb-1">
+      <div class="input-group-prepend">
+        <span class="input-group-text">Bez.</span>
+      </div>
+      <input id="elmArtBez" readonly type="text" [attr.value]="formInventar.Bezeichnung" class="form-control" placeholder="Artikelbezeichnung" aria-label="Artikelbezeichnung">
       <div class="input-group-append">
         <button class="btn btn-outline-success" type="button" (click)="openSelectCreateArtikel()">...</button>
       </div>
     </div>
 </div>
 <div class="form-group row">
-    <label for="elmArtTyp" class="col-3 col-sm-3 col-md-2 col-lg-2"><span class="d-none d-md-inline">Artikel-</span>Typ</label>
-    <div class="col">
-      <input  id="elmArtTyp" type="text" [value]="formInventar.Typ" class="form-control">
+  <div class="col input-group mb-1">
+    <div class="input-group-prepend">
+      <span class="input-group-text">Typ</span>
     </div>
+    <!-- div class="col" -->
+      <input  id="elmArtTyp" type="text" [attr.value]="formInventar.Typ" class="form-control">
+    <!-- /div -->
+  </div>
 </div>
 
 <div class="form-group row">
-  <label for="elmArtTyp" class="col-3 col-sm-3 col-md-2 col-lg-2">Bild</label>
-  <div class="col">
-    <div class="btn-group btn-group-lg" role="group" aria-label="Large button group">
-      <button type="button" class="btn btn-success" (click)="openCreateArtikelImage()"> + Neu</button>
-      <button type="button" class="btn btn-info" (click)="openShowArtikelImage()"> anzeigen</button>
+  <!-- label for="elmArtTyp" class="col-2 col-sm-2 col-md-2 col-lg-2 d-none">Bild</label -->
+  <div class="col input-group mb-1">
+    <div class="input-group-prepend">
+      <span class="input-group-text">Bild</span>
     </div>
+  <!-- div class="col">
+    <div class="btn-group btn-group-lg" role="group" aria-label="Large button group" -->
+    <div class="input-group-append">
+      <button type="button" class="btn btn-success" *ngIf="!artikelImageExists" [disabled]="!formInventar.gcuuid" (click)="openCreateArtikelImage()"><fa-icon [icon]="faCamera"></fa-icon> anlegen </button>
+      <button type="button" class="btn btn-info" *ngIf="artikelImageExists" (click)="openShowArtikelImage()"><fa-icon [icon]="faImage"></fa-icon> anzeigen</button>
+    </div>
+    <!-- /div>
+  </div -->
   </div>
 </div>
 
@@ -100,4 +176,5 @@
   <textarea #input2 [ngClass]="lastScanDetectClass"></textarea>
 </app-scannerdetection>
   </div>
+  <div>{{ formInventar | json }}</div>
 </div>

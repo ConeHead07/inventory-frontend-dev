@@ -63,36 +63,46 @@ export class InventoryEditorService {
 
   async updateArtikelImage(invid: number, data: Blob) {}
 
-  async assignInventarToRaum(ivid: number, rid: number, useJobid?: number) {
+  async assignInventarToRaum(ivid: number, rid: number, useJobid?: number): Promise<InventoryEditorResult> {
     const jobid = useJobid || this.baseData.getCurrentJobid();
     const uid = this.baseData.getCurrentUid();
     const devid = this.baseData.getCurrentDeviceId();
+    console.log('InventoryEditorService.assignInventarToRaum', {
+      ivid,
+      rid,
+      jobid,
+      uid,
+      devid
+    });
 
-    Promise.all([
+    return Promise.all([
         this.dexieService.inventar.get(ivid),
         this.dexieService.raeume.get(rid)
       ])
       .then(result => {
         const inv = result[0];
         const raum = result[1];
+        console.log('InventoryEditorService.assignInventarToRaum', {
+          inv,
+          raum
+        });
+
+        if (!inv) {
+          return this.returnResultError( { errorCode: InventoryEditorErrorCode.InventarNotFound });
+        }
 
         if (!raum) {
           return this.returnResultError( { errorCode: InventoryEditorErrorCode.RaumNotFound });
         }
 
-        if (inv.rid === rid) {
-          return this.returnResultSuccess();
-        }
-
-        if (inv.rid !== rid) {
-          return this.dexieService.inventar.update(inv.ivid, {
-            rid,
-            jobid,
-            modified_uid: uid,
-            modified_jobid: jobid,
-            modified_device_id: devid
-          }).then( () => this.returnResultSuccess() );
-        }
+        return this.dexieService.inventar.update(inv.ivid, {
+          rid,
+          ruuid: raum.uuid,
+          jobid,
+          modified_uid: uid,
+          modified_jobid: jobid,
+          modified_device_id: devid
+        }).then( () => this.returnResultSuccess() );
       });
   }
 

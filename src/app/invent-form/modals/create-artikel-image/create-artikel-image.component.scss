@@ -1,0 +1,57 @@
+.editor {
+  height: 60%;
+  position:relative;
+}
+
+.canvas {
+  height: 100%;
+}
+
+.canvas {
+  -webkit-box-align: center;
+  -ms-flex-align: center;
+  align-items: center;
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-pack: center;
+  -ms-flex-pack: center;
+  justify-content: center;
+}
+
+.toolbar-cropend,
+.toolbar {
+  bottom: 1rem;
+  color: #fff;
+  height: 2rem;
+  left: 50%;
+  margin-left: -8rem;
+  position: absolute;
+  width: 16rem;
+  z-index: 2015;
+}
+.toolbar {
+  background-color: rgba(0, 0, 0, .4);
+}
+.toolbar button {
+  background: transparent;
+  color:#fff;
+  border:0;
+}
+
+.toolbar-cropend {
+  top: 1rem;
+  width: 5rem;
+  margin-left: -2.5rem;
+  z-index: 2016;
+  background-color: transparent;
+}
+
+.btn-icon-cirular {
+  width:2rem;
+  height:2rem;
+  border-radius:1rem;
+}
+.btn-icon-cirular + .btn-icon-cirular {
+  margin-left: 1rem;
+}

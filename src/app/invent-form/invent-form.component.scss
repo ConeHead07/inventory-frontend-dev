@@ -26,3 +26,7 @@ textarea.NewFreshScan.CountDown-1 {
   background-color: #d6ffe1;
   color: #200f0f;
 }
+input.bg-danger::placeholder {
+  color: #ffffff;
+  font-weight: bold;
+}

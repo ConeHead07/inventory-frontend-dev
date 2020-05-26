@@ -10,5 +10,5 @@ export class ScannerinputDirective {
   onClick(btn) {
     console.log('button', btn, 'number of clicks:', this.numberOfClicks++);
   }
-
+n
 }

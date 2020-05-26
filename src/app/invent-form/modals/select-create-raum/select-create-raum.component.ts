@@ -1,11 +1,9 @@
 import {Component, EventEmitter, OnInit, Output } from '@angular/core';
 
 import {NgbModal, ModalDismissReasons, NgbActiveModal} from '@ng-bootstrap/ng-bootstrap';
-import { faSearch } from '@fortawesome/free-solid-svg-icons';
+import { faSearch, faCamera } from '@fortawesome/free-solid-svg-icons';
 import {DBDIRaeume} from '../../../dexie.service';
 import { RaumService, RaumBasisDaten } from '../../data-services/raum.service';
-
-
 
 @Component({
   selector: 'app-select-create-raum',
@@ -15,14 +13,17 @@ import { RaumService, RaumBasisDaten } from '../../data-services/raum.service';
 export class SelectCreateRaumComponent implements OnInit {
   closeResult: string;
   faSearch = faSearch;
+  faCamera = faCamera;
 
   raumExistsStatus = -1;
   bezeichnungExistsStatus = -1;
 
+
   public raumDaten: RaumBasisDaten = {
     Raum: '',
     Raumbezeichnung: '',
-    Etage: ''
+    Etage: '',
+    code: ''
   };
 
   formIsValid = false;
@@ -32,6 +33,7 @@ export class SelectCreateRaumComponent implements OnInit {
 
   @Output() raumSearching = new EventEmitter<number>();
   @Output() raumCreated = new EventEmitter<DBDIRaeume>();
+  @Output() scannerRequest = new EventEmitter<HTMLElement>();
 
   constructor(
     // private modalService: NgbModal,
@@ -50,6 +52,10 @@ export class SelectCreateRaumComponent implements OnInit {
   }
 
   ngOnInit() {
+  }
+
+  openScanner(target) {
+    this.scannerRequest.emit(target);
   }
 
   formValidate(): boolean {

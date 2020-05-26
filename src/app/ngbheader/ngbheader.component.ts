@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import {HttpClient, HttpErrorResponse} from '@angular/common/http';
+import { faCog } from '@fortawesome/free-solid-svg-icons';
 
 @Component({
   selector: 'app-ngbheader',
@@ -8,6 +9,7 @@ import {HttpClient, HttpErrorResponse} from '@angular/common/http';
 })
 export class NgbheaderComponent {
   collapsed = true;
+  faCog = faCog;
 
   constructor(private http: HttpClient) {}
 

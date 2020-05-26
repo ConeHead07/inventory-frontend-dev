@@ -1,0 +1,6 @@
+<p>settings works!</p>
+<button class="btn btn-primary" [disabled]="buildBcLookup" (click)="reIndexBarcodeLookup()">reIndexBarcodeLookup</button>
+<div class="row" *ngFor="let varItem of variableList">
+  <div class="col-3">{{ varItem.name }}</div>
+  <div class="col">{{ varItem.value | json }}</div>
+</div>

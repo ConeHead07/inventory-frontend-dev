@@ -1,6 +1,6 @@
 <div class="modal-header p-0" style="padding:0.1rem">
   <div class="btn-group row no-gutters w-100">
-    <button class="btn btn-primary col-10 text-left pl-3" (click)="showSearchForm($event)($event)">
+    <button class="btn btn-primary col-10 text-left pl-3" (click)="showSearchForm($event)">
       <fa-icon [icon]="faSearch"></fa-icon> Artikel suchen
     </button>
     <button type="button" class="btn btn-danger col-2" (click)="activeModal.dismiss('Cross click')">
@@ -11,77 +11,195 @@
 <div class="modal-header">
   <h4 class="modal-title" id="modal-basic-title">Neuen Artikel anlegen</h4>
 </div>
-<div class="modal-body">
+<div class="modal-body artikel-form">
   <form #myForm="ngForm">
+
+    <div class="form-group">
+      <label for="Hersteller" class="d-none">Hersteller:</label>
+      <div class="input-group mb-3">
+        <div class="input-group-prepend">
+          <span class="input-group-text">HST</span>
+        </div>
+      <input
+        id="Hersteller"
+        name="Hersteller"
+        placeholder="Hersteller"
+        type="text"
+        class="form-control"
+        [(ngModel)]="artikelDaten.Hersteller"
+        (selectItem)="onSelectHersteller($event)"
+        [ngbTypeahead]="search"
+        [inputFormatter]="formatter"
+        [resultFormatter]="formatter"
+        (change)="onChangeHersteller($event)"
+        (focus)="focus$.next($any($event).target.value)"
+        (click)="click$.next($any($event).target.value)"
+        #instance="ngbTypeahead"
+      />
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="typ" class="d-none">Gruppe: </label>
+
+      <div class="input-group mb-3">
+        <div class="input-group-prepend">
+          <span class="input-group-text">GRP</span>
+        </div>
+        <input id="Gruppe" class="form-control" placeholder="Gruppe"
+               name="Gruppe"
+               [(ngModel)]="artikelDaten.Gruppe"
+               (change)="onChangeGruppe($event)"
+               (input)="onInput($event)"
+               (selectItem)="onSelectGruppe($event)"
+               [ngbTypeahead]="searchGruppen"
+               [inputFormatter]="formatter"
+               [resultFormatter]="formatter"
+               (focus)="focusGrp$.next($any($event).target.value)"
+               (click)="clickGrp$.next($any($event).target.value)"
+               #instanceGrp="ngbTypeahead"
+        >
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="typ" class="d-none">Kategorie: </label>
+      <div class="input-group mb-3">
+        <div class="input-group-prepend">
+          <span class="input-group-text">KTG</span>
+        </div>
+        <input id="Kategorie" class="form-control" placeholder="Kategorie"
+               name="Kategorie"
+               [(ngModel)]="artikelDaten.Kategorie"
+               (change)="onChange($event)"
+               (input)="onInput($event)"
+               (selectItem)="onSelectKategorie($event)"
+               [ngbTypeahead]="searchKategorien"
+               [inputFormatter]="formatter"
+               [resultFormatter]="formatter"
+               (focus)="focusKtg$.next($any($event).target.value)"
+               (click)="clickKtg$.next($any($event).target.value)"
+               #instanceKtg="ngbTypeahead"
+        >
+      </div>
+    </div>
+
     <div class="form-group" [ngClass]="{
-        'has-error': bezeichnung.dirty && (bezeichnung.invalid || bezeichnungExistsStatus === 1),
-        'has-info': bezeichnung.dirty && bezeichnungExistsStatus === -1
+        'has-error': bezeichnung.dirty && (bezeichnung.invalid || numBezeichnungExists === 1),
+        'has-info': bezeichnung.dirty && numBezeichnungExists === -1
         }">
-      <label for="Bezeichnung">Artike-Bez: </label>
-      <div class="input-group">
+      <label for="Bezeichnung" class="d-none">Artikel-Bez: </label>
+      <div class="input-group mb-3">
+        <div class="input-group-prepend">
+          <span class="input-group-text">BEZ</span>
+        </div>
         <input id="Bezeichnung" class="form-control" placeholder="Bezeichnung"
                name="Bezeichnung"
                [(ngModel)]="artikelDaten.Bezeichnung"
                #bezeichnung="ngModel"
-               (change)="checkIfArtikelExistsGlobal()"
+               (change)="checkIfABezeichnungExistsGlobal()"
+               (input)="onInput($event)"
                required
         >
       </div>
       <div *ngIf="bezeichnung.valid">
-        <div *ngIf="bezeichnungExistsStatus===-1" class="help-block">Artikelngabe wird geprüft</div>
-        <div *ngIf="bezeichnungExistsStatus===1" class="help-block">Artikel existiert bereits</div>
+        <div *ngIf="numBezeichnungExists===-1" class="help-block">Artikelangabe wird geprüft</div>
+        <div *ngIf="numBezeichnungExists===1" class="help-block">Artikel existiert bereits</div>
       </div>
     </div>
 
     <div class="form-group">
-      <label for="typ">Artikel-Typ: </label>
-      <div class="input-group">
-        <input id="typ" class="form-control" placeholder="Typ"
+      <label for="typ" class="d-none">Artikel-Typ: </label>
+      <div class="input-group mb-3">
+        <div class="input-group-prepend">
+          <span class="input-group-text">TYP</span>
+        </div>
+        <input id="typ" class="form-control" placeholder="Artikel-Typ"
                name="typ"
                [(ngModel)]="artikelDaten.Typ"
-               #typ="ngModel"
+               (change)="onChange($event)"
+               (input)="onInput($event)"
+               (selectItem)="onSelectTypen($event)"
+               [ngbTypeahead]="searchTypen"
+               [inputFormatter]="formatter"
+               [resultFormatter]="formatter"
+               (focus)="focusTyp$.next($any($event).target.value)"
+               (click)="clickTyp$.next($any($event).target.value)"
+               #instanceTyp="ngbTypeahead"
         >
       </div>
     </div>
 
     <div class="form-group">
-      <label for="Hersteller">Hersteller: </label>
-      <div class="input-group">
-        <input id="Hersteller" class="form-control" placeholder="Hersteller"
-               name="Hersteller"
-               [(ngModel)]="artikelDaten.Hersteller"
-               #typ="ngModel"
-        >
-      </div>
-    </div>
-
-    <div class="form-group">
-      <label for="Groesse">Abmessungen: </label>
-      <div class="input-group">
+      <label for="Groesse" class="d-none">Abmessungen: </label>
+      <div class="input-group mb-3">
+        <div class="input-group-prepend">
+          <span class="input-group-text">Größe</span>
+        </div>
         <input id="Groesse" class="form-control" placeholder="Groesse"
                name="Groesse"
                [(ngModel)]="artikelDaten.Groesse"
-               #typ="ngModel"
+               (change)="onChange($event)"
+               (input)="onInput($event)"
+               (selectItem)="onSelectGroessen($event)"
+               [ngbTypeahead]="searchGroessen"
+               [inputFormatter]="formatter"
+               [resultFormatter]="formatter"
+               (focus)="focusGrs$.next($any($event).target.value)"
+               (click)="clickGrs$.next($any($event).target.value)"
+               #instanceGrs="ngbTypeahead"
         >
       </div>
     </div>
 
     <div class="form-group">
-      <label for="Farbe">Farbe: </label>
-      <div class="input-group">
+      <label for="Farbe" class="d-none">Farbe: </label>
+      <div class="input-group mb-3">
+        <div class="input-group-prepend">
+          <span class="input-group-text">Farbe</span>
+        </div>
         <input id="Farbe" class="form-control" placeholder="Farbe"
                name="Farbe"
                [(ngModel)]="artikelDaten.Farbe"
-               #typ="ngModel"
+               (change)="onChange($event)"
+               (input)="onInput($event)"
+               (selectItem)="onSelectFarben($event)"
+               [ngbTypeahead]="searchFarben"
+               [inputFormatter]="formatter"
+               [resultFormatter]="formatter"
+               (focus)="focusFa$.next($any($event).target.value)"
+               (click)="clickFa$.next($any($event).target.value)"
+               #instanceFa="ngbTypeahead"
         >
       </div>
     </div>
   </form>
-  <p>select-create-artikel works!</p>
   <pre>{{closeResult}}</pre>
+  <p class="d-none">select-create-artikel works!</p>
 </div>
 <div class="modal-footer">
   <button type="button" class="btn btn-outline-dark" (click)="activeModal.close('Close click')">Close</button>
   <button type="button" class="btn btn-outline-dark" (click)="onSubmit($event)" [disabled]="!formIsValid || !myForm.form.valid">Artikel anlegen</button>
   <div *ngIf="formError" class="alert-danger"> {{formError}} </div>
+  <div>
+    <ngb-pagination [collectionSize]="collectionSize" [(page)]="page" [maxSize]="maxSize" [pageSize]="pageSize" (pageChange)="onPageChange(page)"></ngb-pagination>
+  </div>
+  <div class="row no-gutters">
+    <div class="card col-sm-6" *ngFor="let item of listExistingArticlePage">
+      <img *ngIf="item.img_id" class="card-img-top" src="..." alt="">
+      <div class="card-body ">
+        <h6 class="card-title">{{ item.Bezeichnung }}</h6>
+        <div *ngIf="item.Hersteller"><small>Hst: {{ item.Hersteller }}</small></div>
+        <div *ngIf="item.Gruppe"><small>Grp: {{ item.Gruppe }}</small></div>
+        <div *ngIf="item.Typ"><small>Typ: {{ item.Typ }}</small></div>
+        <div *ngIf="item.Kategorie"><small>Ktg: {{ item.Kategorie }}</small></div>
+        <div *ngIf="item.Farbe || item.Groesse"><small>{{ item.Farbe }} {{ item.Groesse }}</small></div>
+        <div *ngIf="item.inventar_count"><small>{{ item.inventar_count }}</small></div>
+      </div>
+      <div class="card-footer text-center">
+        <button (click)="applyItemAsInput(item)" class="btn btn-sm btn-info">Als Vorlage übernehmen</button>
+        <button (click)="applyItemAsArtikel(item)" class="btn btn-sm btn-primary">Artikel Übernehmen</button>
+      </div>
+    </div><!-- Close: div.card -->
+  </div><!-- Close: div.row -->
 </div>

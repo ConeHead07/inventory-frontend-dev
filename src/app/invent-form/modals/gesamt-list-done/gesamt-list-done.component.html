@@ -1,0 +1,52 @@
+<div class="modal-header p-0" style="padding:0.1rem">
+  <div class="btn-group row no-gutters w-100">
+    <button class="btn btn-primary col-10 text-left pl-3" (click)="showGesamtRestForm($event)">
+      <fa-icon [icon]=""></fa-icon> Zeige fehlende Räume
+    </button>
+    <button type="button" class="btn btn-danger col-2" (click)="activeModal.dismiss('Cross click')">
+      <span aria-hidden="true">&times;</span>
+    </button>
+  </div>
+</div>
+<div class="modal-header">
+  <h4 class="modal-title">Bereits inventarisiert</h4>
+</div>
+<div class="modal-body">
+
+  <table class="table table-striped">
+    <thead>
+    <tr>
+      <th scope="col">#</th>
+      <th scope="col" sortable="Bezeichnung">Etage</th>
+      <th scope="col" sortable="Typ">Raum</th>
+      <th scope="col" sortable="Typ">Fertig</th>
+      <th scope="col" sortable="Typ">Prgoress</th>
+      <th scope="col" sortable="Menge">Vorher</th>
+      <th scope="col" sortable="Menge">Nacher</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr *ngFor="let item of raeumeListDone">
+      <th scope="row">{{ item.rid }}</th>
+      <th>{{ item.Etage }}</th>
+      <td>{{ item.Raum }}</td>
+      <td>
+        <fa-icon *ngIf="item.editStatus === 2; else elseInProgress"  [attr.class]="'text-success'" [icon]="faCheck"></fa-icon>
+        <ng-template #elseInProgress><fa-icon [attr.class]="'text-info'" [icon]="faInWork"></fa-icon></ng-template>
+      </td>
+      <td>
+        <ng-container [ngSwitch]="item.statusIconName">
+          <fa-icon [attr.class]="'text-danger'" *ngSwitchCase="'empty'" [icon]="faEmpty"></fa-icon>
+          <fa-icon [attr.class]="'text-warning'" *ngSwitchCase="'quarter'" [icon]="faQuarter"></fa-icon>
+          <fa-icon [attr.class]="'text-info'" *ngSwitchCase="'half'" [icon]="faHalf"></fa-icon>
+          <fa-icon [attr.class]="'text-success'" *ngSwitchCase="'three-quarter'" [icon]="faThreeQuarter"></fa-icon>
+          <fa-icon [attr.class]="'text-success'" *ngSwitchCase="'full'" [icon]="faFull"></fa-icon>
+        </ng-container> {{ item.progress }}%
+      </td>
+      <td>{{ item.total }}</td>
+      <td>{{ item.done }}</td>
+    </tr>
+    </tbody>
+  </table>
+</div>
+<p>gesamt-list-done works!</p>

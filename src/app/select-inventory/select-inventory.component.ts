@@ -7,6 +7,19 @@ import {DBDIGebaeude, DBDIInventuren, DBDIMandanten} from '../dexie.service';
 import {AuthService} from '../auth/auth.service';
 import {BasedataService} from '../basedata.service';
 import {InventoryProgress, InventoryProgressService} from '../inventory-progress.service';
+import { faSyncAlt } from '@fortawesome/free-solid-svg-icons';
+import {ConnectionService as NgConnectionService } from 'ng-connection-service';
+import {ConnectionService, ConnectionState} from '../connection-service.service';
+
+enum StatusLoadingInventories {
+  None,
+  WaitingForNetwork,
+  WaitingForServerAccess,
+  Pending,
+  Loading,
+  FinishedSuccessful,
+  Failure
+}
 
 @Component({
   selector: 'app-select-inventory',
@@ -18,10 +31,17 @@ export class SelectInventoryComponent implements OnInit, OnDestroy {
   @ViewChild('f', {static: false })
   selectForm: NgForm;
 
-  public status = '';
+  faSyncIcon = faSyncAlt;
+  ngHasConnection = false;
+  hasConnection = false;
+  hasServerConnection = false;
 
-  private totalElements = 300;
-  private doneElements = 50;
+  public status = '';
+  public statusLoadingUserInventories = StatusLoadingInventories.None;
+  public loadedUserInventories = false;
+
+  private totalElements = 0;
+  private doneElements = 0;
 
   private jobid?: number;
   private inventory?: DBDIInventuren;
@@ -42,7 +62,10 @@ export class SelectInventoryComponent implements OnInit, OnDestroy {
     private router: Router,
     private auth: AuthService,
     private baseData: BasedataService,
-    private progressService: InventoryProgressService) {}
+    private progressService: InventoryProgressService,
+    private connection: ConnectionService,
+    private ngConnection: NgConnectionService) {
+  }
 
   get progressAmount(): number {
     if (typeof this.doneElements !== 'number' || this.doneElements <= 0) {
@@ -53,34 +76,88 @@ export class SelectInventoryComponent implements OnInit, OnDestroy {
     }
     const done = this.doneElements;
     const total = this.totalElements;
-    return Math.round((done * 1000) / total) / 10;
+    return total > 0 ? Math.round((done * 1000) / total) / 10 : 0;
   }
 
 
   ngOnInit() {
+    this.routingSubscription = this.route.params.subscribe(params => {
+      console.log({params});
+    });
+
+    this.ngConnection.monitor().subscribe( (hasConn: boolean) => {
+      this.ngHasConnection = hasConn;
+    });
+    this.hasConnection = this.connection.hasInternetAccess;
+    this.hasServerConnection = this.connection.hasInternetAccess;
+    this.connection.monitor().subscribe( (conn: ConnectionState) => {
+      this.hasConnection = conn.hasNetworkConnection;
+      this.hasServerConnection = conn.hasInternetAccess;
+
+      if (this.statusLoadingUserInventories < StatusLoadingInventories.FinishedSuccessful) {
+        this.checkLoadUserInventories();
+      }
+    });
+
+
+  }
+
+  public checkLoadUserInventories() {
+    const stat = this.statusLoadingUserInventories;
+    if (stat < StatusLoadingInventories.FinishedSuccessful) {
+      if (stat < StatusLoadingInventories.Pending) {
+        if (!this.hasConnection) {
+          this.statusLoadingUserInventories = StatusLoadingInventories.WaitingForNetwork;
+          return;
+        }
+        if (!this.hasServerConnection) {
+          this.statusLoadingUserInventories = StatusLoadingInventories.WaitingForServerAccess;
+          return;
+        }
+        this.statusLoadingUserInventories = StatusLoadingInventories.Pending;
+        this.loadUserInventories().then( (success) => {
+          this.statusLoadingUserInventories = success
+            ? StatusLoadingInventories.FinishedSuccessful
+            : StatusLoadingInventories.Failure;
+        }).catch( (err) => {
+          this.statusLoadingUserInventories = StatusLoadingInventories.Failure;
+          this.status = JSON.stringify( err );
+        });
+      }
+    }
+  }
+
+  public async loadUserInventories(): Promise<boolean> {
     console.log('ngOnInit select-iventory.components.ts');
     const uid = this.auth.getUser().id;
     const mid = this.baseData.getCurrentMid() || 0;
     const gid = this.baseData.getCurrentGid() || 0;
 
-    this.dataService.getUserAssignedInventories( uid ).then( (result) => {
-      console.log({ called: 'this.dataService.getUserAssignedInventories', result});
-      this.inventories = result;
-      const aMids = this.inventories.map<number>( (itm) => itm.mid );
-      console.log( 'ngOnInit', { uid, aMids });
+    return await this.dataService.getUserAssignedInventories( uid )
+      .then( (result) => {
+        console.log({ called: 'this.dataService.getUserAssignedInventories', result});
+        this.inventories = result;
+        const aMids = this.inventories.map<number>( (itm) => itm.mid );
+        console.log( 'ngOnInit', { uid, aMids });
 
-      this.dataService.getClientList().then( (mandanten: DBDIMandanten[]) => {
-        this.clients = mandanten.filter( (itm) => aMids.indexOf( itm.mid ) !== -1 );
-        return this.clients;
+        return this.dataService.getClientList()
+          .then( (mandanten: DBDIMandanten[]) => {
+            this.clients = mandanten.filter( (itm) => aMids.indexOf( itm.mid ) !== -1 );
+            return this.clients;
+          })
+          .then( clientList => {
+            this.setDefaultSelection(mid, gid);
+            return true;
+          })
+          .catch( (err) => {
+            this.status = JSON.stringify(err);
+            return false;
+          });
       })
-        .then( clientList => {
-          this.setDefaultSelection(mid, gid);
-        });
-    });
-
-    this.routingSubscription = this.route.params.subscribe(params => {
-      console.log({params});
-    });
+      .catch( (err) => {
+        this.status = JSON.stringify(err);
+        return false;
+      });
   }
 
   public setDefaultSelection(mid: number, gid?: null|number) {

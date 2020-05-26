@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import {DBDIInventar, DBDIRaeume, DexieService} from './dexie.service';
 import {BasedataService} from './basedata.service';
+import {IndexableType} from 'dexie';
 
 export interface InventoryProgress {
   total: number;
@@ -22,25 +23,33 @@ export class InventoryProgressService {
   }
 
   async getGebaeudeProgressByGidAndJobid(gid: number, jobid: number): Promise<InventoryProgress> {
+    const db = this.dexieService;
+    const raeume = db.raeume;
+    const inventar = db.inventar;
+
     const progress: InventoryProgress = {
       total: 0,
       done: 0,
     };
 
-    const ridList = await this.dexieService.raeume
-      .where({ gid })
-      .toArray()
-      .then<number[]>( (list) => list.map( itm => itm.rid) );
+    const ridListTmp = await raeume.where( {gid}).toArray();
+    const ridList = ridListTmp.filter( (rg) => rg.gid === gid).map( (rg) => rg.rid);
 
-    await Promise.all([
-      this.dexieService.inventar.where( 'rid' ).anyOf(ridList).count(),
-      this.dexieService.inventar.where( 'rid' ).anyOf(ridList).and( itm => itm.jobid === jobid).count()
-      ]).then( totalAndProgress => {
-        progress.total = totalAndProgress[0];
-        progress.done = totalAndProgress[1];
-      });
+    const chunkSize = Math.ceil( ridList.length / 8 );
+    const chunks = [];
+    for (let i = 0; i < ridList.length; i += chunkSize) {
+      chunks.push( ridList.slice(i, i + chunkSize) );
+    }
 
-    return progress;
+    return await Promise.all([
+      inventar.where( { jobid } ).count(),
+      Promise.all( chunks.map( async (ridChunkList) => inventar.where( 'rid' ).anyOf( ridChunkList ).count() ))
+    ]).then( (chunksTotalAndProgress) => {
+      console.log({chunksTotalAndProgress});
+      progress.done = chunksTotalAndProgress[0];
+      progress.total = chunksTotalAndProgress[1].reduce( (sum, chnk) => sum + chnk, 0);
+      return progress;
+    });
   }
 
   async getCurrentRaumProgress(useRid?: number): Promise<InventoryProgress> {

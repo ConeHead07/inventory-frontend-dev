@@ -4,31 +4,44 @@ import {Location} from '@angular/common';
 import {DataService, InventarData} from '../inventory/service/data.service';
 import {DBDIMandanten} from '../inventory/models/client.model';
 import {DBDIGebaeude} from '../inventory/models/building.model';
-import {InventarModel} from '../inventory/models/inventar.model';
-import {faSearch} from '@fortawesome/free-solid-svg-icons';
+import {faCamera, faImage, faSearch, faCheck, faDoorClosed, faDoorOpen } from '@fortawesome/free-solid-svg-icons';
 import {InventoryProgress, InventoryProgressService} from '../inventory-progress.service';
 
 import {ScanDetectData} from '../inventory/components/scannerdetection/scannerdetection.component';
 
-import {NgbModal} from '@ng-bootstrap/ng-bootstrap';
+import {NgbModal, NgbModalRef} from '@ng-bootstrap/ng-bootstrap';
 // Dialogs
 import {ScannerBarcodeData, ScannerComponent} from './modals/scanner/scanner.component';
 import {CreateArtikelImageComponent} from './modals/create-artikel-image/create-artikel-image.component';
 import {ShowArtikelImageComponent} from './modals/show-artikel-image/show-artikel-image.component';
 import {SelectCreateArtikelComponent} from './modals/select-create-artikel/select-create-artikel.component';
-import {SelectSearchArtikelComponent} from './modals/select-search-artikel/select-search-artikel.component';
+import {
+  ArtikelOption,
+  SelectSearchArtikelComponent
+} from './modals/select-search-artikel/select-search-artikel.component';
 import {SelectCreateRaumComponent} from './modals/select-create-raum/select-create-raum.component';
+import {RaumListRestComponent} from './modals/raum-list-rest/raum-list-rest.component';
+import {RaumListDoneComponent} from './modals/raum-list-done/raum-list-done.component';
+
 import {
   DBDIArtikel,
-  DBDIInventar, DBDIObjektKatalogGlobal, DBDIObjektKatalogMandant,
+  DBDIInventar,
   DBDIRaeume,
+  DBDIRaumEditStatus,
   DBDIRaumGebaeude,
-  LookupAssignedInventar,
+  IUnionLookupAssignedObject,
+  LookupResultTable,
   LookupResultType
 } from '../dexie.service';
 import {SelectSearchRaumComponent} from './modals/select-search-raum/select-search-raum.component';
 import {BasedataService} from '../basedata.service';
 import {InventoryEditorService} from '../inventory-editor.service';
+import {InventarService} from './data-services/inventar.service';
+import {ImagesService} from './data-services/images.service';
+import {BarcodeService} from './data-services/barcode.service';
+import {RaumIDAndStatus, RaumService} from './data-services/raum.service';
+import {GesamtListRestComponent} from './modals/gesamt-list-rest/gesamt-list-rest.component';
+import {GesamtListDoneComponent} from './modals/gesamt-list-done/gesamt-list-done.component';
 
 interface ScannerConfiguration {
   minLength?: number; // 7
@@ -42,7 +55,7 @@ interface ScannerConfiguration {
   barcodeType?: string; // ean13 - gtin[d] or ean[\]
 }
 
-interface RaumStatus {
+interface RaumProgressStatus {
   hasTotal: boolean;
   total: number;
   numDone: number;
@@ -51,7 +64,9 @@ interface RaumStatus {
 interface FormInventar {
   ivid?: number;
   mcid?: number;
+  mcuuid?: string;
   gcid?: number;
+  gcuuid?: string;
   rid?: number;
   Raum?: string;
   Raumbezeichnung?: string;
@@ -59,6 +74,40 @@ interface FormInventar {
   Barcode?: string;
   Bezeichnung?: string;
   Typ?: string;
+}
+
+interface CurrentModal {
+  modalRef?: NgbModalRef;
+  name: string;
+  isOpen: boolean;
+}
+
+/*
+if ( matchesObjektbuchArtikel ) {
+      const [, src, id, mid, gkid, hashStart ] = matchesObjektbuchArtikel;
+      console.log( 'search for scanned Article', { src, id, mid, gkid, hashStart });
+ */
+
+interface BCPartsObjektbuch {
+  src: string;
+  id: string;
+  mid: string;
+  hashStart: string;
+}
+
+interface BCPartsObjektbuchRaum extends BCPartsObjektbuch {
+  gid: string;
+}
+
+interface BCPartsObjektbuchArtikel extends BCPartsObjektbuch {
+  gcid: string;
+}
+
+interface BCLookupResult {
+  barcode: string;
+  expectedType: LookupResultType;
+  bcParts?: BCPartsObjektbuchArtikel|BCPartsObjektbuchRaum;
+  result: IUnionLookupAssignedObject;
 }
 
 @Component({
@@ -69,6 +118,11 @@ interface FormInventar {
 export class InventFormComponent implements OnInit, OnDestroy {
 
   faSearch = faSearch;
+  faCamera = faCamera;
+  faImage = faImage;
+  faCheck = faCheck;
+  faDoorOpen = faDoorOpen;
+  faDoorClosed = faDoorClosed;
 
   @ViewChild('input2', { static: true }) input2: ElementRef;
   @ViewChild('inputSimulateBarcode', { static: true }) inputSimulateBarcode: ElementRef;
@@ -81,7 +135,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
     scanTimeout: 100,
     replaceNotNumber: false,
     allowNotNumber: true,
-    ignoreOverElement: [],
+    ignoreOverElement: [ '.formcontrol-edit-barcode'],
     barcodeType: ''
   };
 
@@ -89,6 +143,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
     ivid: null,
     mcid: null,
     gcid: null,
+    gcuuid: null,
     rid: null,
     Raum: null,
     Raumbezeichnung: null,
@@ -103,9 +158,6 @@ export class InventFormComponent implements OnInit, OnDestroy {
   public raum?: DBDIRaeume;
   public inventarData?: InventarData;
 
-  public invObject: InventarModel;
-  public raumStatus: RaumStatus;
-
   private clientID: number;
   private buildingID: number;
   private roomID?: number;
@@ -115,16 +167,29 @@ export class InventFormComponent implements OnInit, OnDestroy {
   public lastScanDetectTime?: Date;
   public lastScanDetectClass = '';
   private lastScanDetectTimer = null;
+  private waitingForNewInventarBarcode = false;
+  private openedCreateRaum = false;
+  private artikelImageExists = false;
 
   private jobProgress: InventoryProgress = {
     total: 0,
     done: 0,
   };
 
+  private raumEditStatus: DBDIRaumEditStatus;
+
   private raumProgress: InventoryProgress = {
     total: 0,
     done: 0,
   };
+
+  private currentModal: CurrentModal = {
+    modalRef: null,
+    isOpen: false,
+    name: ''
+  };
+
+  private currentModals: CurrentModal[] = [];
 
   constructor(
     private route: ActivatedRoute,
@@ -133,9 +198,19 @@ export class InventFormComponent implements OnInit, OnDestroy {
     private modalService: NgbModal,
     private baseData: BasedataService,
     private inventoryProgress: InventoryProgressService,
-    private inventoryEditor: InventoryEditorService) {}
+    private inventoryEditor: InventoryEditorService,
+    private inventarDataService: InventarService,
+    private raumService: RaumService,
+    private imageService: ImagesService,
+    private bcLookup: BarcodeService) {
+  }
 
   ngOnInit() {
+    this.raumService.raumStatusChanged.subscribe( (stat: RaumIDAndStatus) => {
+      if (stat.rid === this.roomID) {
+        this.raumEditStatus = stat.status;
+      }
+    });
     this.routingSubscription = this.route.params.subscribe(params => {
       this.clientID = parseInt( params.clientid,  10 );
       this.buildingID = parseInt( params.buildingid, 10 );
@@ -181,7 +256,8 @@ export class InventFormComponent implements OnInit, OnDestroy {
     this.formInventar.Raum = raum.Raum;
     this.formInventar.Raumbezeichnung = raum.Raumbezeichnung;
     this.formInventar.RaumBarcode = raum.code;
-    console.log('#144 loadRaumByData refreshRaumProgress')
+    this.raumEditStatus = this.raum.current_jobstatus;
+    console.log('#144 loadRaumByData refreshRaumProgress');
 
     this.refreshRaumProgress();
   }
@@ -196,6 +272,21 @@ export class InventFormComponent implements OnInit, OnDestroy {
       .catch( (err) => {
         console.error('Inventar konnte nicht zugewiesen werden!', err);
       });
+  }
+
+  async saveNewInventar() {
+    const jobid = this.baseData.getCurrentJobid();
+    const uid = this.baseData.getCurrentUid();
+    const inventar: DBDIInventar = {
+      mcid: this.formInventar.mcid,
+      mcuuid: this.formInventar.mcuuid,
+      rid: this.formInventar.rid,
+      code: this.formInventar.Barcode,
+      jobid,
+      created_at: new Date(),
+      created_uid: uid
+    };
+    this.inventarDataService.insertInventar(inventar, jobid);
   }
 
   async assignArtikelToRaum(artikelMcid: number) {}
@@ -244,11 +335,19 @@ export class InventFormComponent implements OnInit, OnDestroy {
   loadArtikelByData(artikel: DBDIArtikel) {
     this.artikelID = artikel.mcid;
     this.formInventar.mcid = artikel.mcid;
+    this.formInventar.mcuuid = artikel.uuid;
     this.formInventar.gcid = artikel.gcid;
+    this.formInventar.gcuuid = artikel.uuid;
     this.formInventar.Bezeichnung = artikel.Bezeichnung;
     this.formInventar.Typ = artikel.Typ;
     this.formInventar.Barcode = '';
     this.formInventar.ivid = null;
+
+    const tmp = {...this.formInventar};
+    this.formInventar = {...tmp};
+    this.waitingForNewInventarBarcode = true;
+    console.log('Applied argument artikel', artikel, ' to formInventar', this.formInventar);
+    this.reloadImageExistsStatus();
   }
 
   loadInventarById(ivid: number) {
@@ -266,10 +365,27 @@ export class InventFormComponent implements OnInit, OnDestroy {
     this.artikelID = inventar.mcid;
     this.formInventar.mcid = inventar.mcid;
     this.formInventar.gcid = artikelRef.gcid;
+    this.formInventar.mcuuid = artikelRef.uuid;
+    this.formInventar.gcuuid = artikelData.uuid;
     this.formInventar.Bezeichnung = artikelData.Bezeichnung;
     this.formInventar.Typ = artikelData.Typ;
     this.formInventar.Barcode = inventar.code;
     this.formInventar.ivid = inventar.ivid;
+
+    this.reloadImageExistsStatus();
+  }
+
+  async reloadImageExistsStatus(): Promise<boolean> {
+    this.artikelImageExists = false;
+    if (!this.formInventar.gcuuid) {
+      return false;
+    }
+    return this.imageService.imageExistsOfGcuuid( this.formInventar.gcuuid )
+      .then( exists => {
+        this.artikelImageExists = exists;
+        return exists;
+      })
+      .catch( () => false);
   }
 
   get kundeName(): string {
@@ -293,33 +409,101 @@ export class InventFormComponent implements OnInit, OnDestroy {
 
   openCreateArtikelImage() {
     const modalRef = this.modalService.open(CreateArtikelImageComponent);
-    modalRef.componentInstance.name = 'World';
+    modalRef.componentInstance.name = this.formInventar.Bezeichnung + '/' + this.formInventar.Typ;
+    modalRef.componentInstance.gcuuid = this.formInventar.gcuuid;
+    modalRef.result.then( () => {
+      this.reloadImageExistsStatus();
+    });
   }
 
   openShowArtikelImage() {
     const modalRef = this.modalService.open(ShowArtikelImageComponent);
     modalRef.componentInstance.name = 'World';
+    modalRef.componentInstance.setGcuuid( this.formInventar.gcuuid );
+    modalRef.result.then( () => {
+      this.reloadImageExistsStatus();
+    });
   }
 
-  openScanner() {
+  openScanner(inputElm?: HTMLElement) {
     const modalRef = this.modalService.open(ScannerComponent);
     modalRef.componentInstance.name = 'World';
     const sub = modalRef.componentInstance.onScan.subscribe((data: ScannerBarcodeData) => {
       const scan: ScanDetectData = {
         barcode: data.barcode,
         length: data.length,
-        valid: data.valid
+        valid: data.valid,
+        target: inputElm
       };
       this.handleScanData( scan );
     });
   }
 
+  getModalRefByName(name): NgbModalRef {
+    const modal = this.currentModals.find( mod => mod.name === name);
+    return (modal && modal.modalRef.componentInstance) ? modal.modalRef : null;
+  }
+
+  modalWatch(modalRef: NgbModalRef, name: string) {
+    const mRef = modalRef;
+    const mName = name;
+    console.log('Opened Modal: ', name);
+    this.currentModal = {
+      modalRef,
+      name,
+      isOpen: true
+    };
+    this.currentModals = this.currentModals.filter( mod => undefined !== mod.modalRef.componentInstance);
+    this.currentModals.push( this.currentModal );
+    console.log('After open Modal: ', this.currentModal, this.currentModals);
+
+    modalRef.result.then( (result) => {
+      if (name === 'SelectCreateRaum') {
+        this.openedCreateRaum = false;
+      }
+      this.currentModals = this.currentModals.filter( mod => undefined !== mod.modalRef.componentInstance);
+
+      if (this.currentModals.length) {
+        this.currentModal = this.currentModals[ this.currentModals.length - 1];
+      } else {
+        this.currentModal = {
+          modalRef: null,
+          name: '',
+          isOpen: false
+        };
+      }
+      console.log('After dismiss resolved: ', this.currentModal, this.currentModals);
+    })
+      .catch( (err) => {
+        if (name === 'SelectCreateRaum') {
+          this.openedCreateRaum = false;
+        }
+        this.currentModals = this.currentModals.filter( mod => undefined !== mod.modalRef.componentInstance);
+        console.error('Error on Closing Modal ', { mName, err} );
+        if (this.currentModals.length) {
+          this.currentModal = this.currentModals[ this.currentModals.length - 1];
+        } else {
+          this.currentModal = {
+            modalRef: null,
+            name: '',
+            isOpen: false
+          };
+        }
+        console.log('After Catch: ', this.currentModal, this.currentModals);
+      });
+  }
+
   openSelectCreateArtikel() {
     const modalRef = this.modalService.open(SelectCreateArtikelComponent);
+    this.modalWatch(modalRef, 'SelectCreateArtikel');
     modalRef.componentInstance.name = 'World';
     modalRef.componentInstance.clientId = this.clientID;
     modalRef.componentInstance.artikelCreated.subscribe( (artikel: DBDIArtikel) => {
       this.loadArtikelByData( artikel );
+    });
+    modalRef.componentInstance.artikelSelected.subscribe((item: ArtikelOption) => {
+      console.log('#505 openSelectCreateArtikel Apply selected Article', item);
+      this.loadArtikelById(item.id);
     });
     modalRef.componentInstance.artikelSearching.subscribe( (raum: number) => {
       this.openSelectSearchArtikel();
@@ -328,9 +512,11 @@ export class InventFormComponent implements OnInit, OnDestroy {
 
   openSelectSearchArtikel() {
     const modalRef = this.modalService.open(SelectSearchArtikelComponent);
+    this.modalWatch(modalRef, 'SelectSearchArtikel');
     modalRef.componentInstance.clientId = this.clientID;
-    modalRef.componentInstance.artikelSelected.subscribe((item: DBDIArtikel) => {
-      this.loadArtikelByData(item);
+    modalRef.componentInstance.artikelSelected.subscribe((item: ArtikelOption) => {
+      console.log('Apply selected Article', item);
+      this.loadArtikelById(item.id);
     });
     modalRef.componentInstance.artikelCreating.subscribe((mid: number) => {
       modalRef.close();
@@ -340,6 +526,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
 
   openSelectSearchRaum() {
     const modalRef = this.modalService.open(SelectSearchRaumComponent);
+    this.modalWatch(modalRef, 'SelectSearchRaum');
     modalRef.componentInstance.gebaeudeId = this.buildingID;
     modalRef.componentInstance.raumSelected.subscribe( (raum: DBDIRaeume) => {
       this.loadRaumByData(raum);
@@ -352,6 +539,8 @@ export class InventFormComponent implements OnInit, OnDestroy {
 
   openSelectCreateRaum() {
     const modalRef = this.modalService.open(SelectCreateRaumComponent);
+    this.modalWatch(modalRef, 'SelectCreateRaum');
+    this.openedCreateRaum = true;
     modalRef.componentInstance.gebaeudeId = this.buildingID;
     modalRef.componentInstance.raumCreated.subscribe( (raum: DBDIRaeume) => {
       this.loadRaumByData(raum);
@@ -359,23 +548,334 @@ export class InventFormComponent implements OnInit, OnDestroy {
     modalRef.componentInstance.raumSearching.subscribe( (raum: number) => {
       this.openSelectSearchRaum();
     });
+    modalRef.componentInstance.scannerRequest.subscribe( (target: HTMLElement) => {
+      this.openScanner(target);
+    });
+  }
+
+  openGesamtListDone(useGebaeude?: DBDIGebaeude) {
+    const gebaeude = useGebaeude || this.gebaeude;
+    const modalRef = this.modalService.open( GesamtListDoneComponent, { size: 'xl', scrollable: true } );
+    this.modalWatch(modalRef, 'GesamtListDone');
+    modalRef.componentInstance.gebaeude = gebaeude;
+    modalRef.componentInstance.requestGesamtRest.subscribe( (g: DBDIGebaeude) => {
+      this.openGesamtListRest(g);
+    });
+  }
+
+  openGesamtListRest(useGebaeude?: DBDIGebaeude) {
+    const gebaeude = useGebaeude || this.gebaeude;
+    if (!gebaeude || !gebaeude.gid) {
+      console.error('No Gebaeude-Data!!!');
+    } else {
+      console.log('OpenGesamtListRest', {
+        buildingID: this.buildingID,
+        gebaeude: this.gebaeude
+      });
+    }
+    const modalRef = this.modalService.open( GesamtListRestComponent );
+    this.modalWatch(modalRef, 'GesamtListRest');
+    modalRef.componentInstance.gebaeude = gebaeude;
+    modalRef.componentInstance.requestGesamtDone.subscribe( (g: DBDIGebaeude) => {
+      this.openGesamtListDone(g);
+    });
+  }
+
+  openRaumListDone(useRaum?: DBDIRaeume) {
+    const raum = useRaum || this.raum;
+    const modalRef = this.modalService.open( RaumListDoneComponent );
+    this.modalWatch(modalRef, 'RaumListDone');
+    modalRef.componentInstance.raum = raum;
+    modalRef.componentInstance.requestRestList.subscribe( (r: DBDIRaeume) => {
+      this.openRaumListRest(r);
+    });
+  }
+
+  openRaumListRest(useRaum?: DBDIRaeume) {
+    const raum = useRaum || this.raum;
+    const modalRef = this.modalService.open( RaumListRestComponent );
+    this.modalWatch(modalRef, 'RaumListRest');
+    modalRef.componentInstance.raum = raum;
+    modalRef.componentInstance.requestDoneList.subscribe( (r: DBDIRaeume) => {
+      this.openRaumListDone(r);
+    });
   }
 
   ngOnDestroy(): void {
     this.routingSubscription.unsubscribe();
   }
 
+  toggleRaumEditStatus() {
+    const jobid = this.baseData.getCurrentJobid();
+    if (this.raumEditStatus !== DBDIRaumEditStatus.Closed) {
+      this.raumService.setRaumStatusClosed(this.roomID, jobid);
+    } else {
+      this.raumService.setRaumStatusStarted(this.roomID, jobid);
+    }
+  }
+
+  setRaumEditStatusClosed() {
+    const jobid = this.baseData.getCurrentJobid();
+    this.raumService.setRaumStatusClosed(this.roomID, jobid);
+  }
+
+  setRaumEditStatusStarted() {
+    const jobid = this.baseData.getCurrentJobid();
+    this.raumService.setRaumStatusStarted(this.roomID, jobid);
+  }
+
+  setRaumEditStatusUntouched() {
+    const jobid = this.baseData.getCurrentJobid();
+    this.raumService.setRaumStatusInit(this.roomID, jobid);
+  }
+
   onRaumBarcodeInput(event: Event): void {
     if (event.target instanceof HTMLInputElement || 'value' in event.target ) {
-      console.log('BarCodeInput:', event.target.value );
+      console.log('BarCodeInput :', event.target.value );
     }
+  }
+
+  showGesamtDone(): void {
+    console.log('Called show Gesamt Done');
+    this.openGesamtListDone();
+  }
+
+  showGesamtRest(): void {
+    console.log('Called show Gesamt Rest');
+    this.openGesamtListRest();
+  }
+
+  showRaumDone(): void {
+    console.log('Called show Raum Done ...');
+    this.openRaumListDone();
+  }
+
+  showRaumRest(): void {
+    console.log('Called show Raum Rest');
+    this.openRaumListRest();
+  }
+
+  async barcodeLookup( barcode: string): Promise<BCLookupResult> {
+    const bclResult: BCLookupResult = {
+      barcode,
+      expectedType: LookupResultType.NoMatch,
+      bcParts: null,
+      result: { type: LookupResultType.NoMatch }
+    };
+
+    // Test auf Objektbuch - Artikel
+    const matchesObjektbuchArtikel = barcode.match(/^(A)-(\d+)-(\d+)-(\d+)-([0-9a-zA-Z]+)$/);
+    if ( matchesObjektbuchArtikel ) {
+      const [, src, id, mid, gcid, hashStart ] = matchesObjektbuchArtikel;
+      bclResult.expectedType = LookupResultType.ObjektBuchArtikel;
+      bclResult.bcParts = { src, id, mid, gcid, hashStart } as BCPartsObjektbuchArtikel;
+
+      const data = await this.dataService.getArtikelRefAndData( parseInt(id, 10) );
+      if (data) {
+        bclResult.result = {
+          type: LookupResultType.ObjektBuchArtikel,
+          artikelRef: data.artikelRef,
+          artikelData: data.artikelData
+        };
+      }
+      return bclResult;
+    }
+
+    // Test auf Objektbuch - Raum
+    const matchesObjektbuchRaum = barcode.match(/^(R)-(\d+)-(\d+)-(\d+)-([0-9a-zA-Z]+)$/);
+    if ( matchesObjektbuchRaum ) {
+      const [ , src, id, mid, gid, hashStart ] = matchesObjektbuchRaum;
+      bclResult.expectedType = LookupResultType.ObjektBuchRaum;
+      bclResult.bcParts = { src, id, mid, gid, hashStart } as BCPartsObjektbuchRaum;
+
+      const data = await this.dataService.getRaumAndGebaeude( parseInt(id, 10) );
+      if (data) {
+        bclResult.result = {
+          type: LookupResultType.ObjektBuchRaum,
+          raum: data.raum,
+          gebaeude: data.gebaeude
+        };
+      }
+      return bclResult;
+    }
+
+    console.log('Start Barcode-Lookup');
+    bclResult.result = await this.dataService.barcodeLookup(barcode, this.kunde.mid);
+
+    return bclResult;
+
+    // switch (result.type) {
+    //   case LookupResultType.Inventar:
+    //     bclResult.result = {
+    //       type: LookupResultType.Inventar,
+    //       inventar: result.inventar,
+    //       artikelRef: result.artikelRef,
+    //       artikelData: result.artikelData
+    //     };
+    //     break;
+    //
+    //   case LookupResultType.Raum:
+    //     bclResult.result = {
+    //       type: LookupResultType.Raum,
+    //       raum: result.raum,
+    //       gebaeude: result.gebaeude
+    //     };
+    //     break;
+    //
+    //   default:
+    //   // Nothing
+    // }
+    //
+    // return bclResult;
+
   }
 
   onBarcodeInput(): void {}
 
-  handleScanData(event: ScanDetectData) {
+  async handleScanData(event: ScanDetectData) {
     console.log(event);
-    this.input2.nativeElement.value = event.barcode;
+    const bcResult = await this.bcLookup.fullLookup(event.barcode);
+    const barcode = event.barcode;
+    let expectedBarcodeType = this.waitingForNewInventarBarcode ? LookupResultType.Inventar : null;
+    this.displayScannedBarcode(event.barcode);
+
+    if (event.target && event.target.id) {
+      switch ( event.target.id ) {
+        case 'raumBarcode':
+          expectedBarcodeType = LookupResultType.Raum;
+          break;
+
+        case 'newRaumBarcode':
+          expectedBarcodeType = LookupResultType.ObjektBuchRaum;
+          break;
+
+        case 'invBarcode':
+          break;
+      }
+    }
+
+    const RaumCreateModal = this.getModalRefByName('SelectCreateRaum');
+
+    if (RaumCreateModal && RaumCreateModal.componentInstance) {
+      if (bcResult.lookupResultTable === LookupResultTable.None) {
+        const modalComp: SelectCreateRaumComponent = RaumCreateModal.componentInstance;
+        modalComp.raumDaten.code = bcResult.barcode;
+        return true;
+      } else {
+        alert('Ungültiger Barcode für Raun-Neu-Erfassung! ' +
+          'Gebe einen gülten Barcode ein oder schließe den Dialog "Neuen Raum anlegen"!');
+        return false;
+      }
+    }
+
+    if (this.waitingForNewInventarBarcode) {
+      if (bcResult.lookupResultTable === LookupResultTable.None) {
+        this.formInventar.Barcode = bcResult.barcode;
+        this.waitingForNewInventarBarcode = false;
+        this.saveNewInventar();
+        return true;
+      } else {
+        if (!confirm('Ungültiger Barcode für die Inventar-Neu-Anlage!' +
+          'Bitte bestätige den Abbruch, wenn die vorherige Aktion abgebrochen werden soll.')) {
+          return;
+        }
+      }
+    }
+
+    switch (bcResult.lookupResultTable) {
+      case LookupResultTable.None:
+        break;
+
+      case LookupResultTable.Raeume:
+        if (bcResult.raum.gid === this.buildingID) {
+          this.loadRaumByData( bcResult.raum );
+          return;
+        } else {
+          const geb = bcResult.gebaeude;
+          const gebName = geb ? (geb.Gebaeude || geb.Adresse) : ' Unbekannte Standort-ID ' + bcResult.raum.gid;
+          alert('Fehler: Raum kann nicht geladen werden\n' +
+            'Der gescannte Raum-Barcode ist einem anderen Standort zugewiesen:\n' +
+            gebName
+          );
+        }
+        break;
+
+      case LookupResultTable.Inventar:
+        this.assignInventarToRaum( {
+          inventar: bcResult.inventar,
+          artikelRef: bcResult.artikelRef,
+          artikelData: bcResult.artikelData
+        } );
+        break;
+
+      case LookupResultTable.ObjektKatalogMandant:
+        this.loadArtikelByData({
+          ...bcResult.artikelRef,
+          ...bcResult.artikelData
+        });
+        break;
+
+      default:
+        alert('Ungültiger oder nicht richtig erkannter Barcode!');
+    }
+
+    // OLD-Part, dessen Lokik mit neuem BC-Lookup übernommen werden muss
+    this.barcodeLookup(barcode).then( (bclResult: BCLookupResult) => {
+/*
+      if (RaumCreateModal && RaumCreateModal.componentInstance) {
+        if (bclResult.result.type === LookupResultType.NoMatch) {
+          const modalComp: SelectCreateRaumComponent = RaumCreateModal.componentInstance;
+          modalComp.raumDaten.code = barcode;
+          return true;
+        } else {
+          alert('Ungültiger Barcode für Raun-Neu-Erfassung! ' +
+            'Gebe einen gülten Barcode ein oder schließe den Dialog "Neuen Raum anlegen"!');
+          return false;
+        }
+      }
+
+      if (this.waitingForNewInventarBarcode) {
+        if (bclResult.result.type === LookupResultType.NoMatch) {
+          this.formInventar.Barcode = barcode;
+          this.waitingForNewInventarBarcode = false;
+          this.saveNewInventar();
+          return true;
+        } else {
+          if (!confirm('Ungültiger Barcode für die Inventar-Neu-Anlage!' +
+          'Bitte bestätige den Abbruch, wenn die vorherige Aktion abgebrochen werden soll.')) {
+            return;
+          }
+        }
+      }
+ */
+
+      switch (bclResult.result.type) {
+        case LookupResultType.ObjektBuchRaum:
+        case LookupResultType.Raum:
+          this.loadRaumByData( bclResult.result.raum );
+          return true;
+
+        case LookupResultType.ObjektBuchArtikel:
+          this.loadArtikelByData({
+            ...bclResult.result.artikelRef,
+            ...bclResult.result.artikelData
+          });
+          return true;
+
+        case LookupResultType.Inventar:
+          this.assignInventarToRaum( bclResult.result );
+          return true;
+
+        default:
+          alert('Ungültiger oder nicht richtig erkannter Barcode!');
+      }
+    }).catch( (err) => {
+      console.error(err);
+    });
+  }
+
+  displayScannedBarcode(barcode: string) {
+    this.input2.nativeElement.value = barcode;
     this.lastScanDetectTime = new Date();
     this.lastScanDetectClass = 'NewFreshScan CountDown-5';
     let countdown = 5;
@@ -391,63 +891,6 @@ export class InventFormComponent implements OnInit, OnDestroy {
         this.lastScanDetectTimer = null;
       }
     }, 1000);
-
-    let matches = null;
-    matches = matches = event.barcode.match(/^(A)-(\d+)-(\d+)-(\d+)-([0-9a-zA-Z]+)$/);
-    if ( matches ) {
-      const [, src, id, mid, gkid, hashStart ] = matches;
-      console.log( 'search for scanned Article', { src, id, mid, gkid, hashStart });
-
-      this.dataService.getArtikel( parseInt(id, 10) )
-        .then((artikel: DBDIArtikel) => {
-          console.log(artikel );
-        } )
-        .catch(() => console.error(arguments) );
-      return;
-    }
-
-    matches = matches = event.barcode.match(/^(R)-(\d+)-(\d+)-(\d+)-([0-9a-zA-Z]+)$/);
-    if ( matches ) {
-      const [ , src, id, mid, gid, hashStart ] = matches;
-      console.log('Search scanned Room', { src, id, mid, gid, hashStart });
-
-      this.dataService.getRaum( parseInt(id, 10) )
-        .then( (raum: DBDIRaumGebaeude) => {
-          console.log('Retrieved Raum', {raum});
-          this.loadRaumByData( raum );
-        });
-      return;
-    }
-
-    console.log('Start Barcode-Lookup');
-    const result = this.dataService.barcodeLookup(event.barcode, this.kunde.mid);
-    result.then( lookupResult => {
-      switch (lookupResult.type) {
-        case LookupResultType.Inventar:
-          const lookupInventar: LookupAssignedInventar = lookupResult;
-          const inv = lookupInventar.inventar;
-          console.log('Assign Inventar');
-          const inventarData: InventarData = {
-            inventar: lookupInventar.inventar,
-            artikelRef: lookupInventar.artikelRef,
-            artikelData: lookupInventar.artikelData
-          };
-          this.assignInventarToRaum( inventarData );
-          break;
-
-        case LookupResultType.Raum:
-          const raum = lookupResult.raum;
-          this.loadRaumByData( raum );
-          break;
-
-        case LookupResultType.NoMatch:
-        default:
-          // ERROR
-      }
-    });
-
-    console.log('Result of Barcode-Lookup', {result });
-
   }
 
   // dummy

@@ -4,6 +4,7 @@ export interface ScanDetectData {
   barcode: string;
   length: number;
   valid: boolean;
+  target?: HTMLElement;
 }
 
 export interface ScanDetectConfig {
@@ -50,18 +51,45 @@ export class ScannerdetectionComponent implements OnInit {
   @Output() scanned: EventEmitter<ScanDetectData> = new EventEmitter();
 
   @HostListener('window:keyup', ['$event', '$event.target'])
-  onKeyUp(event: KeyboardEvent, target) {
+  onKeyUp(event: KeyboardEvent, useTarget?: HTMLElement) {
     console.log('scannerDetection onKeyUp');
+    if (!useTarget || (useTarget instanceof HTMLElement) ) {
+      return false;
+    }
+    const target: HTMLElement = useTarget;
     const targetTagName = target.tagName;
-    const ignoreTagNames = this.detectorConfig.ignoreOverElements;
+    const targetElementId = target.id;
+    const targetClassName = target.className;
+    const ignoreElements = this.detectorConfig.ignoreOverElements;
+    let emitScanData = true;
+
+    const ignoreTagNames = ignoreElements
+      .filter( name => !name.startsWith('.') && !name.startsWith('#'))
+      .map( name => name.toUpperCase());
+
+    const ignoreElementIds = ignoreElements
+      .filter( name => name.startsWith('#'))
+      .map(name => name.substr(1));
+
+    const ignoreClassNames = ignoreElements
+      .filter( name => name.startsWith('.'))
+      .map(name => name.substr(1));
+
+    if (ignoreElementIds.indexOf( targetElementId ) !== -1) {
+      emitScanData = false;
+    }
+
+    if (ignoreClassNames.indexOf( targetClassName ) !== -1) {
+      emitScanData = false;
+    }
+
     if (ignoreTagNames.indexOf( targetTagName ) !== -1) {
-      console.log('scannerDetection not our element', { targetTagName, ignoreTagNames});
-      return;
+      emitScanData = false;
     }
 
     const now = Date.now();
     const diff = now - this.lastKeyEventTime;
-    const isScanInput = diff > this.detectorConfig.scanTimeout;
+    const isScanInput: boolean = diff > this.detectorConfig.scanTimeout;
     const key = event.key;
     const code = event.code;
     const isCtrlKey = event.ctrlKey;
@@ -81,11 +109,14 @@ export class ScannerdetectionComponent implements OnInit {
           clearTimeout( this.lastTimer );
         }
         console.log('#82 scannerDetection emit scannerStream, input', this.input);
-        this.scanned.emit({
-          barcode,
-          length: barcode.length,
-          valid: true
-        });
+        if (emitScanData) {
+          this.scanned.emit({
+            barcode,
+            length: barcode.length,
+            valid: true,
+            target
+          });
+        }
         return;
       }
     }

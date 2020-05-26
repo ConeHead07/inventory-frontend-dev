@@ -1,4 +1,4 @@
-import { Component, OnInit, Input } from '@angular/core';
+import {Component, OnInit, Input, Output, EventEmitter} from '@angular/core';
 
 @Component({
   selector: 'app-progressbar',
@@ -12,6 +12,11 @@ export class ProgressbarComponent implements OnInit {
   @Input() private restType = 'danger';
   @Input() private value = 0;
   @Input() private total = 0;
+  @Input() private sendDoneClick = false;
+  @Input() private sendRestClick = false;
+
+  @Output() clickedDone = new EventEmitter();
+  @Output() clickedRest = new EventEmitter();
 
   get short(): string {
     return this.shortTitle ? this.shortTitle : this.title;
@@ -66,6 +71,21 @@ export class ProgressbarComponent implements OnInit {
   constructor() { }
 
   ngOnInit() {
+  }
+
+  onClickDone(e) {
+    console.log('onClickDone', { e });
+    this.clickedDone.emit(e);
+  }
+
+  onClickBarDone(e) {
+    e.stopPropagation();
+    this.onClickDone(e);
+  }
+
+  onClickRest(e) {
+    console.log('onClickRest', { e });
+    this.clickedRest.emit(e);
   }
 
 }

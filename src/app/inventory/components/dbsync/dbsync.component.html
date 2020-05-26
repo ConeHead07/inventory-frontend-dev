@@ -1,0 +1,50 @@
+<p>dbsync works!</p>
+
+<div *ngIf="currInventur">
+  <h4>Aktuelle Inventur (Job-ID: {{ currInventur.jobid }})</h4>
+  <div class="row">
+    <div class="col-3">Titel</div>
+    <div class="col">{{ currInventur.Titel }}</div>
+  </div>
+  <div class="row">
+    <div class="col-3">Start</div>
+    <div class="col">{{ currInventur.Start }}</div>
+  </div>
+  <div class="row">
+    <div class="col-3">Unsynced Changes</div>
+    <div class="col">{{ numUnsyncedChanges }}</div>
+  </div>
+  <div class="row">
+    <div class="col-3">Mandant-ID</div>
+    <div class="col">{{ currInventur.mid }}</div>
+  </div>
+  <div class="row">
+    <div class="col-3">Created</div>
+    <div class="col">{{ currInventur.created_at }}</div>
+  </div>
+</div>
+<button [disabled]="syncInProcess" class="btn btn-primary" (click)="syncCurrJob()"><fa-icon [icon]="faSyncAlt"></fa-icon> Synchronisierung starten</button>
+<br>
+syncStatus: {{syncStatus | json }}<br>
+syncFinished: {{syncFinished | json }}<br>
+
+<div *ngIf="currUser">
+  <div class="row">
+    <div class="col">User</div>
+    <div class="col">{{ currUser.email }}</div>
+  </div>
+</div>
+
+<div *ngIf="currProcess">
+  <div class="row">
+    <div class="col">Status</div>
+    <div class="col">{{ syncStatusName }}</div>
+  </div>
+  <div class="row">
+    <div class="col">Start</div>
+    <div class="col">{{ currProcess.starttime | date }}</div>
+  </div>
+</div>
+
+
+

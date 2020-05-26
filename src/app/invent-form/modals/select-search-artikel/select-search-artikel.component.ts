@@ -17,8 +17,10 @@ interface State {id: number; name: string; }
 
 const states: State[] = [];
 
-interface ArtikelOption {
+export interface ArtikelOption {
   id: number;
+  mcid: number;
+  mcuuid: string;
   name: string;
 }
 
@@ -35,9 +37,7 @@ export class SelectSearchArtikelComponent implements OnInit {
   private mid: number;
   private options: ArtikelOption[];
 
-
-
-  @Output() artikelSelected = new EventEmitter<DBDIArtikel>();
+  @Output() artikelSelected = new EventEmitter<ArtikelOption>();
   @Output() artikelCreating = new EventEmitter<number>();
 
   formatter = (state: Artikel) => state.name;
@@ -92,10 +92,15 @@ export class SelectSearchArtikelComponent implements OnInit {
     console.log('called loadArtikels');
     await this.dataService.getArtikelListByClientId( this.mid )
       .then( items => {
-          console.log('process fetched artikels', items );
+          console.log('process fetched artikels', items.length );
           return items.map( artikel => {
-            const option: ArtikelOption = { id: artikel.mcid, name: artikel.Bezeichnung };
-            console.log('loadArtikels push ', { artikel, name: option });
+            const option: ArtikelOption = {
+              id: artikel.mcid,
+              mcid: artikel.mcid,
+              mcuuid: artikel.mcuuid,
+              name: artikel.Bezeichnung
+            };
+            console.log('loadArtikels push ', { artikel, option });
             states.push( option );
             return { ...artikel, ...option };
         });
