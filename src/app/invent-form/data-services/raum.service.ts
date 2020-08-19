@@ -82,15 +82,16 @@ export class RaumService {
       modified_at: null,
       modified_uid: null
     };
+    const log = { log: true }
 
     let newId = 0;
     let newItem = null;
     try {
-      newId = await this.dexie.raeume.add(insertData);
+      newId = await this.dexie.raeume.add( { ...insertData, ...log });
       newItem = await this.dexie.raeume.get(newId);
     } catch (err) {
-      const errorMsg = ('name' in err ? err.name + ': ' : '')
-        + ('message' in err ? err.message : JSON.stringify(err));
+      const errorMsg = ( ('name' in err) ? err.name + ': ' : '')
+        + ( ('message' in err) ? err.message : JSON.stringify(err));
       return {
         success: false,
         errorMsg,
@@ -131,9 +132,11 @@ export class RaumService {
 
 
   public async setRaumStatus(stat: DBDIRaumEditStatus, rid: number, jobid: number): Promise<number> {
+    const log = true;
     const numChanges = await this.dexie.raeume.where({rid}).modify({
       current_jobstatus: stat,
       current_jobid: jobid,
+      log
     });
 
     if (numChanges) {

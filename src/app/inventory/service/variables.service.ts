@@ -93,8 +93,17 @@ export class VariablesService {
       oldVal = await this.get(name);
       action = SettingsChangeAction.Update;
     }
-    return this.variables.put({name, value})
+    if (name === 'jobid-2-revision-id' && value === 0 || oldVal > value) {
+      const err = 'Fehlerhafter Zugriff: Wert von ' + name + ' wurde versucht herunterzusetzen von ' + oldVal + ' auf ' + value;
+      console.error( err );
+      alert( err );
+      return;
+    }
+    return await this.variables.put({name, value})
       .then(() => {
+        if (name === 'jobid-2-revision-id') {
+          console.log('changed variable: ', { name, value, action, oldVal });
+        }
         this.checkWatchVar(name, action, value, oldVal);
         return true;
       })

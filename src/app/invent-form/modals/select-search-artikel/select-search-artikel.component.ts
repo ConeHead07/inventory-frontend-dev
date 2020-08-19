@@ -2,7 +2,7 @@ import { Component, EventEmitter, OnInit, Output} from '@angular/core';
 import { Observable } from 'rxjs';
 import { debounceTime, distinctUntilChanged, map, filter} from 'rxjs/operators';
 import { DataService } from '../../../inventory/service/data.service';
-import { faPlus } from '@fortawesome/free-solid-svg-icons';
+import { faPlus, faSearch, faSignOutAlt } from '@fortawesome/free-solid-svg-icons';
 
 import { NgbModal, ModalDismissReasons, NgbActiveModal} from '@ng-bootstrap/ng-bootstrap';
 import { DBDIArtikel } from '../../../dexie.service';
@@ -32,6 +32,8 @@ export interface ArtikelOption {
 export class SelectSearchArtikelComponent implements OnInit {
 
   faPlus = faPlus;
+  faSignOutAlt = faSignOutAlt;
+  faSearch = faSearch;
 
   public model: Artikel;
   private mid: number;

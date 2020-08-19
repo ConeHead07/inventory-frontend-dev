@@ -1,7 +1,7 @@
 <div class="modal-header p-0" style="padding:0.1rem">
   <div class="btn-group row no-gutters w-100">
     <button class="btn btn-primary col-10 text-left pl-3" (click)="showSearchForm($event)">
-      <fa-icon [icon]="faSearch"></fa-icon> Raum suchen
+      <fa-icon [icon]="faSignOutAlt" class="mr-3"></fa-icon> <fa-icon [icon]="faSearch"></fa-icon> Raum suchen
     </button>
     <button type="button" class="btn btn-danger col-2" (click)="activeModal.dismiss('Cross click')">
       <span aria-hidden="true">&times;</span>
@@ -18,8 +18,11 @@
         'has-error': raum.dirty && (raum.invalid || raumExistsStatus === 1),
         'has-info': raum.dirty && raumExistsStatus === -1
         }">
-        <label for="dateOfBirth">Raum-Nr.: </label>
-        <div class="input-group">
+        <label for="dateOfBirth" class="d-none">Raum-Nr.: </label>
+        <div class="input-group mb-1">
+          <div class="input-group-prepend">
+            <span class="input-group-text">RNr</span>
+          </div>
           <input id="Raum" class="form-control" placeholder="Raumnr"
                  name="Raum"
                  [(ngModel)]="raumDaten.Raum"
@@ -38,8 +41,11 @@
         'has-warning': bezeichnung.dirty && (bezeichnung.invalid || bezeichnungExistsStatus === 1),
         'has-info': bezeichnung.dirty && bezeichnungExistsStatus === -1
         }">
-        <label for="dateOfBirth">Raum-Bez.: </label>
-        <div class="input-group">
+        <label for="Bezeichnung" class="d-none">Raum-Bez.: </label>
+        <div class="input-group mb-1">
+          <div class="input-group-prepend">
+            <span class="input-group-text">Bezg</span>
+          </div>
           <input id="Bezeichnung" class="form-control" placeholder="Raumbezeichnung"
                  name="Bezeichnung"
                  [(ngModel)]="raumDaten.Raumbezeichnung"
@@ -54,8 +60,11 @@
       </div>
 
       <div class="form-group">
-        <label for="dateOfBirth">Etage: </label>
-        <div class="input-group">
+        <label for="Etage" class="d-none">Etage: </label>
+        <div class="input-group mb-1">
+          <div class="input-group-prepend">
+            <span class="input-group-text">Etage</span>
+          </div>
           <input id="Etage" class="form-control" placeholder="Etage"
                  name="Etage"
                  [(ngModel)]="raumDaten.Etage"
@@ -66,8 +75,11 @@
       </div>
 
       <div class="form-group">
-        <label for="newRaumBarcode">Barcode: </label>
-        <div class="input-group">
+        <label for="newRaumBarcode" class="d-none">Barcode: </label>
+        <div class="input-group mb-1">
+          <div class="input-group-prepend">
+            <span class="input-group-text">BCode</span>
+          </div>
           <input id="newRaumBarcode" #newRaumBarcode class="form-control formcontrol-edit-barcode" (paste)="$event.preventDefault()" placeholder="Barcode"
                  name="code"
                  [(ngModel)]="raumDaten.code"

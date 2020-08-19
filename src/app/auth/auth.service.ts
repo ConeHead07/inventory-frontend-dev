@@ -27,7 +27,6 @@ export class AuthService {
   private url = ':8040/auth/login/';
 
   constructor(private http: HttpClient, private router: Router, private baseData: BasedataService) {
-
     console.log('#29 AuthService.constructor', 'this.url: ', this.url);
     const originDomain = (window && window.location && window.location.origin)
       ? window.location.origin.split(':').slice(0, 2).join(':')
@@ -72,7 +71,10 @@ export class AuthService {
   ) {
     const expirationDate = new Date(new Date().getTime() + expiresIn * 1000);
     this.user = new User(email, userId, token, expirationDate);
-
+    const previousUser = this.baseData.getCurrentUser();
+    if (previousUser) {
+      this.baseData.setPreviousUser( previousUser );
+    }
     this.setUserData( this.user );
     this.setClientDeviceId( clientDeviceId );
   }
@@ -97,7 +99,7 @@ export class AuthService {
 
     const userData = JSON.parse( localStorage.getItem('userData') );
 
-    if (userData && 'email' in userData && 'id' in userData && 'uToken' in userData && 'uTokenExpirationDate' in userData) {
+    if (userData && ('email' in userData) && ('id' in userData) && ('uToken' in userData) && ('uTokenExpirationDate' in userData)) {
       return new User(userData.email, userData.id, userData.uToken, userData.uTokenExpirationDate);
     }
 

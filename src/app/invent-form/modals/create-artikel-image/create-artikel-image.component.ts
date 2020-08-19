@@ -95,7 +95,7 @@ export class CreateArtikelImageComponent implements OnInit {
 
   imageUrl?: string;
 
-  constructor(private activeModal: NgbActiveModal, private imageService: ImagesService) {
+  constructor(public activeModal: NgbActiveModal, private imageService: ImagesService) {
   }
 
   cropMove(data) {

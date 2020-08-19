@@ -50,12 +50,10 @@ export class ScannerdetectionComponent implements OnInit {
 
   @Output() scanned: EventEmitter<ScanDetectData> = new EventEmitter();
 
-  @HostListener('window:keyup', ['$event', '$event.target'])
-  onKeyUp(event: KeyboardEvent, useTarget?: HTMLElement) {
-    console.log('scannerDetection onKeyUp');
-    if (!useTarget || (useTarget instanceof HTMLElement) ) {
-      return false;
-    }
+  @HostListener('window:keydown', ['$event', '$event.target'])
+  onKeyDown(event: KeyboardEvent, useTarget?: HTMLElement) {
+    console.log('#55 scannerDetection Key-Down-Event', { event, useTarget });
+
     const target: HTMLElement = useTarget;
     const targetTagName = target.tagName;
     const targetElementId = target.id;
@@ -87,52 +85,46 @@ export class ScannerdetectionComponent implements OnInit {
       emitScanData = false;
     }
 
+    if (!emitScanData) {
+      console.log('#89 scannerDetection target is not our target: ', {
+        useTarget,
+        ignoreTagNames,
+        ignoreElementIds,
+        ignoreClassNames
+      });
+    }
+
     const now = Date.now();
     const diff = now - this.lastKeyEventTime;
     const isScanInput: boolean = diff > this.detectorConfig.scanTimeout;
     const key = event.key;
     const code = event.code;
+    const isShiftKey = event.shiftKey;
     const isCtrlKey = event.ctrlKey;
 
     if (!isScanInput) {
       this.input = key;
-      console.log('#70 scannerDetection nochKeinScannerStream oder Start, input', this.input);
+      console.log('#101 scannerDetection Start, input', this.input);
     } else {
       if (key.length === 1 ) {
-        this.input += key;
-        console.log('#74 scannerDetection verarbeite scannerStream, input', this.input);
-      } else {
+        this.input += !isShiftKey ? key : key.toUpperCase();
         const barcode = this.input;
-        console.log('#77 scannerDetection verpacke scannerStream, input', this.input);
-        this.input = '';
-        if (this.lastTimer) {
-          clearTimeout( this.lastTimer );
-        }
-        console.log('#82 scannerDetection emit scannerStream, input', this.input);
-        if (emitScanData) {
-          this.scanned.emit({
-            barcode,
-            length: barcode.length,
-            valid: true,
-            target
-          });
-        }
-        return;
+        console.log('#106 scannerDetection add Char to Barcode', { key, barcode });
+      } else if (key === 'Tab' || key === 'Enter') {
+        // Nothing
+        event.preventDefault();
       }
     }
 
-    if (this.lastTimer && now - this.lastTimerTime < this.detectorConfig.scanTimeout ) {
-      console.log('#93 scannerDetection setTimeout wurde bereits gestartet', this.lastTimerTime);
-      return;
-    }
-
-    console.log('#97 scannerDetection');
     this.lastTimerTime = now;
+    if (this.lastTimer) {
+      clearTimeout(this.lastTimer);
+    }
     this.lastTimer = setTimeout( () => {
-      console.log('#100 scannerDetection');
       const barcode = this.input;
-      if (barcode.length > 7) {
-        console.log('#103 scannerDetection');
+      console.log('#138 scannerDetection Emit After Timeout', { key, barcode });
+      this.input = '';
+      if (barcode.length >= 5) {
         this.scanned.emit({
           barcode,
           length: barcode.length,
@@ -140,8 +132,7 @@ export class ScannerdetectionComponent implements OnInit {
         });
       }
     }, this.detectorConfig.scanTimeout);
-    console.log('#111 scannerDetection LAST-LINE');
-
+    console.log('#147 scannerDetection LAST-LINE');
   }
 
   constructor() { }

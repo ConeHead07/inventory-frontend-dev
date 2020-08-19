@@ -3,6 +3,7 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import {AuthResponseData, AuthService} from "./auth.service";
 import {Observable} from "rxjs";
 import {Router} from "@angular/router";
+import {BasedataService} from '../basedata.service';
 
 @Component({
   selector: 'app-auth',
@@ -25,7 +26,10 @@ export class AuthComponent implements OnInit {
     password: null,
   }
 
-  constructor(private authService: AuthService, private router: Router) {
+  constructor(
+    private authService: AuthService,
+    private router: Router,
+    private baseData: BasedataService) {
   }
 
   ngOnInit() {

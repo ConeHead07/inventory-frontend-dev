@@ -59,11 +59,11 @@ class Server {
 
     // Catch errors
     this.app.on('error', (error: any) => {
-      console.error(moment().format(), 'ERROR', error);
+      console.error('ERROR', error);
     });
 
     process.on('uncaughtException', (error: any) => {
-      console.log(moment().format(), error);
+      console.log(error);
     });
   }
 }

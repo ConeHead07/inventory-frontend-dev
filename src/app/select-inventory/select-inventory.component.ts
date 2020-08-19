@@ -3,13 +3,15 @@ import { DataService   } from '../inventory/service/data.service';
 import {EventService} from '../event.service';
 import {NgForm} from '@angular/forms';
 import {ActivatedRoute, Router} from '@angular/router';
-import {DBDIGebaeude, DBDIInventuren, DBDIMandanten} from '../dexie.service';
+import {DBDIGebaeude, DBDIInventuren, DBDIMandanten, DBDIRaeume} from '../dexie.service';
 import {AuthService} from '../auth/auth.service';
 import {BasedataService} from '../basedata.service';
 import {InventoryProgress, InventoryProgressService} from '../inventory-progress.service';
 import { faSyncAlt } from '@fortawesome/free-solid-svg-icons';
 import {ConnectionService as NgConnectionService } from 'ng-connection-service';
 import {ConnectionService, ConnectionState} from '../connection-service.service';
+import {last} from 'rxjs/operators';
+import {Subscription} from "rxjs";
 
 enum StatusLoadingInventories {
   None,
@@ -19,6 +21,26 @@ enum StatusLoadingInventories {
   Loading,
   FinishedSuccessful,
   Failure
+}
+
+interface LastInventoryDetails {
+  jobid: number;
+  mid: number;
+  gid: number;
+  Titel: string;
+  Gebaeude: string;
+  Mandant: string;
+  routeParams: number[];
+  rid?: number;
+  Etage?: string;
+  Raum?: string;
+  Raumbezeichnung?: string;
+}
+
+interface InventurIds {
+  mid: number;
+  jobid?: number;
+  gid?: number;
 }
 
 @Component({
@@ -40,20 +62,27 @@ export class SelectInventoryComponent implements OnInit, OnDestroy {
   public statusLoadingUserInventories = StatusLoadingInventories.None;
   public loadedUserInventories = false;
 
-  private totalElements = 0;
-  private doneElements = 0;
+  totalElements = 0;
+  doneElements = 0;
 
   private jobid?: number;
-  private inventory?: DBDIInventuren;
-  private client: DBDIMandanten;
-  private building: DBDIGebaeude;
+  inventory?: DBDIInventuren;
+  client: DBDIMandanten;
+  building: DBDIGebaeude;
 
-  private clients: DBDIMandanten[];
-  private buildings: DBDIGebaeude[];
+  clients: DBDIMandanten[];
+  buildings: DBDIGebaeude[];
 
   private routingSubscription: any;
 
-  private inventories: DBDIInventuren[];
+  inventories: DBDIInventuren[];
+  private inventoriesSelectable: DBDIInventuren[];
+  lastInventory: DBDIInventuren;
+  private lastBuilding: DBDIGebaeude;
+  private lastRaum: DBDIRaeume;
+  lastInventoryDetails: LastInventoryDetails;
+  private ngConnenctionSubscription: Subscription;
+  private connectionSubscription: Subscription;
 
   constructor(
     private dataService: DataService,
@@ -81,16 +110,21 @@ export class SelectInventoryComponent implements OnInit, OnDestroy {
 
 
   ngOnInit() {
+    this.lastInventory = this.baseData.getCurrentInventur();
+    this.lastBuilding = this.baseData.getCurrentGebaeude();
+    this.lastRaum = this.baseData.getCurrentRaum();
     this.routingSubscription = this.route.params.subscribe(params => {
       console.log({params});
     });
 
-    this.ngConnection.monitor().subscribe( (hasConn: boolean) => {
+    this.ngConnenctionSubscription = this.ngConnection.monitor().subscribe( (hasConn: boolean) => {
       this.ngHasConnection = hasConn;
     });
+
     this.hasConnection = this.connection.hasInternetAccess;
     this.hasServerConnection = this.connection.hasInternetAccess;
-    this.connection.monitor().subscribe( (conn: ConnectionState) => {
+
+    this.connectionSubscription = this.connection.monitor().subscribe( (conn: ConnectionState) => {
       this.hasConnection = conn.hasNetworkConnection;
       this.hasServerConnection = conn.hasInternetAccess;
 
@@ -102,6 +136,51 @@ export class SelectInventoryComponent implements OnInit, OnDestroy {
 
   }
 
+  private async loadLastInventoryDetails() {
+    this.lastInventoryDetails = null;
+    const inv = this.baseData.getCurrentInventur();
+    const geb = this.baseData.getCurrentGebaeude();
+    const mandant = await this.dataService.getClient(inv.mid);
+    const rm = this.baseData.getCurrentRaum();
+
+    if (inv && geb && mandant) {
+      this.lastInventoryDetails = {
+        jobid: inv.jobid,
+        mid: inv.mid,
+        gid: geb.gid,
+        Titel: inv.Titel,
+        Mandant: mandant.Mandant,
+        Gebaeude: geb.Gebaeude,
+        routeParams: [inv.mid, geb.gid],
+        rid: 0,
+        Etage: null,
+        Raum: null,
+        Raumbezeichnung: null
+      };
+      if (rm) {
+        this.lastInventoryDetails.rid = rm.rid;
+        this.lastInventoryDetails.Etage = rm.Etage;
+        this.lastInventoryDetails.Raum = rm.Raum;
+        this.lastInventoryDetails.Raumbezeichnung = rm.Raumbezeichnung;
+        this.lastInventoryDetails.routeParams.push( rm.rid );
+      }
+    }
+  }
+
+  gotoLastInventory() {
+    if (this.lastInventoryDetails && this.lastInventoryDetails.routeParams.length > 1) {
+      this.gotoFormInventory.apply(this, this.lastInventoryDetails.routeParams );
+    }
+  }
+
+  private gotoFormInventory(mid: number, gid: number, rid?: number): void {
+    const routeData = [ '/form-inventory', mid, gid ];
+    if (!isNaN(rid) && rid > 0) {
+      routeData.push(rid);
+    }
+    this.router.navigate( routeData );
+  }
+
   public checkLoadUserInventories() {
     const stat = this.statusLoadingUserInventories;
     if (stat < StatusLoadingInventories.FinishedSuccessful) {
@@ -110,10 +189,12 @@ export class SelectInventoryComponent implements OnInit, OnDestroy {
           this.statusLoadingUserInventories = StatusLoadingInventories.WaitingForNetwork;
           return;
         }
+
         if (!this.hasServerConnection) {
           this.statusLoadingUserInventories = StatusLoadingInventories.WaitingForServerAccess;
           return;
         }
+
         this.statusLoadingUserInventories = StatusLoadingInventories.Pending;
         this.loadUserInventories().then( (success) => {
           this.statusLoadingUserInventories = success
@@ -127,16 +208,38 @@ export class SelectInventoryComponent implements OnInit, OnDestroy {
     }
   }
 
+  public getStatusLoadingInventoryText(status: StatusLoadingInventories): string {
+    return StatusLoadingInventories[status];
+  }
+
   public async loadUserInventories(): Promise<boolean> {
     console.log('ngOnInit select-iventory.components.ts');
     const uid = this.auth.getUser().id;
-    const mid = this.baseData.getCurrentMid() || 0;
-    const gid = this.baseData.getCurrentGid() || 0;
+    const lastMid = this.baseData.getCurrentMid() || 0;
+    const lastGid = this.baseData.getCurrentGid() || 0;
+    const lastJobid = this.baseData.getCurrentJobid();
+    const lastRid = this.baseData.getCurrentRid();
 
     return await this.dataService.getUserAssignedInventories( uid )
-      .then( (result) => {
+      .then( (result: DBDIInventuren[]) => {
         console.log({ called: 'this.dataService.getUserAssignedInventories', result});
         this.inventories = result;
+        this.inventoriesSelectable = this.inventories;
+        this.lastInventory = this.inventories.find( (inv) => inv.jobid === lastJobid);
+
+        let defaultMid = 0;
+        let defaultGid = 0;
+        let defaultJobid = 0;
+
+        this.statusLoadingUserInventories = StatusLoadingInventories.Loading;
+
+        if (this.lastInventory) {
+          this.loadLastInventoryDetails();
+          defaultMid = this.lastInventory.mid;
+          defaultGid = this.lastInventory.gid;
+          defaultJobid = this.lastInventory.jobid;
+        }
+
         const aMids = this.inventories.map<number>( (itm) => itm.mid );
         console.log( 'ngOnInit', { uid, aMids });
 
@@ -146,7 +249,11 @@ export class SelectInventoryComponent implements OnInit, OnDestroy {
             return this.clients;
           })
           .then( clientList => {
-            this.setDefaultSelection(mid, gid);
+            this.setDefaultSelection({
+              mid: defaultMid,
+              gid: defaultGid,
+              jobid: defaultJobid
+            });
             return true;
           })
           .catch( (err) => {
@@ -160,17 +267,33 @@ export class SelectInventoryComponent implements OnInit, OnDestroy {
       });
   }
 
-  public setDefaultSelection(mid: number, gid?: null|number) {
-    const clientListIdx = this.getClientListIdxByMid(mid);
+  public setDefaultSelection(ids: InventurIds) {
+    const clientListIdx = this.getClientListIdxByMid(ids.mid);
     if (-1 !== clientListIdx) {
       const clientChanged = this.clientChanged( clientListIdx);
-      if (gid) {
+
+      if (ids.gid || ids.jobid) {
         clientChanged.then( (success) => {
           if (!success) {
             return false;
           }
-          const buildingsListIdx = this.getBuildingListIdxByGid(gid);
-          this.buildingChanged(buildingsListIdx);
+          if (ids.gid) {
+            const buildingsListIdx = this.getBuildingListIdxByGid(ids.gid);
+            this.buildingChanged(buildingsListIdx);
+          }
+          if (ids.jobid) {
+            this.inventoriesSelectable = this.inventories.filter( (inv) => inv.mid === ids.mid);
+            const checkInv = this.inventoriesSelectable.find( (inv) => inv.jobid === ids.jobid);
+            if (checkInv) {
+              this.inventory = checkInv;
+              this.inventorySelectionChanged(checkInv.jobid).then( () => {
+                const checkGeb = this.buildings.find( (b: DBDIGebaeude) => b.gid === this.lastBuilding.gid);
+                if (checkGeb) {
+                  this.building = checkGeb;
+                }
+              });
+            }
+          }
         });
       }
     }
@@ -202,41 +325,44 @@ export class SelectInventoryComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     this.routingSubscription.unsubscribe();
+    this.ngConnenctionSubscription.unsubscribe();
+    this.connectionSubscription.unsubscribe();
   }
 
   async clientChanged(clientIdx) {
     this.client = this.clients[ clientIdx];
     console.log('client changed to ', { clientIdx, this_clients: this.clients, this_client: this.client});
     this.buildings = await this.dataService.getBuildingList( this.client.mid );
+    this.inventoriesSelectable = this.inventories.filter( (inv) => inv.mid === this.client.mid );
     console.log( 'assign selection buildings: ', this.buildings );
     return true;
   }
 
   async onSubmit() {
     console.log( this.selectForm );
-    this.status = 'Lade Inventarisierungsdaten vom Server';
-    await this.dataService.loadInventurDataByInventurId(1);
-    this.status = '';
-
-    // Simple Way to navigate
-    if (0) {
-      this.router.navigateByUrl( '/form-inventory');
+    if (!this.client || !this.inventory || !this.building) {
+      this.status = 'Bitte vervollständige die Auswahl!';
+      return;
     }
 
-    for (const inventory of this.inventories) {
-      if (inventory.mid === this.client.mid && inventory.gid === this.building.gid) {
-        this.jobid = inventory.jobid;
-        this.inventory = inventory;
-        this.baseData.setCurrentInventur( inventory );
-        this.baseData.setCurrentGebaeude( this.building );
-        // More Control for navigate
-        this.router.navigate( [
-          '/form-inventory', this.client.mid, this.building.gid
-        ]);
-        return true;
-      }
+    this.jobid = this.inventory.jobid;
+    this.baseData.setCurrentInventur( this.inventory );
+    this.baseData.setCurrentGebaeude( this.building );
+    if (
+      this.lastInventory && this.lastInventory.jobid === this.jobid
+      && this.lastBuilding && this.lastBuilding.gid === this.building.gid
+    ) {
+      this.gotoLastInventory();
+    } else {
+
+      this.status = 'Bitte warten .... Inventarisierungsdaten werden vom Server geladen.';
+      await this.dataService.loadInventurDataByInventurId( this.inventory.jobid );
+      this.status = 'Daten wurden geladen';
+      // More Control for navigate
+      this.router.navigate([
+        '/form-inventory', this.client.mid, this.building.gid
+      ]);
     }
-    return false;
   }
 
   buildingChanged(buildingListIdx: number) {
@@ -246,6 +372,11 @@ export class SelectInventoryComponent implements OnInit, OnDestroy {
       this.totalElements = progress.total;
       this.doneElements = progress.done;
     });
+  }
+
+  async inventorySelectionChanged(jobid: number) {
+    this.inventory = this.inventories.find((ivy) => ivy.jobid === jobid);
+    this.buildings = await this.dataService.getBuildingListByJobid(this.inventory.jobid, this.inventory.mid);
   }
 
 }

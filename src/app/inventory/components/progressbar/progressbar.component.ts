@@ -6,14 +6,14 @@ import {Component, OnInit, Input, Output, EventEmitter} from '@angular/core';
   styleUrls: ['./progressbar.component.scss']
 })
 export class ProgressbarComponent implements OnInit {
-  @Input() private title = 'Fortschrittsanzeige';
-  @Input() private shortTitle = '';
-  @Input() private type = 'success';
-  @Input() private restType = 'danger';
-  @Input() private value = 0;
-  @Input() private total = 0;
-  @Input() private sendDoneClick = false;
-  @Input() private sendRestClick = false;
+  @Input() title = 'Fortschrittsanzeige';
+  @Input() shortTitle = '';
+  @Input() type = 'success';
+  @Input() restType = 'danger';
+  @Input() value = 0;
+  @Input() total = 0;
+  @Input() sendDoneClick = false;
+  @Input() sendRestClick = false;
 
   @Output() clickedDone = new EventEmitter();
   @Output() clickedRest = new EventEmitter();

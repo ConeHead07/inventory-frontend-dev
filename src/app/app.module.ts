@@ -14,7 +14,6 @@ import { AppComponent } from './app.component';
 import { HeaderComponent } from './header/header.component';
 import { NgbModule } from '@ng-bootstrap/ng-bootstrap';
 import { AuthComponent } from './auth/auth.component';
-import { TestComponent } from './test/test.component';
 import { Routes, RouterModule } from '@angular/router';
 import { SelectInventoryComponent } from './select-inventory/select-inventory.component';
 import { NgbheaderComponent } from './ngbheader/ngbheader.component';
@@ -35,6 +34,9 @@ import { WebcamModule } from 'ngx-webcam';
 import { AngularCropperjsModule } from 'angular-cropperjs';
 // import imageCompression from 'browser-image-compression';
 
+import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
+import { ToastrModule } from 'ngx-toastr';
+
 // Scanner-Detection
 import { ScannerDetectionModule } from 'ngx-scanner-detection';
 
@@ -49,11 +51,12 @@ import { GesamtListRestComponent } from './invent-form/modals/gesamt-list-rest/g
 import { GesamtListDoneComponent } from './invent-form/modals/gesamt-list-done/gesamt-list-done.component';
 import { DbsyncComponent } from './inventory/components/dbsync/dbsync.component';
 import { SettingsComponent } from './inventory/components/settings/settings.component';
+import { environment } from '../environments/environment';
+import { ServiceWorkerModule } from '@angular/service-worker';
 
 const appRoutes: Routes = [
   { path: '', component: AuthComponent },
   { path: 'auth', component: AuthComponent },
-  { path: 'test', component: TestComponent },
   { path: 'select-inventory', component: SelectInventoryComponent },
   { path: 'form-inventory/:clientid/:buildingid', component: InventFormComponent },
   { path: 'form-inventory/:clientid/:buildingid/:roomid', component: InventFormComponent },
@@ -74,7 +77,6 @@ persist();
     AppComponent,
     HeaderComponent,
     AuthComponent,
-    TestComponent,
     SelectInventoryComponent,
     NgbheaderComponent,
     InventFormComponent,
@@ -107,8 +109,17 @@ persist();
     FontAwesomeModule,
     ZXingScannerModule,
     WebcamModule,
-    AngularCropperjsModule
-
+    AngularCropperjsModule,
+    BrowserAnimationsModule, // required animations module
+    ToastrModule.forRoot({
+      enableHtml: true,
+      closeButton: true,
+      progressBar: true,
+      maxOpened: 6,
+      autoDismiss: true,
+      preventDuplicates: true,
+      resetTimeoutOnDuplicate: true
+    }), ServiceWorkerModule.register('ngsw-worker.js', { enabled: environment.production })
   ],
   entryComponents: [
     CreateArtikelImageComponent,

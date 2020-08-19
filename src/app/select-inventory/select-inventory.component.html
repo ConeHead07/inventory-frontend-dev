@@ -1,37 +1,124 @@
 
-{{ statusLoadingUserInventories }}
+<ng-container [ngSwitch]="statusLoadingUserInventories">
+  <span *ngSwitchCase="0"></span>
+  <ngb-alert *ngSwitchCase="1" [type]="'danger'" [dismissible]="false">[{{statusLoadingUserInventories}}] Warte auf Internet-Verbindung</ngb-alert>
+  <ngb-alert *ngSwitchCase="2" [type]="'danger'" [dismissible]="false">[{{statusLoadingUserInventories}}] Warte auf Server-Verbindung</ngb-alert>
+  <ngb-alert *ngSwitchCase="3" [type]="'warning'" [dismissible]="false">[{{statusLoadingUserInventories}}] Verbindung wird aufgebaut</ngb-alert>
+  <ngb-alert *ngSwitchCase="4" [type]="'info'" [dismissible]="false">[{{statusLoadingUserInventories}}] Daten werden abgerufen</ngb-alert>
+  <ngb-alert *ngSwitchCase="5" [type]="'success'" [dismissible]="false">[{{statusLoadingUserInventories}}] Auswahldaten wurden geladen</ngb-alert>
+  <ngb-alert *ngSwitchCase="6" [type]="'danger'" [dismissible]="false">[{{statusLoadingUserInventories}}] Leider ist etwas schiefgelaufen</ngb-alert>
+</ng-container>
 
-<form (ngSubmit)="onSubmit()" #f="ngForm">
+<div *ngIf="false && lastInventoryDetails as inv">
+  Möchten Sie die vorherige Inventur fortsetzen?<br>
+  <div *ngIf="1" class="row">
+    <div class="col-3">Titel</div>
+    <div class="col-8">{{ inv.Titel }}</div>
+  </div>
+  <div *ngIf="1" class="row">
+    <div class="col-3">Mandant</div>
+    <div class="col-8">{{ inv.Mandant }}</div>
+  </div>
+  <div *ngIf="1" class="row">
+    <div class="col-3">Gebaeude</div>
+    <div class="col-8">{{ inv.Gebaeude }}</div>
+  </div>
+  <div *ngIf="inv.Raum" class="row">
+    <div class="col-3">Raum</div>
+    <div class="col-8">{{ inv.Raum }}</div>
+  </div>
+  <div *ngIf="inv.Raumbezeichnung" class="row">
+    <div class="col-3">R-Bezeichnung</div>
+    <div class="col-8">{{ inv.Raumbezeichnung }}</div>
+  </div>
+  <div *ngIf="inv.Etage" class="row">
+    <div class="col-3">Etage</div>
+    <div class="col-8">{{ inv.Etage }}</div>
+  </div>
+  <button class="btn btn-primary" (click)="gotoLastInventory()">Fortsetzen</button>
+</div>
+
+<h5>Inventarisierung auswählen</h5>
+<form (ngSubmit)="onSubmit()" #f="ngForm" class="select-inventory">
 
   <div class="form-group">
-    <label for="ctrlKunde">Auswahl KundeModel</label>
-    <select
-        class="form-control"
-        id="client"
-        name="client"
-        ngModel
-        (change)="clientChanged($event.target.value)"
-        required>
-      <option *ngFor="let _client of clients; let i = index" [attr.data-index]="i" [value]="i">
-        {{ _client.Mandant }}
-      </option>
-    </select>
+    <div class="row no-gutters input-group mb-1">
+      <div class="col-auto input-group-prepend">
+        <span class="input-group-text border-secondary">Kunde</span>
+      </div>
+      <div ngbDropdown #myDropKunde="ngbDropdown" class="col myDropdown">
+        <button (click)="$event.preventDefault(); $event.stopPropagation(); myDropKunde.isOpen() ? myDropKunde.close() : myDropKunde.open();"
+                class="col btn btn-outline-secondary" id="dropKunde" ngbDropdownAnchor>
+          <ng-container *ngIf="client"><span>{{ client.Mandant }}</span></ng-container>
+          <ng-container *ngIf="!client && statusLoadingUserInventories < 5"><span>Kunden werden geladen</span></ng-container>
+          <ng-container *ngIf="!client && statusLoadingUserInventories >= 5 && clients && clients.length > 0"><span>Bitte Kunde auswählen</span></ng-container>
+          <ng-container *ngIf="!client && statusLoadingUserInventories >= 5 && (!clients || clients.length === 0)"><span>Keine Auswahl vorhanden</span></ng-container>
+        </button>
+
+        <div ngbDropdownMenu aria-labelledby="dropKunde" class="border-secondary rounded-bottom">
+          <button ngbDropdownItem *ngFor="let _client of clients; let i = index"
+                  (click)="$event.preventDefault(); $event.stopPropagation(); clientChanged(i)"
+                  [attr.data-index]="i"
+                  [value]="i">{{_client.Mandant}}</button>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <div>{{ client?.Mandant }}</div>
-
   <div class="form-group">
-    <label for="ctrlStandort">Auswahl Standort</label>
+    <div class="row no-gutters input-group mb-1">
+      <div class="col-auto input-group-prepend">
+        <span class="input-group-text border-secondary">Inventur</span>
+      </div>
+      <div ngbDropdown #myInventoryDrop="ngbDropdown" class="col myDropdown">
+        <button (click)="$event.preventDefault(); $event.stopPropagation(); myInventoryDrop.isOpen() ? myInventoryDrop.close() : myInventoryDrop.open();"
+                class="col btn btn-outline-secondary" id="dropInventory" ngbDropdownAnchor>
+          <ng-container *ngIf="inventory && lastInventory && inventory.jobid === lastInventory.jobid"><span>{{ inventory.Titel }} (Zuletzt in Arbeit)</span></ng-container>
+          <ng-container *ngIf="inventory && (!lastInventory || inventory.jobid !== lastInventory.jobid)"><span>{{ inventory.Titel }}</span></ng-container>
+          <ng-container *ngIf="!inventory && statusLoadingUserInventories < 5"><span>Inventarisierungen werden geladen</span></ng-container>
+          <ng-container *ngIf="!inventory && statusLoadingUserInventories >= 5 && inventories && inventories.length > 0"><span>Bitte Inventur auswählen</span></ng-container>
+          <ng-container *ngIf="!inventory && statusLoadingUserInventories >= 5 && (!inventories || inventories.length === 0)"><span>Keine Auswahl vorhanden</span></ng-container>
+        </button>
 
-    <select
-      class="form-control"
-      id="building"
-      name="building"
-      ngModel
-      (change)="buildingChanged($event.target.value)"
-      required>
-      <option *ngFor="let _bldg of buildings; let i = index" [attr.data-index]="i" [value]="i">{{_bldg.Gebaeude}}</option>
-    </select>
+        <div ngbDropdownMenu aria-labelledby="dropInventory" class="border-secondary rounded-bottom">
+          <button ngbDropdownItem *ngFor="let _inventory of inventories; let i = index"
+                  (click)="$event.preventDefault(); $event.stopPropagation(); inventorySelectionChanged(_inventory.jobid)"
+                  [attr.data-index]="_inventory.jobid"
+                  [value]="_inventory.jobid">{{_inventory.Titel}}
+            <ng-container *ngIf="lastInventory && _inventory.jobid === lastInventory.jobid">
+            (Zuletzt in Arbeit)
+          </ng-container></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div *ngIf="true" class="form-group">
+    <div class="row no-gutters input-group mb-1">
+      <div class="col-auto input-group-prepend">
+        <span class="input-group-text border-secondary">Standort</span>
+      </div>
+      <div ngbDropdown #myGebaeudeDrop2="ngbDropdown" class="col myDropdown">
+        <button (click)="$event.preventDefault(); $event.stopPropagation(); myGebaeudeDrop2.isOpen() ? myGebaeudeDrop2.close() : myGebaeudeDrop2.open();"
+                [disabled]="!inventory"
+                class="col btn btn-outline-secondary" id="dropGebaeude2" ngbDropdownAnchor>
+          <ng-container *ngIf="building"><span>{{ building.Gebaeude }}</span> <span *ngIf="lastBuilding && building.gid === lastBuilding.gid">(Zuletzt in Arbeit)</span></ng-container>
+          <ng-container *ngIf="!building && statusLoadingUserInventories < 5"><span>Standorte werden geladen</span></ng-container>
+          <ng-container *ngIf="!building && statusLoadingUserInventories >= 5 && buildings && buildings.length > 0"><span>Bitte Standort auswählen</span></ng-container>
+          <ng-container *ngIf="!building && statusLoadingUserInventories >= 5 && (!buildings || buildings.length === 0)"><span>Keine Auswahl vorhanden</span></ng-container>
+        </button>
+
+        <div ngbDropdownMenu aria-labelledby="dropGebaeude2" class="border-secondary rounded-bottom" style="max-height:50vh;overflow-y:scroll">
+          <button ngbDropdownItem *ngFor="let _bldg of buildings; let i = index"
+                  (click)="$event.preventDefault(); $event.stopPropagation(); buildingChanged(i)"
+                  [attr.data-index]="i"
+                  [value]="i">{{_bldg.Gebaeude}}
+            <ng-container *ngIf="lastInventory && _bldg.gid === lastBuilding.gid">
+              (Zuletzt in Arbeit)
+            </ng-container></button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div class="form-group">
@@ -40,12 +127,8 @@
 
   <div class="row">
     <div class="col col-sm-6 offset-sm-6">
-      <button [disabled]="false && !f.valid" class="btn btn-primary w-100">Starten</button>
+      <button [disabled]="!building" class="btn btn-primary w-100">Starten</button>
   </div>
     <div *ngIf="status" class="alert-info">{{status}}</div>
   </div>
 </form>
-
-
-
-<div style="display: none"><p>select-inventory works!</p></div>

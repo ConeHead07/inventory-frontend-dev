@@ -36,12 +36,15 @@ import {
 import {SelectSearchRaumComponent} from './modals/select-search-raum/select-search-raum.component';
 import {BasedataService} from '../basedata.service';
 import {InventoryEditorService} from '../inventory-editor.service';
-import {InventarService} from './data-services/inventar.service';
+import {InventarService, InventarChanged } from './data-services/inventar.service';
 import {ImagesService} from './data-services/images.service';
 import {BarcodeService} from './data-services/barcode.service';
 import {RaumIDAndStatus, RaumService} from './data-services/raum.service';
 import {GesamtListRestComponent} from './modals/gesamt-list-rest/gesamt-list-rest.component';
 import {GesamtListDoneComponent} from './modals/gesamt-list-done/gesamt-list-done.component';
+import {SoundsService} from '../sounds.service';
+import { ToastrService } from 'ngx-toastr';
+import {Subscription} from "rxjs";
 
 interface ScannerConfiguration {
   minLength?: number; // 7
@@ -162,23 +165,25 @@ export class InventFormComponent implements OnInit, OnDestroy {
   private buildingID: number;
   private roomID?: number;
   private artikelID?: number;
-  private routingSubscription: any;
+  private routingSubscription: Subscription;
+  private raumStatusChangeSubscription: Subscription;
+  private inventarDataChangeSubscription: Subscription;
 
   public lastScanDetectTime?: Date;
   public lastScanDetectClass = '';
   private lastScanDetectTimer = null;
-  private waitingForNewInventarBarcode = false;
+  waitingForNewInventarBarcode = false;
   private openedCreateRaum = false;
-  private artikelImageExists = false;
+  artikelImageExists = false;
 
-  private jobProgress: InventoryProgress = {
+  jobProgress: InventoryProgress = {
     total: 0,
     done: 0,
   };
 
-  private raumEditStatus: DBDIRaumEditStatus;
+  raumEditStatus: DBDIRaumEditStatus;
 
-  private raumProgress: InventoryProgress = {
+  raumProgress: InventoryProgress = {
     total: 0,
     done: 0,
   };
@@ -191,6 +196,13 @@ export class InventFormComponent implements OnInit, OnDestroy {
 
   private currentModals: CurrentModal[] = [];
 
+  blobAlert?: string;
+  private blobAlertSuccess = 'success';
+  private blobAlertFailure = 'danger';
+  private blobAlertOff = null;
+  private blobAlertTimer = null;
+  useOverlay = 0;
+
   constructor(
     private route: ActivatedRoute,
     private location: Location,
@@ -202,15 +214,48 @@ export class InventFormComponent implements OnInit, OnDestroy {
     private inventarDataService: InventarService,
     private raumService: RaumService,
     private imageService: ImagesService,
-    private bcLookup: BarcodeService) {
+    private bcLookup: BarcodeService,
+    private sounds: SoundsService,
+    private toastr: ToastrService) {
+  }
+
+  showBlobAlertSuccess() {
+    this.showBlobAlert('success');
+  }
+
+  showBlobAlertError() {
+    this.showBlobAlert('danger');
+  }
+
+  showBlobAlert(alertType: string) {
+    this.useOverlay = this.useOverlay < 2 ? this.useOverlay + 1 : 1;
+    this.blobAlert = null;
+    if (this.blobAlertTimer) {
+      clearTimeout( this.blobAlertTimer );
+    }
+    this.blobAlert = alertType;
+    this.blobAlertTimer = setTimeout(
+      () => {
+        this.blobAlert = null;
+        this.useOverlay = 0;
+      },
+      1200
+    );
   }
 
   ngOnInit() {
-    this.raumService.raumStatusChanged.subscribe( (stat: RaumIDAndStatus) => {
+    this.raumStatusChangeSubscription = this.raumService.raumStatusChanged
+      .subscribe( (stat: RaumIDAndStatus) => {
       if (stat.rid === this.roomID) {
         this.raumEditStatus = stat.status;
       }
     });
+
+    this.inventarDataChangeSubscription = this.inventarDataService.changed
+      .subscribe( (change: InventarChanged) => {
+      this.refreshRaumProgress();
+    });
+
     this.routingSubscription = this.route.params.subscribe(params => {
       this.clientID = parseInt( params.clientid,  10 );
       this.buildingID = parseInt( params.buildingid, 10 );
@@ -264,11 +309,10 @@ export class InventFormComponent implements OnInit, OnDestroy {
 
   async assignInventarToRaum(inventarData: InventarData) {
     this.loadInventarByData( inventarData );
-    this.inventoryEditor.assignInventarToRaum(inventarData.inventar.ivid, this.roomID)
-      .then( () => {
-        console.log('Inventar wurde dem Raum zugewiesen!');
-        this.refreshInventoryProgress();
-    })
+    this.inventarDataService.assignRaum(inventarData.inventar.ivid, this.roomID)
+      .then( (rslt) => {
+        console.log('Inventar wurde dem Raum zugewiesen!', { rslt });
+      })
       .catch( (err) => {
         console.error('Inventar konnte nicht zugewiesen werden!', err);
       });
@@ -286,7 +330,14 @@ export class InventFormComponent implements OnInit, OnDestroy {
       created_at: new Date(),
       created_uid: uid
     };
-    this.inventarDataService.insertInventar(inventar, jobid);
+
+    this.inventarDataService.insertInventar(inventar, jobid)
+      .then( (result) => {
+        console.log('Inventar wurde hinzugefügt', result);
+      })
+      .catch( (err) => {
+        console.error('Fehler beim Speichern neuer Inventar-Daten', { err });
+      });
   }
 
   async assignArtikelToRaum(artikelMcid: number) {}
@@ -294,8 +345,8 @@ export class InventFormComponent implements OnInit, OnDestroy {
   async refreshInventoryProgress() {
 
     return Promise.all([
-      this.refreshGebaeudeProgress(),
-      this.refreshRaumProgress()
+      this.refreshRaumProgress(),
+      this.refreshGebaeudeProgress()
     ]).then( () =>  {
       console.log('Fortschritt für Gebaeude und Raum wurde aktualisiert');
       return true;
@@ -346,6 +397,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
     const tmp = {...this.formInventar};
     this.formInventar = {...tmp};
     this.waitingForNewInventarBarcode = true;
+    console.log('#351 loadArtikelByData', { waitingForNewInventarBarcode: this.waitingForNewInventarBarcode });
     console.log('Applied argument artikel', artikel, ' to formInventar', this.formInventar);
     this.reloadImageExistsStatus();
   }
@@ -603,6 +655,8 @@ export class InventFormComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.routingSubscription.unsubscribe();
+    this.raumStatusChangeSubscription.unsubscribe();
+    this.inventarDataChangeSubscription.unsubscribe();
   }
 
   toggleRaumEditStatus() {
@@ -700,7 +754,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
     }
 
     console.log('Start Barcode-Lookup');
-    bclResult.result = await this.dataService.barcodeLookup(barcode, this.kunde.mid);
+    bclResult.result = await this.dataService.bcLookup(barcode, this.kunde.mid)
 
     return bclResult;
 
@@ -733,8 +787,9 @@ export class InventFormComponent implements OnInit, OnDestroy {
   onBarcodeInput(): void {}
 
   async handleScanData(event: ScanDetectData) {
-    console.log(event);
+    console.log('#738 handleScanData', { waitingForNewInventarBarcode: this.waitingForNewInventarBarcode, event });
     const bcResult = await this.bcLookup.fullLookup(event.barcode);
+    console.log('#740 handleScanData', { waitingForNewInventarBarcode: this.waitingForNewInventarBarcode });
     const barcode = event.barcode;
     let expectedBarcodeType = this.waitingForNewInventarBarcode ? LookupResultType.Inventar : null;
     this.displayScannedBarcode(event.barcode);
@@ -760,23 +815,37 @@ export class InventFormComponent implements OnInit, OnDestroy {
       if (bcResult.lookupResultTable === LookupResultTable.None) {
         const modalComp: SelectCreateRaumComponent = RaumCreateModal.componentInstance;
         modalComp.raumDaten.code = bcResult.barcode;
+        this.playSuccess();
         return true;
       } else {
-        alert('Ungültiger Barcode für Raun-Neu-Erfassung! ' +
+        this.playError();
+        this.toastr.error(
+          'Gebe einen gülten Barcode ein oder schließe den Dialog "Neuen Raum anlegen"!' +
+          '<br>' + barcode,
+          'Ungültiger Barcode für Raum-Neu-Erfassung:'
+        );
+        if (0) alert('Ungültiger Barcode für Raum-Neu-Erfassung! ' +
           'Gebe einen gülten Barcode ein oder schließe den Dialog "Neuen Raum anlegen"!');
         return false;
       }
     }
 
+    console.log('#777 handleScanData', { waitingForNewInventarBarcode: this.waitingForNewInventarBarcode });
     if (this.waitingForNewInventarBarcode) {
+      console.log('#779 handleScanData', { waitingForNewInventarBarcode: this.waitingForNewInventarBarcode });
       if (bcResult.lookupResultTable === LookupResultTable.None) {
         this.formInventar.Barcode = bcResult.barcode;
         this.waitingForNewInventarBarcode = false;
+        console.log('#783 handleScanData', { waitingForNewInventarBarcode: this.waitingForNewInventarBarcode });
         this.saveNewInventar();
+        this.playSuccess();
         return true;
       } else {
-        if (!confirm('Ungültiger Barcode für die Inventar-Neu-Anlage!' +
+        this.playError();
+        console.log('#789 handleScanData', { waitingForNewInventarBarcode: this.waitingForNewInventarBarcode });
+        if (confirm('Ungültiger Barcode für die Inventar-Neu-Anlage!' +
           'Bitte bestätige den Abbruch, wenn die vorherige Aktion abgebrochen werden soll.')) {
+          this.waitingForNewInventarBarcode = false;
           return;
         }
       }
@@ -784,16 +853,31 @@ export class InventFormComponent implements OnInit, OnDestroy {
 
     switch (bcResult.lookupResultTable) {
       case LookupResultTable.None:
+        console.log('#800 handleScanData LookupResultTable.None');
+        this.playError();
+        if (0) alert('Barcode wurde nicht erkannt');
+
+        this.toastr.error(
+          'Barcode wurde nicht erkannt<br>' + barcode,
+          'Barcode-Fehler'
+        );
         break;
 
       case LookupResultTable.Raeume:
+        console.log('#804 handleScanData LookupResultTable.Raeume');
         if (bcResult.raum.gid === this.buildingID) {
           this.loadRaumByData( bcResult.raum );
+          this.playSuccess();
           return;
         } else {
           const geb = bcResult.gebaeude;
           const gebName = geb ? (geb.Gebaeude || geb.Adresse) : ' Unbekannte Standort-ID ' + bcResult.raum.gid;
-          alert('Fehler: Raum kann nicht geladen werden\n' +
+          this.playError();
+          this.toastr.error(
+            'Der gescannte Raum-Barcode ist einem anderen Standort zugewiesen: ' + gebName,
+            'Fehler: Raum kann nicht geladen werden!'
+          );
+          if (0) alert('Fehler: Raum kann nicht geladen werden\n' +
             'Der gescannte Raum-Barcode ist einem anderen Standort zugewiesen:\n' +
             gebName
           );
@@ -801,53 +885,32 @@ export class InventFormComponent implements OnInit, OnDestroy {
         break;
 
       case LookupResultTable.Inventar:
+        console.log('#821 handleScanData LookupResultTable.Inventar');
         this.assignInventarToRaum( {
           inventar: bcResult.inventar,
           artikelRef: bcResult.artikelRef,
           artikelData: bcResult.artikelData
         } );
+        this.playSuccess();
         break;
 
       case LookupResultTable.ObjektKatalogMandant:
+        console.log('#831 handleScanData LookupResultTable.Mandant', { bcResult });
         this.loadArtikelByData({
           ...bcResult.artikelRef,
           ...bcResult.artikelData
         });
+        this.playSuccess();
         break;
 
       default:
-        alert('Ungültiger oder nicht richtig erkannter Barcode!');
+        this.playError();
+        this.toastr.error('Ungültiger oder nicht richtig erkannter Barcode!');
+        if (0) alert('Ungültiger oder nicht richtig erkannter Barcode!');
     }
 
     // OLD-Part, dessen Lokik mit neuem BC-Lookup übernommen werden muss
-    this.barcodeLookup(barcode).then( (bclResult: BCLookupResult) => {
-/*
-      if (RaumCreateModal && RaumCreateModal.componentInstance) {
-        if (bclResult.result.type === LookupResultType.NoMatch) {
-          const modalComp: SelectCreateRaumComponent = RaumCreateModal.componentInstance;
-          modalComp.raumDaten.code = barcode;
-          return true;
-        } else {
-          alert('Ungültiger Barcode für Raun-Neu-Erfassung! ' +
-            'Gebe einen gülten Barcode ein oder schließe den Dialog "Neuen Raum anlegen"!');
-          return false;
-        }
-      }
-
-      if (this.waitingForNewInventarBarcode) {
-        if (bclResult.result.type === LookupResultType.NoMatch) {
-          this.formInventar.Barcode = barcode;
-          this.waitingForNewInventarBarcode = false;
-          this.saveNewInventar();
-          return true;
-        } else {
-          if (!confirm('Ungültiger Barcode für die Inventar-Neu-Anlage!' +
-          'Bitte bestätige den Abbruch, wenn die vorherige Aktion abgebrochen werden soll.')) {
-            return;
-          }
-        }
-      }
- */
+    if (0) this.barcodeLookup(barcode).then( (bclResult: BCLookupResult) => {
 
       switch (bclResult.result.type) {
         case LookupResultType.ObjektBuchRaum:
@@ -902,11 +965,27 @@ export class InventFormComponent implements OnInit, OnDestroy {
     const s = this.inputSimulateBarcode.nativeElement.value;
     for (const character of s) {
     // for (let i = 0; i < s.length; i++) {
-      const e = new KeyboardEvent('keyup', {bubbles : true, cancelable : true, key : character, shiftKey : false});
+      const shiftKey = (s !== s.toLowerCase() && s === s.toUpperCase());
+      if (shiftKey) {
+        const shift = new KeyboardEvent('keydown', {bubbles : true, cancelable : true,
+          key : 'Shift', code: 'ShiftLeft', shiftKey });
+        document.dispatchEvent( shift );
+      }
+      const e = new KeyboardEvent('keydown', {bubbles : true, cancelable : true, key : character, shiftKey });
       setTimeout(() => document.dispatchEvent(e));
     }
-    const xe = new KeyboardEvent('keyup', {bubbles : true, cancelable : true, key : 'Enter', shiftKey : false});
+    const xe = new KeyboardEvent('keydown', {bubbles : true, cancelable : true, key : 'Enter', shiftKey : false});
     setTimeout(() => document.dispatchEvent(xe));
+  }
+
+  async playSuccess() {
+    this.showBlobAlertSuccess();
+    this.sounds.playSuccess();
+  }
+
+  async playError() {
+    this.showBlobAlertError();
+    this.sounds.playError();
   }
 
 }

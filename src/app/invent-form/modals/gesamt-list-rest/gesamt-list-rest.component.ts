@@ -15,7 +15,7 @@ export class GesamtListRestComponent implements OnInit {
   raeumeListDone?: RaumStatusProgress[];
 
   constructor(
-    private activeModal: NgbActiveModal,
+    public activeModal: NgbActiveModal,
     private baseData: BasedataService,
     private raumData: RaumService
   ) { }

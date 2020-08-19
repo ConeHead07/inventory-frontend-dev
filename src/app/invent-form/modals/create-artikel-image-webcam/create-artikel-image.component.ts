@@ -41,7 +41,7 @@ export class CreateArtikelImageWebcamComponent implements OnInit {
   // switch to next / previous / specific webcam; true/false: forward/backwards, string: deviceId
   private nextWebcam: Subject<boolean|string> = new Subject<boolean|string>();
 
-  constructor(private activeModal: NgbActiveModal) {
+  constructor(public activeModal: NgbActiveModal) {
   }
 
   public ngOnInit(): void {

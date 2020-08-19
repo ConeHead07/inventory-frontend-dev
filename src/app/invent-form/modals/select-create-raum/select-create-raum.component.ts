@@ -1,7 +1,7 @@
 import {Component, EventEmitter, OnInit, Output } from '@angular/core';
 
 import {NgbModal, ModalDismissReasons, NgbActiveModal} from '@ng-bootstrap/ng-bootstrap';
-import { faSearch, faCamera } from '@fortawesome/free-solid-svg-icons';
+import { faSearch, faCamera, faSignOutAlt } from '@fortawesome/free-solid-svg-icons';
 import {DBDIRaeume} from '../../../dexie.service';
 import { RaumService, RaumBasisDaten } from '../../data-services/raum.service';
 
@@ -14,6 +14,7 @@ export class SelectCreateRaumComponent implements OnInit {
   closeResult: string;
   faSearch = faSearch;
   faCamera = faCamera;
+  faSignOutAlt = faSignOutAlt;
 
   raumExistsStatus = -1;
   bezeichnungExistsStatus = -1;

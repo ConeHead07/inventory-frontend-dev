@@ -1,6 +1,6 @@
 import {Component, EventEmitter, OnInit, Output, ViewChild} from '@angular/core';
 import { ModalDismissReasons, NgbActiveModal, NgbTypeahead} from '@ng-bootstrap/ng-bootstrap';
-import { faSearch } from '@fortawesome/free-solid-svg-icons';
+import { faSearch, faSignOutAlt } from '@fortawesome/free-solid-svg-icons';
 import {DBDIArtikel, DBDIHersteller } from '../../../dexie.service';
 import {
   ArtikelService,
@@ -55,6 +55,7 @@ interface HerstellerExistsStatus {
 export class SelectCreateArtikelComponent implements OnInit {
   closeResult: string;
   faSearch = faSearch;
+  faSignOutAlt = faSignOutAlt;
 
   ArtikelExistsStatus = -1;
   numBezeichnungExists = -1;

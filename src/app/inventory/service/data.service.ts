@@ -4,7 +4,7 @@ import {
   DBDIArtikel, DBDIDevices,
   DBDIGebaeude, DBDIHersteller, DBDIImages,
   DBDIInventar,
-  DBDIInventuren,
+  DBDIInventuren, DBDIInventurenGebaeude,
   DBDIInventurenUser,
   DBDIMandanten, DBDIObjektbuchBarcodesLookup,
   DBDIObjektKatalogGlobal,
@@ -26,12 +26,17 @@ import {throwError} from 'rxjs';
 import {VariablesService} from './variables.service';
 import {last} from 'rxjs/operators';
 import Dexie, {IndexableType } from 'dexie';
+import {DBSyncClientService, SyncJobResult} from '../../dbsync-client.service';
+import {BarcodeService} from '../../invent-form/data-services/barcode.service';
 
 export interface LoadApiDataResult {
   success: boolean;
   errorMsg?: string;
   total?: number;
   inserts?: number;
+  revisionId?: number;
+  switchedToSync?: boolean;
+  syncJobResult?: SyncJobResult;
   debug?: any;
 }
 
@@ -65,6 +70,7 @@ export interface InventarDataResult {
 }
 
 export interface ApiCollectionDataResponse<T> {
+  revisionId: number;
   rows: T[];
 }
 
@@ -129,6 +135,25 @@ export interface JoinStrictFormatted {
   joins?: JoinStrictFormatted[];
 }
 
+const log = {
+  info: (line: number, ...vars: any) => {
+    const l = console.log.bind(console, '[INFO] data.service.ts #' + line);
+    l.apply(console, vars);
+  },
+  err: (line: number, ...vars: any) => {
+    const l = console.error.bind(console, '[ERROR] data.service.ts #' + line);
+    l.apply(console, vars);
+  },
+  dbg: (line: number, ...vars: any) => {
+    const l = console.log.bind(console, '[Debug] data.service.ts #' + line);
+    l.apply(console, vars);
+  },
+  warn: (line: number, ...vars: any) => {
+    const l = console.log.bind(console, '[Warning] data.service.ts #' + line);
+    l.apply(console, vars);
+  }
+};
+
 @Injectable({
   providedIn: 'root'
 })
@@ -141,11 +166,13 @@ export class DataService {
   constructor(
     private api: ApiService,
     private dexie: DexieService,
+    private barcodeLookup: BarcodeService,
     private connectionService: ConnectionService,
-    private settingsService: VariablesService) {
+    private settingsService: VariablesService,
+    private DbSyncService: DBSyncClientService) {
     this.currentState = connectionService.getCurrentState();
     this.connectionService.monitor().subscribe((currentState: ConnectionState) => {
-      console.log('#43 DataService network status has changed', { currentState });
+      log.info(43, 'network status has changed', { currentState });
       this.currentState = currentState;
     });
   }
@@ -155,15 +182,15 @@ export class DataService {
   }
 
   async getUserAssignedInventories(uid: number): Promise<DBDIInventuren[]>  {
-    console.log('#52 getUserAssignedInventories loadUserAssignedInventories');
+    log.info(173, 'getUserAssignedInventories');
     let userInventuren: DBDIInventuren[] = [];
 
     if (this.currentState.hasInternetAccess) {
-      console.log('#56 getUserAssignedInventories loadUserAssignedInventories');
+      log.dbg(177, 'getUserAssignedInventories, call loadUserAssignedInventories');
       await this.loadUserAssignedInventories();
     } else {
-      console.log(
-        '#59 getUserAssignedInventories no InternetAccess. Cannot call loadUserAssignedInventories',
+      log.err(180,
+        'getUserAssignedInventories no InternetAccess. Cannot call loadUserAssignedInventories',
         { 'this.currentState': this.currentState, 'this.currentState.hasInternetAccess': this.currentState.hasInternetAccess });
       return null;
     }
@@ -187,11 +214,11 @@ export class DataService {
   }
 
   async loadUserAssignedInventories(): Promise<boolean>  {
+    log.dbg(205, 'loadUserAssignedInventories');
 
     const db = this.dexie;
     const api = this.api;
 
-    db.stopClientLogForServerLoad = true;
     // jobidsByAuthUser
     return await Promise
     .all([
@@ -205,7 +232,9 @@ export class DataService {
         .then( list => Promise.all( list.map( (item: DBDIGebaeude) => db.gebaeude.put(item) ) ) ),
 
       api.get<DBDIInventuren[]>( 'api/inventur/listByAuthUser').toPromise()
-        .then( list => Promise.all( list.map( (item: DBDIInventuren) => db.inventuren.put(item) ) ) )
+        .then( list => Promise.all( list.map( (item: DBDIInventuren) => db.inventuren.put(item) ) ) ),
+
+      api.get<DBDIInventurenGebaeude[]>( 'api/inventur/inventurenGebaeudeByAuthUser').toPromise()
 
     ])
       .then( async (results) => {
@@ -214,42 +243,50 @@ export class DataService {
         const mandantenRslt = results[2];
         const gebaeudeRslt = results[3];
         const inventurenRslt = results[4];
-        console.log({ results });
+        const invGebaeude = results[5];
+        log.dbg(247, { results });
 
         const del = await db.inventurenUser.where('uid').equals(authUser.id).delete();
         await invUser.map((item: DBDIInventurenUser) => db.inventurenUser.add(item));
+
+        const delG = await db.inventurenGebaeude.where('uid').equals(authUser.id).delete()
+          .catch( (reason) => console.error('Cannot delete GRef', reason));
+        await invGebaeude.map((item: DBDIInventurenGebaeude) => db.inventurenGebaeude.add(item)
+          .catch( (reason) => {
+          console.error('Cannot add GRef', { item, reason} );
+        }));
+
         console.log('Finished loading user-inventories');
         return true;
       })
       .finally( () => {
-        db.stopClientLogForServerLoad = false;
       });
   }
 
   async loadClientList(): Promise<any> {
+    console.log('#244  data.service loadClientList');
     return this.api
       .get<any>( 'api/mandant')
       .subscribe( (list: DBDIMandanten[]) => {
         console.log( 'SelectInventoryComponent', 'loadClientList', {list });
 
-        this.dexie.stopClientLogForServerLoad = true;
         const asyncJobs: Promise<void|number>[] = [];
         asyncJobs.push(this.dexie.mandanten.clear());
         list.forEach( (item: DBDIMandanten) => {
           console.log({ called: 'loadClientList', item });
           asyncJobs.push( this.dexie.mandanten.put(item) );
         });
-        Promise.all( asyncJobs ).finally( () => { this.dexie.stopClientLogForServerLoad = false; } );
+        Promise.all( asyncJobs ).finally( () => {} );
       });
   }
 
   async loadGebaeudeListByClientId(mid: number): Promise<boolean> {
+    console.log('#261  data.service loadGebaeudeListByClientd');
     await this.api
       .get<any>( 'api/mandant/' + mid + '/gebaeude')
       .subscribe( (list: DBDIGebaeude[]) => {
         console.log( 'SelectInventoryComponent', 'loadClientList', {list });
 
-        this.dexie.stopClientLogForServerLoad = true;
         this.dexie.gebaeude.where('mid').equals(mid)
           .delete()
           .then( () => {
@@ -259,19 +296,19 @@ export class DataService {
             });
           })
           .finally( () => {
-            this.dexie.stopClientLogForServerLoad = false;
           });
       });
 
     return true;
   }
 
-  loadRaeumeListByGebaeudeId(gid: number): void {
-    this.api.get<any>( 'api/gebaeude/' + gid + '/raeume').subscribe( (list: DBDIRaeume[]) => {
+  async loadRaeumeListByGebaeudeId(gid: number): Promise<void> {
+    console.log('#283  data.service');
+    this.api.get<any>( 'api/gebaeude/' + gid + '/raeume').subscribe( async (list: DBDIRaeume[]) => {
       console.log( 'SelectInventoryComponent', 'loadClientList', {list });
 
-      this.dexie.stopClientLogForServerLoad = true;
-      this.dexie.raeume
+      this.dexie.stopChangeLogForImport( true );
+      await this.dexie.raeume
         .where('gid').equals(gid)
         .delete()
         .then( (nr) => list.map( (item: DBDIRaeume) => {
@@ -280,16 +317,18 @@ export class DataService {
         })
         )
         .finally( () => {
-          this.dexie.stopClientLogForServerLoad = false;
+          this.dexie.stopChangeLogForImport( false );
         });
     });
   }
 
-  loadInventar(gid: number): void {
-    this.api.get<any>( 'api/gebaeude/' + gid + '/raeume').subscribe( (list: DBDIRaeume[]) => {
+  async loadInventar(gid: number): Promise<void> {
+    console.log('#303  data.service');
+    this.api.get<any>( 'api/gebaeude/' + gid + '/raeume').subscribe( async (list: DBDIRaeume[]) => {
       console.log( 'SelectInventoryComponent', 'loadClientList', {list });
 
-      this.dexie.stopClientLogForServerLoad = true;
+      this.dexie.stopChangeLogForImport( true);
+      console.log('#303 data-service delete raeume');
       return this.dexie.raeume.where('gid').equals(gid)
         .delete()
         .then( (nr: number) => {
@@ -299,12 +338,13 @@ export class DataService {
           });
         })
         .finally( () => {
-          this.dexie.stopClientLogForServerLoad = false;
+          this.dexie.stopChangeLogForImport( false );
         });
       });
   }
 
-  async loadInventurDataByInventurId(id: number): Promise<LoadApiDataResult[]> {
+  async loadInventurDataByInventurId(jobid: number, reset: boolean = false): Promise<LoadApiDataResult[]> {
+    console.log('#324 called loadInventurDataByInventurId(', jobid, reset, ')');
     const tables = {
       gebaeude: 'pending',
       raeume: 'pending',
@@ -315,55 +355,146 @@ export class DataService {
       objektkatalogmandant: 'pending',
       objektbuchBarcodesLookup: 'pending'
     };
+
     const tblStatus = (table, status) => {
       tables[ table ] = status;
       console.log( tables );
     };
 
-    this.dexie.stopClientLogForServerLoad = true;
+    const inventurAlreadyStartedRevId = +(await this.settingsService.get('jobid-' + jobid + '-revision-id', 0));
+    console.log('#335 loadInventurDataByInventurId, inventurAlreadyStartedRevId: ', inventurAlreadyStartedRevId);
+
+    if (!isNaN(inventurAlreadyStartedRevId) && inventurAlreadyStartedRevId > 0 && !reset) {
+      console.log('#338 loadInventurDataByInventurId');
+      const numUnsyncedClientChanges = await this.DbSyncService.numUnsyncedChangeLogsByJobId(jobid);
+      console.log('#340 loadInventurDataByInventurId', {numUnsyncedClientChanges});
+      if (numUnsyncedClientChanges) {
+        console.log('#342 loadInventurDataByInventurId START SYNC', {numUnsyncedClientChanges});
+        const syncJobResult = await this.DbSyncService.syncJob(jobid);
+        return [{
+          success: true,
+          switchedToSync: true,
+          syncJobResult
+        }] as LoadApiDataResult[];
+      } else {
+        console.log('#346 loadInventurDataByInventurId NOTHING TO SYNC');
+        return [{
+          success: true,
+          errorMsg: '',
+          total: 0,
+          inserts: 0,
+          revisionId: await this.settingsService.get('jobid-' + jobid + '-revision-id'),
+          debug: null,
+        }];
+      }
+    }
+
+    this.dexie.stopChangeLogForImport( true );
+    if (reset) {
+      console.log('#352 loadInventurDataByInventurId');
+      const numRaeume = await this.dexie.raeume.where( { for_jobid: jobid}).count().catch( (reason) => {
+        console.error('#354 ', { reason });
+      });
+      console.log('#357 Before cleanup');
+      await Promise.all([
+        this.dexie.raeume.where( { for_jobid: jobid}).delete()
+          .finally(() => console.log('#359finished cleanup raeume')),
+        this.dexie.inventar.where( { for_jobid: jobid}).delete()
+          .finally(() => console.log('#361 finished cleanup inventar')),
+        this.dexie.hersteller.where( { for_jobid: jobid}).delete()
+          .finally(() => console.log('#363 finished cleanup hersteller')),
+        this.dexie.images.filter( (img) => img.for_jobid === jobid).delete()
+          .finally(() => console.log('#365 finished cleanup images')),
+        this.dexie.objektKatalogMandant.where( { created_jobid: jobid}).delete()
+          .finally(() => console.log('#367 finished cleanup okg')),
+        this.dexie.objektKatalogGlobal.where( { created_jobid: jobid}).delete()
+          .finally(() => console.log('#369 finished cleanup okm')),
+        this.dexie.clientChangeLog.where({ jobid }).delete()
+          .finally(() => console.log('#371 finished cleanup clientchangelog'))
+      ]);
+      console.log('#373 After cleanup');
+      this.settingsService.set('jobid-' + jobid + '-revision-id', 0);
+      this.settingsService.set('inventar-' + jobid + '-revision-id', 0);
+      this.settingsService.set('raeume-' + jobid + '-revision-id', 0);
+      this.settingsService.set('images-' + jobid + '-revision-id', 0);
+      this.settingsService.set('hersteller-' + jobid + '-revision-id', 0);
+      this.settingsService.set('objektKatalogGlobal-' + jobid + '-revision-id', 0);
+      this.settingsService.set('objektKatalogMandant-' + jobid + '-revision-id', 0);
+      console.log('#362 loadInventurDataByInventurId');
+    }
+
     return await Promise
       .all([
         this.loadTableDataByUrl<DBDIGebaeude>(
-          'gebaeude', `api/inventur/${id}/gebaeude`, tblStatus, { jobid: id }),
+          'gebaeude', `api/inventur/${jobid}/gebaeude`, tblStatus, { jobid, reset }),
         this.loadTableDataByUrl<DBDIRaeume>(
-          'raeume', `api/inventur/${id}/raeume`, tblStatus, { jobid: id }),
+          'raeume', `api/inventur/${jobid}/raeume`, tblStatus, { jobid, reset }),
         this.loadTableDataByUrl<DBDIHersteller>(
-           'hersteller', `api/inventur/${id}/hersteller`, tblStatus, { jobid: id }),
+           'hersteller', `api/inventur/${jobid}/hersteller`, tblStatus, { jobid, reset }),
         this.loadTableDataByUrl<DBDIImages>(
-          'images', `api/inventur/${id}/images`, tblStatus, { jobid: id }),
+          'images', `api/inventur/${jobid}/images`, tblStatus, { jobid, reset }),
         this.loadTableDataByUrl<DBDIInventar>(
-          'inventar', `api/inventur/${id}/inventar`, tblStatus, { jobid: id }),
+          'inventar', `api/inventur/${jobid}/inventar`, tblStatus, { jobid, reset }),
         this.loadTableDataByUrl<DBDIObjektKatalogGlobal>(
-          'objektKatalogGlobal', `api/inventur/${id}/katalog`, tblStatus, { jobid: id }),
+          'objektKatalogGlobal', `api/inventur/${jobid}/katalog`, tblStatus, { jobid, reset }),
         this.loadTableDataByUrl<DBDIObjektKatalogMandant>(
-          'objektKatalogMandant', `api/inventur/${id}/artikelids`, tblStatus, { jobid: id }),
-        this.loadTableDataByUrl<DBDIObjektbuchBarcodesLookup>(
-          'objektbuchBarcodesLookup', `api/inventur/${id}/objektbuchLookup`, tblStatus, { jobid: id })
+          'objektKatalogMandant', `api/inventur/${jobid}/artikelids`, tblStatus, { jobid, reset })
+        // ,this.loadTableDataByUrl<DBDIObjektbuchBarcodesLookup>(
+        //   'objektbuchBarcodesLookup', `api/inventur/${jobid}/objektbuchLookup`, tblStatus, { jobid, reset })
       ])
+      .then( async (results) => {
+        const maxRevId = results.reduce( (carry, item) => {
+          if (isNaN(item.revisionId)) {
+            return carry;
+          }
+          const max = Math.max(carry, item.revisionId || 0);
+          console.log('#414 data.service reduce to maxRevId', { carry, item, max });
+          return Math.max(carry, item.revisionId);
+        }, 0);
+        this.settingsService.set('jobid-' + jobid + '-revision-id', maxRevId);
+        console.log('#418 data.service.loadInventurDataByInventurId() Start rebuild of barcodeLookup Table');
+        await this.barcodeLookup.rebuildByJobid(jobid);
+        console.log('435 data.service.loadInventurDataByInventurId() finished', 'arguments', arguments);
+        return results;
+      })
       .finally( () => {
-        this.dexie.stopClientLogForServerLoad = false;
+        this.dexie.stopChangeLogForImport( false );
       });
   }
 
   async loadTableDataByUrl<T>(table: string, url: string, cbTblStatus?: any, options?: any): Promise<LoadApiDataResult> {
+    console.log('#425  data.service loadTableDataByUrl ', table);
     if (cbTblStatus) {
       cbTblStatus(table, 'downloading');
     }
     const jobid = options.jobid;
-    const lastLoadAttempt = `${table}-${jobid}-download-attempt`;
-    const lastLoadSuccess = `${table}-${jobid}-download-success`;
-    const lastLoadEntries = `${table}-${jobid}-download-entries`;
-    this.settingsService.set(lastLoadAttempt, new Date());
+    const reset = options.reset || false;
+    const varLastRevisionId = `${table}-${jobid}-revision-id`;
+    const varLastLoadAttempt = `${table}-${jobid}-download-attempt`;
+    const varLastLoadSuccess = `${table}-${jobid}-download-success`;
+    const varLastLoadEntries = `${table}-${jobid}-download-entries`;
+    const lastRevisionId = await this.settingsService.get( varLastRevisionId );
+    const lastLoadSuccessDate = await this.settingsService.get( varLastLoadSuccess );
+    const lastLoadAttemptDate = new Date();
+    this.settingsService.set(varLastLoadAttempt, lastLoadAttemptDate);
 
-    console.log({ function: 'loadTableDataByUrl', table, url, cbTblStatus, options });
+    if (!reset && lastLoadSuccessDate) {
+      url += '?lastLoad=' + Date.parse( lastLoadSuccessDate ) + '&lastRevId=' + lastRevisionId;
+    }
+
     let inserts = 0;
     let total = 0;
+    let revisionId = 0;
 
+    console.log({ function: 'loadTableDataByUrl', table, url, cbTblStatus, options });
     return await this.api.get<any>( url).toPromise()
       .then( (data: ApiCollectionDataResponse<T>) => {
-        console.log('Retrieved Data ', table, ' for processing!');
-        this.settingsService.set(lastLoadSuccess, new Date());
-        this.settingsService.set(lastLoadEntries, data.rows.length);
+
+        console.log('#452 data.service: Retrieved Data ', table, ' for processing!');
+        this.settingsService.set(varLastRevisionId, data.revisionId);
+        this.settingsService.set(varLastLoadSuccess, lastLoadAttemptDate);
+        this.settingsService.set(varLastLoadEntries, data.rows.length);
+
         if (cbTblStatus) {
           cbTblStatus(table, 'process import ' + data.rows.length);
           cbTblStatus(table, 'total: ' + data.rows.length);
@@ -371,12 +502,14 @@ export class DataService {
 
         inserts = 0;
         total = data.rows.length;
+        revisionId = data.revisionId || 0;
+
         const stepSize = parseInt((data.rows.length / 10).toString(), 10);
+        if (!data.rows) {
+          console.error('#468 data.service loadTableDataByUrl Invalid Data-Structure from ', { url, data});
+        }
 
         const asyncJobs: Promise<any>[] = data.rows.map((item: T, i) => {
-          if (table === 'raeume') {
-            console.log({called: 'load item' + table, item});
-          }
           if (((i + 1) % stepSize === 0 || (i + 1) === total) && cbTblStatus) {
             cbTblStatus(table, i + 1);
           }
@@ -392,18 +525,20 @@ export class DataService {
           cbTblStatus(table, 'finished');
         }
 
-        console.log( 'Finished Importprocess Data ', table );
+        console.log( '#487 data.service loadTableDataByUrl Finished Importprocess Data ', table );
 
         return {
           success: true,
           errorMsg: '',
           total,
-          inserts
+          inserts,
+          revisionId,
         } as LoadApiDataResult;
       });
   }
 
   async getClient(clientID: number): Promise<DBDIMandanten> | null {
+    console.log('#500  data.service');
     const clients = await this.getClientList();
     const fclients = clients.filter( client => client.mid === clientID);
     console.log( { clientID, clients, fclients });
@@ -411,6 +546,7 @@ export class DataService {
   }
 
   async getBuilding(bldgID: number, clientID: number): Promise<DBDIGebaeude> | null {
+    console.log('#508  data.service');
     const bldgs = await this.getBuildingList(clientID);
     const fbldgs = bldgs.filter( bldg => bldg.gid === bldgID);
     console.log( { bldgID, clientID, bldgs, fbldgs });
@@ -418,31 +554,38 @@ export class DataService {
   }
 
   async getClientList(): Promise<DBDIMandanten[]>  {
+    console.log('#516  data.service');
     return await this.dexie.mandanten.toArray();
   }
 
   getFullArtikelData(link: DBDIObjektKatalogMandant, globalData: DBDIObjektKatalogGlobal): DBDIArtikel {
+    console.log('#521  data.service');
     return {...link, ...globalData} as DBDIArtikel;
   }
 
   getFullRaumData(raum: DBDIRaeume, gebaeude: DBDIGebaeude): DBDIRaumGebaeude {
+    console.log('#526  data.service');
     const raumGebaeudeData: DBDIRaumGebaeude = {...raum, ...gebaeude};
     return raumGebaeudeData;
   }
 
   getArtikelRefByGcuuidMid(gcuuid: string, mid: number): Promise<DBDIObjektKatalogMandant> {
+    console.log('#532  data.service');
     return this.dexie.objektKatalogMandant.where( { gcuuid, mid } ).first();
   }
 
   public async getArtikelRef(mcid: number): Promise<DBDIObjektKatalogMandant> {
+    console.log('#537  data.service');
     return this.dexie.objektKatalogMandant.get( mcid );
   }
 
   public async getArtikelData(gcid: number): Promise<DBDIObjektKatalogGlobal> {
+    console.log('#542  data.service');
     return this.dexie.objektKatalogGlobal.get( gcid );
   }
 
   public async getArtikel(id: number): Promise<DBDIArtikel> {
+    console.log('#547  data.service');
     const artikelLink = await this.dexie.objektKatalogMandant.get( { mcid: id } );
     const artikelData = await this.dexie.objektKatalogGlobal.get( { gcid: artikelLink.gcid } );
     console.log('getArtikel by id', { id, artikelLink, artikelData});
@@ -450,6 +593,7 @@ export class DataService {
   }
 
   public async getArtikelRefAndData(id: number): Promise<ArtikelRefAndData> {
+    console.log('#555  data.service');
     const artikelRef = await this.dexie.objektKatalogMandant.get( { mcid: id } );
     const artikelData = await this.dexie.objektKatalogGlobal.get( { gcid: artikelRef.gcid } );
     return {
@@ -459,10 +603,12 @@ export class DataService {
   }
 
   public async getInventarRef(ivid: number): Promise<DBDIInventar> {
+    console.log('#565  data.service');
     return this.dexie.inventar.get(ivid);
   }
 
   public async getInventarData(ivid: number): Promise<InventarDataResult> {
+    console.log('#570  data.service');
     const inventarRef = await this.dexie.inventar.get( ivid );
     if (!inventarRef) {
       return { success: false, errorCode: InventarDataResultError.InventarNotFound };
@@ -488,6 +634,7 @@ export class DataService {
   }
 
   public async getRaumAndGebaeude(id: number): Promise<RaumAndGebaude> {
+    console.log('#596  data.service');
     console.log('getRaum by id', id);
 
     const raum = await this.dexie.raeume.get( id );
@@ -502,6 +649,7 @@ export class DataService {
   }
 
   public getRaum(id: number) {
+    console.log('#611  data.service');
     console.log('getRaum by id', id);
 
     let raum: DBDIRaeume;
@@ -515,12 +663,12 @@ export class DataService {
   }
 
   public getRaeumeByGebaeudeId(gid: number): Promise<DBDIRaeume[]> {
-    console.log('Search in rooms by gid', gid);
+    console.log('#625 data.service Search in rooms by gid', gid);
     return this.dexie.raeume.where({ gid }).toArray();
   }
 
   public async getArtikelListByClientId(mid: number): Promise<DBDIArtikel[]> {
-    console.log('Search in Global Katalog by mid', mid);
+    console.log('#630 data.service Search in Global Katalog by mid', mid);
 
     const artikelRefs = await this.dexie.objektKatalogMandant
       .where({ mid }).toArray();
@@ -530,8 +678,8 @@ export class DataService {
     return artikelRefs.map( (ref, i) => ({...artikelData[i], ...ref, ...{ mcuuid: ref.uuid }}) );
   }
 
-  public async barcodeLookup(barcode: string, mid: number): Promise<IUnionLookupAssignedObject> {
-    console.log('#364 barcodeLookup', {barcode, mid});
+  public async bcLookup(barcode: string, mid: number): Promise<IUnionLookupAssignedObject> {
+    console.log('#641 barcodeLookup', {barcode, mid});
 
     const lookupInventar = await this.getInventarByBarcode(barcode, mid);
 
@@ -555,6 +703,7 @@ export class DataService {
   }
 
   async getInventarByBarcode(barcode: string, useMid?: number): Promise<LookupAssignedInventar|LookupNoMatches> {
+    console.log('#665  data.service');
     const db = this.dexie;
 
     console.log('#380 barcodeLookup in inventar', { barcode, useMid });
@@ -586,6 +735,7 @@ export class DataService {
   }
 
   async getRaumByBarcode(barcode: string, useMid?: number): Promise<LookupAssignedRoom|LookupNoMatches> {
+    console.log('#697  data.service');
     const db = this.dexie;
 
     console.log('#412 barcodeLookup in raeume', { barcode, useMid});
@@ -607,6 +757,7 @@ export class DataService {
 
   async getArtikelByBarcode(barcode: string, useMid?: number):
     Promise<LookupResult|LookupAssignedObjektbuchArtikel|LookupAssignedObjektbuchArtikel[]> {
+    console.log('#719  data.service');
     const db = this.dexie;
 
     console.log('#517 barcodeLookup in Objektbuch', { barcode, useMid});
@@ -644,12 +795,23 @@ export class DataService {
   }
 
   async getBuildingList(clientID: number): Promise<DBDIGebaeude[]> {
+    console.log('#757  data.service');
     const list = await this.dexie.gebaeude.where({mid: clientID}).toArray();
     console.log('#336 async getBuildingList', list);
     return list;
   }
 
+  async getBuildingListByJobid(jobid: number, clientID: number): Promise<DBDIGebaeude[]> {
+    console.log('#764  data.service');
+    const listGebaeudeRef = await this.dexie.inventurenGebaeude.where({jobid}).toArray();
+    const listGid = listGebaeudeRef.map( (jg) => jg.gid);
+    const list = await this.dexie.gebaeude.where( 'gid').anyOf(listGid).filter( (g) => g.mid === clientID).toArray();
+    console.log('#703 async getBuildingList by jobid', { jobid, clientID, listGebaeudeRef, listGid, list });
+    return list;
+  }
+
   joinsToStrictFormat(joins: JoinFlexFormatted, parent?: JoinFlexFormatted): JoinStrictFormatted {
+    console.log('#773  data.service');
     const db = this.dexie;
     const f = { ...joins };
     if (typeof f.table === 'string' ) {
@@ -690,6 +852,7 @@ export class DataService {
   }
 
   joinieTables(join: JoinStrictFormatted): Dexie.Table<any, any>[] {
+    console.log('#814  data.service');
     let tables: Dexie.Table<any, any>[] = [ join.table ];
     if (join.joins) {
       join.joins.forEach( (jn) => tables = tables.concat( this.joinieTables( jn )) );
@@ -698,6 +861,7 @@ export class DataService {
   }
 
   async joinie(flexJoins: JoinFlexFormatted): Promise<any[]|Dexie.Collection<any, any>> {
+    console.log('#823  data.service');
     const joins: JoinStrictFormatted = this.joinsToStrictFormat(flexJoins);
 
     const db = this.dexie;

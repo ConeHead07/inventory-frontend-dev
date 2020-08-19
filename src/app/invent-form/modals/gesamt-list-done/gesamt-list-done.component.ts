@@ -37,7 +37,7 @@ export class GesamtListDoneComponent implements OnInit {
   faFull = faBatteryFull;
 
   constructor(
-    private activeModal: NgbActiveModal,
+    public activeModal: NgbActiveModal,
     private baseData: BasedataService,
     private raumData: RaumService
   ) { }

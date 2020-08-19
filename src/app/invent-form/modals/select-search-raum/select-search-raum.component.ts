@@ -2,7 +2,7 @@ import {Component, EventEmitter, OnInit, Output} from '@angular/core';
 import { Observable } from 'rxjs';
 import { debounceTime, distinctUntilChanged, map, filter} from 'rxjs/operators';
 import { DataService } from '../../../inventory/service/data.service';
-import { faPlus } from '@fortawesome/free-solid-svg-icons';
+import { faPlus, faSearch, faSearchLocation, faSignOutAlt } from '@fortawesome/free-solid-svg-icons';
 
 import {NgbModal, ModalDismissReasons, NgbActiveModal} from '@ng-bootstrap/ng-bootstrap';
 import {DBDIRaeume, DBDIRaumGebaeude} from '../../../dexie.service';
@@ -31,12 +31,13 @@ interface RaumOption extends DBDIRaeume {
 export class SelectSearchRaumComponent implements OnInit {
 
   faPlus = faPlus;
+  faSearch = faSearch;
+  faSearchLocation = faSearchLocation;
+  faSignOutAlt = faSignOutAlt;
 
   public model: Raum;
   private gid: number;
   private options: RaumOption[];
-
-
 
   @Output() raumSelected = new EventEmitter<DBDIRaeume>();
   @Output() raumCreating = new EventEmitter<number>();

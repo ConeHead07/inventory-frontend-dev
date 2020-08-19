@@ -2,7 +2,8 @@ import { Component, OnInit } from '@angular/core';
 import {VariablesService} from '../../service/variables.service';
 import {BasedataService} from '../../../basedata.service';
 import {BarcodeService} from '../../../invent-form/data-services/barcode.service';
-import {DBDIVariables} from '../../../dexie.service';
+import {DBDIVariables, DexieService} from '../../../dexie.service';
+import {SoundsService} from '../../../sounds.service';
 
 @Component({
   selector: 'app-settings',
@@ -14,9 +15,11 @@ export class SettingsComponent implements OnInit {
   buildBcLookup = false;
 
   constructor(
+    private dexieService: DexieService,
     private variables: VariablesService,
     private baseData: BasedataService,
-    private barcodeLookup: BarcodeService) {
+    private barcodeLookup: BarcodeService,
+    private sounds: SoundsService) {
   }
 
   ngOnInit() {
@@ -25,6 +28,14 @@ export class SettingsComponent implements OnInit {
 
   async reloadVariableList() {
     this.variableList = await this.variables.getAll();
+  }
+
+  async dbClear() {
+    this.dexieService.delete();
+    this.baseData.setCurrentInventur(null);
+    this.baseData.setCurrentRaum(null);
+    this.baseData.setCurrentGebaeude(null);
+    this.baseData.setCurrentRaum(null);
   }
 
   async reIndexBarcodeLookup() {
@@ -37,6 +48,14 @@ export class SettingsComponent implements OnInit {
       this.buildBcLookup = false;
     });
     this.reloadVariableList();
+  }
+
+  async playSuccess() {
+    this.sounds.playSuccess();
+  }
+
+  async playError() {
+    this.sounds.playError();
   }
 
 }

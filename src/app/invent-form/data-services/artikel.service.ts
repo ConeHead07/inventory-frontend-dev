@@ -36,6 +36,7 @@ export interface ArtikelBasisDaten {
   Farbe?: string;
   hid?: number;
   huuid?: string;
+  log?: boolean;
 }
 
 export interface DBInsertArtikelResult extends DbInsertResult {
@@ -136,7 +137,9 @@ export class ArtikelService {
     const hersteller = db.hersteller;
     const uid = this.authService.getUser().id;
     const jobid = this.baseData.getCurrentJobid();
+    const deviceid = this.baseData.getCurrentDeviceId();
     const uuid = Guid.create().toString();
+    const log = { log: true }
 
 
     if (daten.hid && !daten.huuid) {
@@ -185,6 +188,7 @@ export class ArtikelService {
       created_at: new Date(),
       modified_at: null,
       created_uid: uid,
+      created_device_id: deviceid,
       created_jobid: jobid,
       lid: !('lid' in daten as any) ? null :  (daten as any).lid,
       Produktnr: !('Produktnr' in daten) ? null : (daten as any).Produktnr,
@@ -195,9 +199,10 @@ export class ArtikelService {
       Flaeche: !('Flaeche' in daten) ? null : (daten as any).Flaeche,
       Gewicht: !('Gewicht' in daten) ? null : (daten as any).Gewicht,
       Baujahr: !('Baujahr' in daten) ? null : (daten as any).Baujahr,
-      Kst: !('Kst' in daten) ? null : (daten as any).Kst
+      Kst: !('Kst' in daten) ? null : (daten as any).Kst,
+      log: true
     };
-    const insertKey = await katalog.add(insertData);
+    const insertKey = await katalog.add({ ...insertData, ...log });
     insertData.gcid = insertKey;
     return insertData;
   }
@@ -210,9 +215,10 @@ export class ArtikelService {
     const uuid = Guid.create().toString();
     const defaultMid = this.baseData.getCurrentMid();
     const devID = this.baseData.getCurrentDeviceId();
+    const log = { log: true }
 
     if (!daten.gcid && !daten.gcuuid) {
-      const artikelData = await this.insertArtikelData(daten);
+      const artikelData = await this.insertArtikelData({ ...daten, ...log});
       daten.gcid = artikelData.gcid;
       daten.gcuuid = artikelData.uuid;
     }
@@ -231,7 +237,7 @@ export class ArtikelService {
       modified_at: null,
       modified_uid: null
     };
-    const insertKey = await artikelRef.add( insertData );
+    const insertKey = await artikelRef.add( {...insertData, ...log} );
     insertData.mcid = insertKey;
     return insertData;
   }
@@ -252,7 +258,7 @@ export class ArtikelService {
       } as DBInsertArtikelResult;
     } catch ( err ) {
       const errorMsg = ( 'name' in err ? err.name + ': ' : '')
-        + ( 'message' in err ? err.message : JSON.stringify(err) );
+        + ( ('message' in err) ? err.message : JSON.stringify(err) );
       return {
         success: false,
         errorMsg,

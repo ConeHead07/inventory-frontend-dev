@@ -1,3 +1,19 @@
+<div class="blobs-overlay" *ngIf="blobAlert && useOverlay === 1">
+  <div class="blobs-container">
+    <ng-container [ngSwitch]="blobAlert">
+      <div class="blob red animate" *ngSwitchCase="'danger'"></div>
+      <div class="blob green animate" *ngSwitchCase="'success'"></div>
+    </ng-container>
+  </div>
+</div>
+<div class="blobs-overlay" *ngIf="blobAlert && useOverlay === 2">
+  <div class="blobs-container">
+    <ng-container [ngSwitch]="blobAlert">
+      <div class="blob red animate" *ngSwitchCase="'danger'"></div>
+      <div class="blob green animate" *ngSwitchCase="'success'"></div>
+    </ng-container>
+  </div>
+</div>
 <div class="row no-gutters mb-1">
   <div class="form-group col-4">
     <label for="kunde" class="mb-0">Mandant</label>
@@ -68,6 +84,7 @@
     </div>
   </div>
 </div>
+
 <div class="form-group row">
   <div class="col input-group mb-1">
     <div class="input-group-prepend">
@@ -115,9 +132,9 @@
       </div>
       <input id="elmBarcode" #invBarcode readonly
              required
-             [ngClass]="{'bg-danger': !formInventar.Barcode.length}" type="text"
+             [ngClass]="{'bg-danger': waitingForNewInventarBarcode }" type="text"
              [attr.value]="formInventar.Barcode" class="form-control"
-             placeholder="Warte auf Barcode ..." aria-label="Barcode">
+             [placeholder]="!waitingForNewInventarBarcode ? 'Inventar-Barcode ...' : 'Warte auf Inventar-Barcode ...'" aria-label="Barcode">
       <div class="input-group-append">
         <button class="btn btn-outline-success" type="button" (click)="openScanner(invBarcode)">
           <fa-icon [icon]="faCamera"></fa-icon>
@@ -163,18 +180,20 @@
   </div -->
   </div>
 </div>
-
+<hr>
+<h5>Barcode-Scanning Test</h5>
 <div class="row">
   <div class="col">
-    <button (click)="simulateScanner()">Scanner Simulation</button><br>
-    <input #inputSimulateBarcode>
+    <h6>Scanner Simulator</h6>
+    <textarea #inputSimulateBarcode></textarea><br>
+    <button (click)="simulateScanner()">Barcode senden</button><br>
   </div>
-
-  <div class="row">
-<app-scannerdetection (scanned)="handleScanData($event)" [config]="scanDetectorConfig">
-  <h4>Detected Barcode (Zeit: {{ lastScanDetectTime | date:'hh:mm:ss' }})</h4>
-  <textarea #input2 [ngClass]="lastScanDetectClass"></textarea>
-</app-scannerdetection>
+  <div class="col">
+    <app-scannerdetection (scanned)="handleScanData($event)" [config]="scanDetectorConfig">
+      <h6>Scan-Detector Barcode</h6>
+      <textarea #input2 [ngClass]="lastScanDetectClass"></textarea><br>
+      (Zeit: {{ lastScanDetectTime | date:'hh:mm:ss' }})
+    </app-scannerdetection>
   </div>
-  <div>{{ formInventar | json }}</div>
+  <div class="d-none">{{ formInventar | json }}</div>
 </div>

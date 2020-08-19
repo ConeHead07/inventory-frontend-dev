@@ -1,6 +1,6 @@
 <div class="modal-header p-0" style="padding:0.1rem">
   <div class="btn-group row no-gutters w-100">
-    <button class="btn btn-primary col-10 text-left pl-3" (click)="showGesamtDoneForm($event)">
+    <button class="btn btn-primary col-10 text-left pl-3" (click)="showGesamtDoneForm()">
       <fa-icon [icon]=""></fa-icon> Zeige bereits aufgenommene Räume
     </button>
     <button type="button" class="btn btn-danger col-2" (click)="activeModal.dismiss('Cross click')">
@@ -8,6 +8,7 @@
     </button>
   </div>
 </div>
+
 <div class="modal-header">
   <h4 class="modal-title">Bereits inventarisiert</h4>
 </div>
@@ -36,7 +37,3 @@
     </tbody>
   </table>
 </div>
-<p>gesamt-list-done works!</p>
-
-
-<p>gesamt-list-rest works!</p>

@@ -1,5 +1,5 @@
 import {EventEmitter, Injectable, Output} from '@angular/core';
-import {DBDIDevices, DBDIGebaeude, DBDIInventuren, DBDIRaeume, DBDIUsers} from './dexie.service';
+import {DBDIGebaeude, DBDIInventuren, DBDIRaeume, DBDIUsers} from './dexie.service';
 import {User} from './auth/user.model';
 
 @Injectable({
@@ -17,11 +17,13 @@ export class BasedataService {
   private currentGebaeude: DBDIGebaeude;
   private currentRaum: DBDIRaeume;
   private currentUser: DBDIUsers;
+  private previousUser: DBDIUsers;
   private currentDevice: number;
 
   constructor() {
     this.currentInventur = JSON.parse( localStorage.getItem( 'currentInventur' ) );
     this.currentUser = JSON.parse(localStorage.getItem('currentUser' ) );
+    this.previousUser = JSON.parse(localStorage.getItem('previousUser' ) );
     this.currentGebaeude = JSON.parse( localStorage.getItem( 'currentGebaeude' ) );
     this.currentRaum = JSON.parse( localStorage.getItem( 'currentRaum' ) );
     this.currentDevice = JSON.parse( localStorage.getItem( 'currentDevice' ) );
@@ -57,6 +59,11 @@ export class BasedataService {
     this.userChanged.emit( this.currentUser );
   }
 
+  setPreviousUser(user: DBDIUsers) {
+    this.previousUser = user;
+    localStorage.setItem('previousUser', JSON.stringify( user ) );
+  }
+
   getCurrentDevice(): number {
     return this.currentDevice;
   }
@@ -71,6 +78,18 @@ export class BasedataService {
 
   getCurrentUser(): DBDIUsers {
     return this.currentUser;
+  }
+
+  getPreviousUser(): DBDIUsers {
+    return this.previousUser;
+  }
+
+  getPreviousUid(): number {
+    try {
+      return this.previousUser.id;
+    } catch (e) {
+      return 0;
+    }
   }
 
   getCurrentUid(): number {

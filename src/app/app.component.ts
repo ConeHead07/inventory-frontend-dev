@@ -20,6 +20,4 @@ export class AppComponent {
     this.heartBeatState = state;
     this.connectionService.updateOptions({enableHeartbeat: state});
   }
-
-  ngOnInit(): void {}
 }

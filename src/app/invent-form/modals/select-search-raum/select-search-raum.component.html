@@ -1,7 +1,7 @@
 <div class="modal-header p-0" style="padding:0.1rem">
   <div class="btn-group row no-gutters w-100">
     <button class="btn btn-primary col-10 text-left pl-3" (click)="showCreateForm($event)">
-      <fa-icon [icon]="faPlus"></fa-icon> Neuen Raum anlegen
+      <fa-icon [icon]="faSignOutAlt" class="mr-3"></fa-icon> <fa-icon [icon]="faPlus"></fa-icon> Neuen Raum anlegen
     </button>
     <button type="button" class="btn btn-danger col-2" (click)="activeModal.dismiss('Cross click')">
       <span aria-hidden="true">&times;</span>
@@ -12,7 +12,11 @@
   <h4 class="modal-title">Raumauswahl</h4>
 </div>
 <div class="modal-body">
-  <label for="typeahead-prevent-manual-entry">Raum suchen:</label>
+  <label for="typeahead-prevent-manual-entry" class="mb-0">Raum suchen:</label>
+  <div class="input-group mb-1">
+    <div class="input-group-prepend">
+      <span class="input-group-text"><fa-icon [icon]="faSearch"></fa-icon></span>
+    </div>
   <input id="typeahead-prevent-manual-entry"  type="text" class="form-control"
          (selectItem)="onSelectItem($event)"
          [(ngModel)]="model"
@@ -20,6 +24,7 @@
          [inputFormatter]="formatter"
          [resultFormatter]="formatter"
          [editable]='false' />
+  </div>
   <hr>
   <pre>Model: {{ model | json }}</pre>
 
