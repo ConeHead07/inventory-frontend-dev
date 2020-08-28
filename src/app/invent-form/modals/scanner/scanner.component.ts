@@ -206,6 +206,11 @@ export class ScannerComponent implements OnInit {
   onCamerasFound(devices: MediaDeviceInfo[]): void {
     this.availableDevices = devices;
     this.hasDevices = Boolean(devices && devices.length);
+    if (this.hasDevices) {
+      for (const dev of this.availableDevices) {
+        console.log( 'found camera mediaDeviceInfo: ', dev);
+      }
+    }
   }
 
   bcInfoToString(json: any): string {
