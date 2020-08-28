@@ -4,7 +4,12 @@ import {BasedataService} from './basedata.service';
 import {DBDIClientChangeLog, DBDIInventuren, DexieService} from './dexie.service';
 import {ConnectionService} from './connection-service.service';
 import {VariablesService} from './inventory/service/variables.service';
+import {DbsyncLogService, TableSyncProgress} from "./dbsync-log.service";
+import {IndexableType} from "dexie";
 
+export interface TableSyncProgressList {
+  [key: string]: TableSyncProgress;
+}
 
 interface SyncServerChangeRevisionLog {
   revision_id: number;
@@ -218,7 +223,8 @@ export class DBSyncClientService {
     private apiService: ApiService,
     private baseData: BasedataService,
     private networkService: ConnectionService,
-    private settings: VariablesService) {
+    private settings: VariablesService,
+    private dbSyncLogService: DbsyncLogService) {
 
     this.autoSyncStart();
   }
@@ -305,6 +311,7 @@ export class DBSyncClientService {
     if (!jobid) {
       jobid = this.baseData.getCurrentJobid();
     }
+    const devid = this.baseData.getCurrentDeviceId() || 0;
     const lastRevId = await this.getClientRevIdByJobid(jobid);
 
     if (!this.networkService.hasInternetAccess) {
@@ -314,7 +321,7 @@ export class DBSyncClientService {
 
     return this.apiService
       .get<any>(
-        `api/sync/havingChanges/${jobid}/${lastRevId}`,
+        `api/sync/havingChanges/${jobid}/${lastRevId}/${devid}`,
         {})
       .toPromise()
       .then(async (data) => {
@@ -416,6 +423,17 @@ export class DBSyncClientService {
     this.processingJobids.push(jobid);
     this.processes.push(syncJobResult);
 
+    this.dbSyncLogService.start(jobid, lastRevId);
+    const syncLogMsg = this.dbSyncLogService.message.bind(this.dbSyncLogService, [jobid]);
+    const syncLogErr = this.dbSyncLogService.error.bind(this.dbSyncLogService, [jobid]);
+    const syncLogData = this.dbSyncLogService.log.bind(this.dbSyncLogService);
+
+    syncLogMsg('Starte Synchronisation');
+    let total = 0;
+    let executed = 0;
+    let chunks = 0;
+    const tableLogs: TableSyncProgressList = {};
+
     let syncJobLoop = 0;
     while (!syncJobResult.finished && syncJobLoop < 20) {
       syncJobLoop++;
@@ -431,6 +449,7 @@ export class DBSyncClientService {
       }
       console.log('#421 dbsync-client.service sendByJobId() Synchronisations-Loop!', { syncJobLoop, lastRevId, logs });
 
+      syncLogMsg('Download Daten ...');
       syncJobResult.committed = logs.length;
       await this.apiService
         .post<SyncServerResponse>(
@@ -443,104 +462,162 @@ export class DBSyncClientService {
           })
         .toPromise()
         .then(async (data) => {
-            if (('errorMsg' in data) && data.errorMsg) {
-              syncJobResult.errorMsg = data.errorMsg;
-              console.error(data.errorMsg);
-              return this.finishProcess(syncJobResult, SyncJobStatus.ServerAnsweredWithErrors);
-            }
-
-            console.log('Changes wurden gesendet, verarbeite Response', {
-              aSyncedChangeIds: data.aSyncedChangeIds ? data.aSyncedChangeIds.length : 0,
-              aFailedChangeIds: data.aFailedChangeIds ? data.aFailedChangeIds.length : 0,
-              serverRechanges: data.serverRechanges ? data.serverRechanges.length : 0,
-              serverChanges: data.serverChanges.rows ? data.serverChanges.rows.length : 0
-            });
-
-            console.log('Process sync_done');
-            if (data.aSyncedChangeIds && data.aSyncedChangeIds.length > 0) {
-              syncJobResult.setStatus(SyncJobStatus.WriteServerSyncedIds);
-              await this.dexieService.clientChangeLog
-                .where('id')
-                .anyOf(data.aSyncedChangeIds)
-                .modify({sync_done: 1});
-
-              await this.dexieService.clientChangeLog
-                .where({sync_done: 1})
-                .delete();
-            }
-
-            if (data.aFailedChangeIds && data.aFailedChangeIds.length > 0) {
-              syncJobResult.errorMsg += 'Num Failed Server-Syncs: ' + data.aFailedChangeIds.length + '.\n';
-              for (const chckFailure of data.aFailedChangeIds) {
-                switch (chckFailure.reason) {
-                  case 'INSERT_ALREADY_EXISTS':
-                  case 'NEWER_VERSION_ON_SERVER':
-                    await this.dexieService.clientChangeLog.delete(chckFailure.id);
-                    break;
-                }
-              }
-            }
-
-            console.log('Process serverRechanges');
-            if (data.serverRechanges && data.serverRechanges.length > 0) {
-              syncJobResult.setStatus(SyncJobStatus.WriteServerReChanges);
-              await Promise.all(data.serverRechanges.map(async (chg) => {
-                chg.table = chg.table[0].toLowerCase() + chg.table.substr(1);
-                await this.dexieService.table(chg.table).where({uuid: chg.uuid}).modify(chg.mods);
-              }));
-            }
-
-            console.log('Process serverChanges');
-            if (data.serverChanges.rows && data.serverChanges.rows.length > 0) {
-              syncJobResult.setStatus(SyncJobStatus.WriteServerChanges);
-              for (const chg of data.serverChanges.rows) {
-
-                // if (data.serverChanges && data.serverChanges.length > 0) {
-                //   syncJobResult.setStatus(SyncJobStatus.WriteServerChanges);
-                //   for (const chg of data.serverChanges) {
-
-                chg.table = chg.table[0].toLowerCase() + chg.table.substr(1);
-                switch (chg.type) {
-                  case 1: // Insert
-                    console.log('#494 dbsync-client.service. await this.dexieService.table( ' + chg.table + ' ).put( chg.obj )', chg);
-                    await this.dexieService.table(chg.table).put(JSON.parse(chg.obj));
-                    break;
-
-                  case 2: // Update
-                    console.log('#499 dbsync-client.service. await this.dexieService.table( ' + chg.table + ' )' +
-                      '.where({uuid:' + chg.uuid + '}).modify( chg.mods )', chg);
-                    await this.dexieService.table(chg.table)
-                      .where({uuid: chg.uuid})
-                      .modify(JSON.parse(chg.mods));
-                    break;
-
-                  case 3: // Delete
-                    console.log('#329 dbsync-client delete ' + chg.table + ' by uuid ' + chg.uuid );
-                    await this.dexieService.table(chg.table).delete({uuid: chg.uuid});
-                }
-                console.log('511 dbsync-client.service await this.settings.set(', lastRevIdVar, chg.revision_id, ')');
-                await this.settings.set(lastRevIdVar, chg.revision_id);
-              }
-            }
-
-            console.log('Process SyncResponse finished');
-            syncJobResult.revisionId = await this.settings.get(lastRevIdVar);
-            syncJobResult.committed = logs ? logs.length : 0;
-            syncJobResult.synced = data.aSyncedChangeIds ? data.aSyncedChangeIds.length : 0;
-            syncJobResult.conflicts = data.aFailedChangeIds ? data.aFailedChangeIds.length : 0;
-            syncJobResult.numServerRechanges = data.serverRechanges ? data.serverRechanges.length : 0;
-            syncJobResult.numServerChanges = data.serverChanges ? data.serverChanges.rows.length : 0;
-
-            console.log('#508 dbsync-client.service, data.serverChanges.total:', data.serverChanges.total);
-
-            if (data.serverChanges.rows.length < data.serverChanges.total) {
-              console.log('#511 keep SyncProcess(jobid: ' + syncJobResult.jobid + ') open');
-              return syncJobResult;
-            }
-            console.log('#514 finish SyncProcess(jobid: ' + syncJobResult.jobid + ')');
-            return this.finishProcess(syncJobResult, SyncJobStatus.Finished);
+          chunks++;
+          if (('errorMsg' in data) && data.errorMsg) {
+            syncJobResult.errorMsg = data.errorMsg;
+            console.error(data.errorMsg);
+            syncLogErr('Download Fehler: ' + data.errorMsg);
+            return this.finishProcess(syncJobResult, SyncJobStatus.ServerAnsweredWithErrors);
           }
-        );
+
+          if (total === 0) {
+            total = data.serverChanges.total;
+            this.dbSyncLogService.jobSetTotal(jobid, total);
+          }
+          this.dbSyncLogService.jobSetChunks(jobid, chunks);
+
+          syncLogMsg('Verarbeite Server-Antwort ...');
+          console.log('Changes wurden gesendet, verarbeite Response', {
+            aSyncedChangeIds: data.aSyncedChangeIds ? data.aSyncedChangeIds.length : 0,
+            aFailedChangeIds: data.aFailedChangeIds ? data.aFailedChangeIds.length : 0,
+            serverRechanges: data.serverRechanges ? data.serverRechanges.length : 0,
+            serverChanges: data.serverChanges.rows ? data.serverChanges.rows.length : 0
+          });
+
+          console.log('Process sync_done');
+          if (data.aSyncedChangeIds && data.aSyncedChangeIds.length > 0) {
+            syncLogMsg('Entferne vom Server bestätige Client-Logs ...');
+            syncJobResult.setStatus(SyncJobStatus.WriteServerSyncedIds);
+            await this.dexieService.clientChangeLog
+              .where('id')
+              .anyOf(data.aSyncedChangeIds)
+              .modify({sync_done: 1});
+
+            await this.dexieService.clientChangeLog
+              .where({sync_done: 1})
+              .delete();
+          }
+
+          if (data.aFailedChangeIds && data.aFailedChangeIds.length > 0) {
+            syncJobResult.errorMsg += 'Num Failed Server-Syncs: ' + data.aFailedChangeIds.length + '.\n';
+            for (const chckFailure of data.aFailedChangeIds) {
+              switch (chckFailure.reason) {
+                case 'INSERT_ALREADY_EXISTS':
+                case 'NEWER_VERSION_ON_SERVER':
+                  await this.dexieService.clientChangeLog.delete(chckFailure.id);
+                  break;
+              }
+            }
+          }
+
+          console.log('Process serverRechanges');
+          if (data.serverRechanges && data.serverRechanges.length > 0) {
+            syncLogMsg('Korrigiere Client-Ids nach Server-Antwort ...');
+            syncJobResult.setStatus(SyncJobStatus.WriteServerReChanges);
+            await Promise.all(data.serverRechanges.map(async (chg) => {
+              chg.table = chg.table[0].toLowerCase() + chg.table.substr(1);
+              await this.dexieService.table(chg.table).where({uuid: chg.uuid}).modify(chg.mods);
+            }));
+          }
+
+          console.log('Process serverChanges');
+
+          if (data.serverChanges.rows && data.serverChanges.rows.length > 0) {
+            syncLogMsg('Import Server-Changes ...');
+            syncJobResult.setStatus(SyncJobStatus.WriteServerChanges);
+            const chgLen = data.serverChanges.rows.length;
+            for (let ci = 0; ci < chgLen; ci++) {
+              const chg = data.serverChanges.rows[ci];
+              const currRevId = chg.revision_id;
+              if (currRevId < lastRevId) {
+                const err = '#501 SYNC-FEHLER: LastRevId ist größer als CurrRevID: ' + lastRevId + ' > ' + currRevId;
+                console.error(err);
+                alert(err);
+                return;
+              }
+
+              chg.table = chg.table[0].toLowerCase() + chg.table.substr(1);
+              if (!(chg.table in tableLogs) ) {
+                tableLogs[chg.table] = {
+                  jobid,
+                  table: chg.table,
+                  revisionId: chg.revision_id,
+                  executed: 0,
+                  puts: 0,
+                  modified: 0,
+                  deleted: 0,
+                  total: 0,
+                  lastEmittedrevisionId: 0
+                };
+              }
+
+              switch (chg.type) {
+                case 1: // Insert
+                  tableLogs[chg.table].puts++;
+                  console.log('#494 ' + ci + '/' + chgLen +
+                    ' dbsync-client.service. await this.dexieService.table( ' + chg.table + ' ).put( chg.obj )', chg);
+                  await this.dexieService.table(chg.table).put(JSON.parse(chg.obj));
+                  break;
+
+                case 2: // Update
+                  tableLogs[chg.table].modified++;
+                  console.log('#499 ' + ci + '/' + chgLen +
+                    ' dbsync-client.service. await this.dexieService.table( ' + chg.table + ' )' +
+                    '.where({uuid:' + chg.uuid + '}).modify( chg.mods )', chg);
+                  await this.dexieService.table(chg.table)
+                    .where({uuid: chg.uuid})
+                    .modify(JSON.parse(chg.mods));
+                  break;
+
+                case 3: // Delete
+                  tableLogs[chg.table].deleted++;
+                  console.log('#329 ' + ci + '/' + chgLen +
+                    ' dbsync-client delete ' + chg.table + ' by uuid ' + chg.uuid );
+                  await this.dexieService.table(chg.table).delete({uuid: chg.uuid});
+              }
+
+              executed++;
+              tableLogs[chg.table].executed++;
+              lastRevId = currRevId;
+              console.log('511 ' + ci + '/' + chgLen +
+                ' dbsync-client.service await this.settings.set(', lastRevIdVar, chg.revision_id, ')');
+              await this.settings.set(lastRevIdVar, chg.revision_id, 'LogRow ' + ci + '/' + chgLen + '; RevId ' + currRevId);
+
+              if (executed === total || executed % 100 === 0) {
+                for (const logData of Object.values(tableLogs)) {
+                  if (logData.revisionId > logData.lastEmittedrevisionId) {
+                    syncLogData(logData);
+                    logData.lastEmittedrevisionId = logData.revisionId;
+                  }
+                }
+              }
+            }
+          }
+
+          console.log('Process SyncResponse finished');
+          syncJobResult.revisionId = await this.settings.get(lastRevIdVar);
+          syncJobResult.committed = logs ? logs.length : 0;
+          syncJobResult.synced = data.aSyncedChangeIds ? data.aSyncedChangeIds.length : 0;
+          syncJobResult.conflicts = data.aFailedChangeIds ? data.aFailedChangeIds.length : 0;
+          syncJobResult.numServerRechanges = data.serverRechanges ? data.serverRechanges.length : 0;
+          syncJobResult.numServerChanges = data.serverChanges ? data.serverChanges.rows.length : 0;
+
+          console.log('#508 dbsync-client.service, data.serverChanges.total:', data.serverChanges.total);
+
+          for (const logData of Object.values(tableLogs)) {
+            syncLogData(logData);
+            logData.lastEmittedrevisionId = logData.revisionId;
+          }
+
+          if (data.serverChanges.rows.length < data.serverChanges.total) {
+            console.log('#511 keep SyncProcess(jobid: ' + syncJobResult.jobid + ') open');
+            return syncJobResult;
+          }
+          console.log('#514 finish SyncProcess(jobid: ' + syncJobResult.jobid + ')');
+          syncLogMsg('Aktuelle Synchronisation wurde abgeschlossen');
+          return this.finishProcess(syncJobResult, SyncJobStatus.Finished);
+        }
+      );
     }
   }
 

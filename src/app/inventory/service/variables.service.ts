@@ -86,7 +86,7 @@ export class VariablesService {
     return this.variables.toArray();
   }
 
-  public async set(name: string, value: any): Promise<boolean> {
+  public async set(name: string, value: any, logComment: string = ''): Promise<boolean> {
     let oldVal;
     let action = SettingsChangeAction.Insert;
     if (await this.has(name)) {
@@ -99,15 +99,17 @@ export class VariablesService {
       alert( err );
       return;
     }
-    return await this.variables.put({name, value})
+    const success = await this.variables.put({name, value})
       .then(() => {
         if (name === 'jobid-2-revision-id') {
-          console.log('changed variable: ', { name, value, action, oldVal });
+          console.log('changed variable: ', { name, value, action, oldVal }, logComment);
         }
         this.checkWatchVar(name, action, value, oldVal);
         return true;
       })
       .catch((err) => false);
+
+    return success;
   }
 
   public async get(name: string, defaultValue: any = null): Promise<any> {

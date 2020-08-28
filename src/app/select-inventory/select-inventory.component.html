@@ -113,7 +113,7 @@
                   (click)="$event.preventDefault(); $event.stopPropagation(); buildingChanged(i)"
                   [attr.data-index]="i"
                   [value]="i">{{_bldg.Gebaeude}}
-            <ng-container *ngIf="lastInventory && _bldg.gid === lastBuilding.gid">
+            <ng-container *ngIf="lastBuilding && _bldg.gid === lastBuilding.gid">
               (Zuletzt in Arbeit)
             </ng-container></button>
         </div>
@@ -131,4 +131,19 @@
   </div>
     <div *ngIf="status" class="alert-info">{{status}}</div>
   </div>
+
+  <div *ngIf="lastMetaMsg !== ''">
+    <ngb-alert [type]="'success'" (close)="lastMetaMsg = ''">{{ lastMetaMsg }}</ngb-alert>
+  </div>
+
+  <div *ngIf="lastMetaErr !== ''">
+    <ngb-alert [type]="'danger'" (close)="lastMetaErr = ''">{{ lastMetaErr }}</ngb-alert>
+  </div>
+
+  <div>
+    <p *ngFor="let msg of listMetaMsg">
+      <ngb-alert [type]="msg.type" (close)="closeMsg(msg)">{{ msg.message }}</ngb-alert>
+    </p>
+  </div>
+
 </form>

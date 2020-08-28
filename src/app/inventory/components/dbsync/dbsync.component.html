@@ -62,5 +62,23 @@ syncAutoRun: {{ syncAutoRun | json }}<br>
   </div>
 </div>
 
+<div id="totalProgress">
+  <p><ngb-progressbar [striped]="true" [animated]="true" [value]="syncTotal.percent"></ngb-progressbar></p>
+  <div class="row">
+    <div class="col">{{ syncTotal.executed }}</div>
+    <div class="col">von {{ syncTotal.total }}</div>
+    <div class="col pull-right">{{ syncTotal.percent }} %</div>
+  </div>
+</div>
+<div id="tableProgress">
+  <div class="row" *ngFor="let st of syncTables; let stIdx = index">
+    <div class="col">{{ st.total }}</div>
+    <div class="col">{{ st.puts }}</div>
+    <div class="col">{{ st.modified }}</div>
+    <div class="col">{{ st.deleted }}</div>
+    <div class="col">{{ st.executed }}</div>
+  </div>
+</div>
+
 
 

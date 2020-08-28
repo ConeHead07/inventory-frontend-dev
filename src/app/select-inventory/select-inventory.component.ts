@@ -12,6 +12,7 @@ import {ConnectionService as NgConnectionService } from 'ng-connection-service';
 import {ConnectionService, ConnectionState} from '../connection-service.service';
 import {last} from 'rxjs/operators';
 import {Subscription} from "rxjs";
+import {DbsyncLogService, LoadingMetaData, LoadingMetaMessage} from "../dbsync-log.service";
 
 enum StatusLoadingInventories {
   None,
@@ -78,11 +79,19 @@ export class SelectInventoryComponent implements OnInit, OnDestroy {
   inventories: DBDIInventuren[];
   private inventoriesSelectable: DBDIInventuren[];
   lastInventory: DBDIInventuren;
-  private lastBuilding: DBDIGebaeude;
-  private lastRaum: DBDIRaeume;
+  lastBuilding: DBDIGebaeude;
+  lastRaum: DBDIRaeume;
   lastInventoryDetails: LastInventoryDetails;
   private ngConnenctionSubscription: Subscription;
   private connectionSubscription: Subscription;
+
+  subscriptionMetaMsg: Subscription;
+  subscriptionMetaErr: Subscription;
+  subscriptionMetaData: Subscription;
+  listMetaData: LoadingMetaData[] = [];
+  listMetaMsg: {type: string, message: string}[] = [];
+  lastMetaErr = '';
+  lastMetaMsg = '';
 
   constructor(
     private dataService: DataService,
@@ -93,7 +102,8 @@ export class SelectInventoryComponent implements OnInit, OnDestroy {
     private baseData: BasedataService,
     private progressService: InventoryProgressService,
     private connection: ConnectionService,
-    private ngConnection: NgConnectionService) {
+    private ngConnection: NgConnectionService,
+    private dbsyncLogService: DbsyncLogService) {
   }
 
   get progressAmount(): number {
@@ -113,6 +123,7 @@ export class SelectInventoryComponent implements OnInit, OnDestroy {
     this.lastInventory = this.baseData.getCurrentInventur();
     this.lastBuilding = this.baseData.getCurrentGebaeude();
     this.lastRaum = this.baseData.getCurrentRaum();
+
     this.routingSubscription = this.route.params.subscribe(params => {
       console.log({params});
     });
@@ -133,7 +144,40 @@ export class SelectInventoryComponent implements OnInit, OnDestroy {
       }
     });
 
+    this.subscriptionMetaData = this.dbsyncLogService.loadingMetaData.subscribe( (data) => {
+      if (data.table) {
+        const existing = this.listMetaData.find((item) => item.table === data.table);
+        if (existing) {
+          existing.message = data.message;
+          if (data.executed) {
+            existing.executed = data.executed;
+          }
+          if (data.total) {
+            existing.total = data.total;
+          }
+        }
+      }
+    });
 
+    this.subscriptionMetaMsg = this.dbsyncLogService.loadingMetaMessage.subscribe( (data) => {
+      this.lastMetaMsg = data.message;
+      this.listMetaMsg.push({
+        type: 'success',
+        message: data.message
+      });
+    });
+
+    this.subscriptionMetaErr = this.dbsyncLogService.loadingMetaError.subscribe( (data) => {
+      this.lastMetaErr = data.message;
+      this.listMetaMsg.push({
+        type: 'danger',
+        message: data.message
+      });
+    });
+  }
+
+  closeMsg(msg: any) {
+    this.listMetaMsg.splice(this.listMetaMsg.indexOf(msg), 1);
   }
 
   private async loadLastInventoryDetails() {
@@ -286,12 +330,14 @@ export class SelectInventoryComponent implements OnInit, OnDestroy {
             const checkInv = this.inventoriesSelectable.find( (inv) => inv.jobid === ids.jobid);
             if (checkInv) {
               this.inventory = checkInv;
-              this.inventorySelectionChanged(checkInv.jobid).then( () => {
-                const checkGeb = this.buildings.find( (b: DBDIGebaeude) => b.gid === this.lastBuilding.gid);
-                if (checkGeb) {
-                  this.building = checkGeb;
-                }
-              });
+              if (this.lastBuilding) {
+                this.inventorySelectionChanged(checkInv.jobid).then(() => {
+                  const checkGeb = this.buildings.find((b: DBDIGebaeude) => b.gid === this.lastBuilding.gid);
+                  if (checkGeb) {
+                    this.building = checkGeb;
+                  }
+                });
+              }
             }
           }
         });
@@ -327,6 +373,10 @@ export class SelectInventoryComponent implements OnInit, OnDestroy {
     this.routingSubscription.unsubscribe();
     this.ngConnenctionSubscription.unsubscribe();
     this.connectionSubscription.unsubscribe();
+
+    this.subscriptionMetaMsg.unsubscribe();
+    this.subscriptionMetaErr.unsubscribe();
+    this.subscriptionMetaData.unsubscribe();
   }
 
   async clientChanged(clientIdx) {

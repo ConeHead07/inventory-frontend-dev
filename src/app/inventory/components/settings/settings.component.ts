@@ -40,6 +40,7 @@ export class SettingsComponent implements OnInit {
 
   async reIndexBarcodeLookup() {
     this.buildBcLookup = true;
+    console.log('Start rebuildOnRunningSystem');
     this.barcodeLookup.rebuildOnRunningSystem().then( (result) => {
       console.log('Finished BC-Lookup-Rebuild', { result });
     }).catch( (err) => {

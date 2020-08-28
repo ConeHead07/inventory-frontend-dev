@@ -364,7 +364,7 @@ export class BarcodeService {
     });
   }
 
-  async rebuildTableOnRunningSystem<I extends DBDITableWithBarcode>(table: Dexie.Table<I, number>) {
+  async rebuildTableOnRunningSystem<I extends DBDITableWithBarcode>(table: Dexie.Table<I, number>): Promise<boolean> {
     if (this.rebuildProcesses.indexOf(table.name) !== -1) {
       return false;
     }
@@ -373,11 +373,14 @@ export class BarcodeService {
     const tblName = table.name;
     const tblBarcodeLookup = this.db.barcodeLookup;
 
+    console.log('rebuildTableOnRunningSystem Start Transaction Barcode-Indexing for table ' + table.name);
     await this.db.transaction('rw', [tblBarcodeLookup, table], () => {
+      console.log('rebuildTableOnRunningSystem Set Flag updateHelper=2 for table ' + table.name);
       tblBarcodeLookup
         .where( {table: tblName, updateHelper: 1})
         .modify({updateHelper: 2})
         .then( () => {
+          console.log('rebuildTableOnRunningSystem rebuild Barcode for table ' + table.name);
           table.filter( (item) => !!item.code).each ( (item) => {
             const forJobid = ('for_jobid' in item) ? item.for_jobid : 0;
             tblBarcodeLookup.put({
@@ -392,9 +395,11 @@ export class BarcodeService {
         });
     } );
 
+    console.log('rebuildTableOnRunningSystem delete Barcodes for no more existing entries in ' + table.name);
     await tblBarcodeLookup.where( {table: tblName, updateHelper: 2}).delete();
     // Clear Finished Process from ProcessList
     this.rebuildProcesses = this.rebuildProcesses.filter( procName => procName !== tblName);
+    return true;
   }
 
   async addBarcode(item: DBDIBarcodeLookup): Promise<string> {

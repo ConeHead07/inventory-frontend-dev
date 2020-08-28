@@ -7,6 +7,17 @@ import {DataService} from '../../service/data.service';
 import {VariablesService} from '../../service/variables.service';
 import {ConnectionService} from '../../../connection-service.service';
 import {Subscription} from 'rxjs';
+import {
+  DbsyncLogService,
+  TableSyncProgress,
+  TotalSyncProgress,
+  SyncMessage,
+  SyncError
+} from '../../../dbsync-log.service';
+
+interface TotalSyncProgressPct extends TotalSyncProgress {
+  percent: number;
+}
 
 @Component({
   selector: 'app-dbsync',
@@ -38,10 +49,18 @@ export class DbsyncComponent implements OnInit, OnDestroy {
   serverRevisionId?: number;
   numServerChanges?: number;
 
+  syncTotal: TotalSyncProgressPct;
+  syncTables: TableSyncProgress[] = [];
+
   subscriptionAutoSyncChange: Subscription;
   subscriptionProcessStarted: Subscription;
   subscriptionProcessFinished: Subscription;
   subscriptionNetworkService: Subscription;
+
+  subscriptionSyncTable: Subscription;
+  subscriptionSyncTotal: Subscription;
+  subscriptionSyncMsg: Subscription;
+  subscriptionSyncErr: Subscription;
 
   private subscribedSyncJobProcesses: [SyncJobResult, Subscription][] = [];
 
@@ -49,9 +68,28 @@ export class DbsyncComponent implements OnInit, OnDestroy {
     private dbsyncClient: DBSyncClientService,
     private baseData: BasedataService,
     private networkService: ConnectionService,
-    private dataService: DataService) { }
+    private dataService: DataService,
+    private dbsyncLogService: DbsyncLogService) {
+    this.syncTotal = {
+      jobid: 0,
+      revisionId: 0,
+      total: 0,
+      executed: 0,
+      percent: 0,
+      puts: 0,
+      modified: 0,
+      deleted: 0,
+      tables: [],
+      chunks: 0,
+      start: null
+    };
+  }
 
   ngOnDestroy(): void {
+    this.subscriptionSyncTotal.unsubscribe();
+    this.subscriptionSyncTable.unsubscribe();
+    this.subscriptionSyncMsg.unsubscribe();
+    this.subscriptionSyncErr.unsubscribe();
     this.subscriptionNetworkService.unsubscribe();
     this.subscriptionAutoSyncChange.unsubscribe();
     this.subscriptionProcessStarted.unsubscribe();
@@ -61,6 +99,44 @@ export class DbsyncComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     this.refreshStatusInfos();
+
+    this.subscriptionSyncTable = this.dbsyncLogService.tableSyncProgress
+      .subscribe( (data: TableSyncProgress) => {
+      const tb = data.table;
+      const rv = data.revisionId;
+      const num = data.executed;
+      let syncTbl = this.syncTables.find( t => t.table === data.table);
+      if (!syncTbl) {
+        syncTbl = { ...data };
+        this.syncTables.push(syncTbl);
+      } else {
+        syncTbl.executed = data.executed;
+        syncTbl.puts = data.puts;
+        syncTbl.modified = data.modified;
+        syncTbl.deleted = data.deleted;
+      }
+    });
+    this.subscriptionSyncTotal = this.dbsyncLogService.totalSyncProgress
+      .subscribe( (data: TotalSyncProgress) => {
+        this.refreshStatusInfos();
+        if (data.executed === 0) {
+          while (this.syncTables.length) {
+            this.syncTables.pop();
+          }
+        }
+        for (const k of Object.keys(data)) {
+          this.syncTotal[ k ] = data[ k ];
+        }
+    });
+    this.subscriptionSyncMsg = this.dbsyncLogService.syncMessage
+      .subscribe( (data: SyncMessage) => {
+        this.refreshStatusInfos();
+
+    });
+    this.subscriptionSyncErr = this.dbsyncLogService.syncError
+      .subscribe( (data: SyncError) => {
+        this.refreshStatusInfos();
+      });
 
     this.subscriptionNetworkService = this.networkService.monitor().subscribe( () => {
       if (this.networkService.hasInternetAccess) {

@@ -28,6 +28,7 @@ import {last} from 'rxjs/operators';
 import Dexie, {IndexableType } from 'dexie';
 import {DBSyncClientService, SyncJobResult} from '../../dbsync-client.service';
 import {BarcodeService} from '../../invent-form/data-services/barcode.service';
+import {DbsyncLogService} from '../../dbsync-log.service';
 
 export interface LoadApiDataResult {
   success: boolean;
@@ -71,7 +72,10 @@ export interface InventarDataResult {
 
 export interface ApiCollectionDataResponse<T> {
   revisionId: number;
+  nextUrl?: string;
   rows: T[];
+  total: number;
+  offset: number;
 }
 
 export interface TableIdxProps {
@@ -169,7 +173,8 @@ export class DataService {
     private barcodeLookup: BarcodeService,
     private connectionService: ConnectionService,
     private settingsService: VariablesService,
-    private DbSyncService: DBSyncClientService) {
+    private DbSyncService: DBSyncClientService,
+    private dbSyncLogService: DbsyncLogService) {
     this.currentState = connectionService.getCurrentState();
     this.connectionService.monitor().subscribe((currentState: ConnectionState) => {
       log.info(43, 'network status has changed', { currentState });
@@ -219,6 +224,7 @@ export class DataService {
     const db = this.dexie;
     const api = this.api;
 
+    this.dbSyncLogService.metaMessage({ message: 'Lade Inventuren Meta-Daten ...' });
     // jobidsByAuthUser
     return await Promise
     .all([
@@ -226,18 +232,28 @@ export class DataService {
       api.get<DBDIInventurenUser[]>( 'api/inventur/jobidsByAuthUser').toPromise(),
 
       api.get<DBDIMandanten[]>( 'api/inventur/clientsByAuthUser').toPromise()
-        .then( list => Promise.all( list.map( (item: DBDIMandanten) => db.mandanten.put(item) ) ) ),
+        .then( list => {
+          this.dbSyncLogService.metaMessage({ message: 'Lade Mandanten ... ' + list.length });
+          return Promise.all( list.map( (item: DBDIMandanten) => db.mandanten.put(item) ) );
+        } ),
 
       api.get<DBDIGebaeude[]>( 'api/inventur/gebaeudeByAuthUser').toPromise()
-        .then( list => Promise.all( list.map( (item: DBDIGebaeude) => db.gebaeude.put(item) ) ) ),
+        .then( list => {
+          this.dbSyncLogService.metaMessage({ message: 'Lade Mandanten ... ' + list.length });
+          return Promise.all(list.map((item: DBDIGebaeude) => db.gebaeude.put(item)));
+        }),
 
       api.get<DBDIInventuren[]>( 'api/inventur/listByAuthUser').toPromise()
-        .then( list => Promise.all( list.map( (item: DBDIInventuren) => db.inventuren.put(item) ) ) ),
+        .then( list => {
+          this.dbSyncLogService.metaMessage({ message: 'Lade Gebäude ... ' + list.length});
+          return Promise.all(list.map((item: DBDIInventuren) => db.inventuren.put(item)));
+        }),
 
       api.get<DBDIInventurenGebaeude[]>( 'api/inventur/inventurenGebaeudeByAuthUser').toPromise()
 
     ])
       .then( async (results) => {
+        this.dbSyncLogService.metaMessage({ message: 'Inventuren Meta-Daten wurden heruntergeladen'});
         const authUser = results[0];
         const invUser = results[1];
         const mandantenRslt = results[2];
@@ -246,16 +262,20 @@ export class DataService {
         const invGebaeude = results[5];
         log.dbg(247, { results });
 
+        this.dbSyncLogService.metaMessage({ message: 'Bereinige Inventur-Auswahl'});
         const del = await db.inventurenUser.where('uid').equals(authUser.id).delete();
         await invUser.map((item: DBDIInventurenUser) => db.inventurenUser.add(item));
 
+        this.dbSyncLogService.metaMessage({ message: 'Bereinige Gebäude-Auswahl'});
         const delG = await db.inventurenGebaeude.where('uid').equals(authUser.id).delete()
           .catch( (reason) => console.error('Cannot delete GRef', reason));
+
         await invGebaeude.map((item: DBDIInventurenGebaeude) => db.inventurenGebaeude.add(item)
           .catch( (reason) => {
           console.error('Cannot add GRef', { item, reason} );
         }));
 
+        this.dbSyncLogService.metaMessage({ message: 'Inventuren Meta-Daten wurden importiert'});
         console.log('Finished loading user-inventories');
         return true;
       })
@@ -345,6 +365,9 @@ export class DataService {
 
   async loadInventurDataByInventurId(jobid: number, reset: boolean = false): Promise<LoadApiDataResult[]> {
     console.log('#324 called loadInventurDataByInventurId(', jobid, reset, ')');
+    const syncLogMsg = this.dbSyncLogService.message.bind(this.dbSyncLogService, [jobid]);
+    const syncLogErr = this.dbSyncLogService.error.bind(this.dbSyncLogService, [jobid]);
+
     const tables = {
       gebaeude: 'pending',
       raeume: 'pending',
@@ -362,7 +385,7 @@ export class DataService {
     };
 
     const inventurAlreadyStartedRevId = +(await this.settingsService.get('jobid-' + jobid + '-revision-id', 0));
-    console.log('#335 loadInventurDataByInventurId, inventurAlreadyStartedRevId: ', inventurAlreadyStartedRevId);
+    console.log('#388 loadInventurDataByInventurId, inventurAlreadyStartedRevId: ', inventurAlreadyStartedRevId);
 
     if (!isNaN(inventurAlreadyStartedRevId) && inventurAlreadyStartedRevId > 0 && !reset) {
       console.log('#338 loadInventurDataByInventurId');
@@ -389,8 +412,10 @@ export class DataService {
       }
     }
 
+    this.dbSyncLogService.start(jobid, inventurAlreadyStartedRevId);
     this.dexie.stopChangeLogForImport( true );
     if (reset) {
+      syncLogMsg( 'Reset: Daten werden für kompletten Neu-Import zurückgesetzt!');
       console.log('#352 loadInventurDataByInventurId');
       const numRaeume = await this.dexie.raeume.where( { for_jobid: jobid}).count().catch( (reason) => {
         console.error('#354 ', { reason });
@@ -398,31 +423,58 @@ export class DataService {
       console.log('#357 Before cleanup');
       await Promise.all([
         this.dexie.raeume.where( { for_jobid: jobid}).delete()
-          .finally(() => console.log('#359finished cleanup raeume')),
+          .finally(() => {
+            syncLogMsg('Finished Reset Räume');
+            console.log('#359finished cleanup raeume');
+          }),
         this.dexie.inventar.where( { for_jobid: jobid}).delete()
-          .finally(() => console.log('#361 finished cleanup inventar')),
+          .finally(() => {
+            syncLogMsg('Finished Reset Inventar');
+            console.log('#361 finished cleanup inventar');
+          }),
         this.dexie.hersteller.where( { for_jobid: jobid}).delete()
-          .finally(() => console.log('#363 finished cleanup hersteller')),
+          .finally(() => {
+            syncLogMsg('Finished Reset Hersteller');
+            console.log('#363 finished cleanup hersteller');
+          }),
         this.dexie.images.filter( (img) => img.for_jobid === jobid).delete()
-          .finally(() => console.log('#365 finished cleanup images')),
-        this.dexie.objektKatalogMandant.where( { created_jobid: jobid}).delete()
-          .finally(() => console.log('#367 finished cleanup okg')),
+          .finally(() => {
+            syncLogMsg('Finished Reset Images');
+            console.log('#365 finished cleanup images');
+          }),
+        this.dexie.objektKatalogMandant.where( { for_jobid: jobid}).delete()
+          .finally(() => {
+            syncLogMsg('Finished Reset globale Katalogdaten');
+            console.log('#367 finished cleanup okg');
+          }),
         this.dexie.objektKatalogGlobal.where( { created_jobid: jobid}).delete()
-          .finally(() => console.log('#369 finished cleanup okm')),
+          .finally(() => {
+            syncLogMsg('Finished Reset Mandanten-Spezifische Katalogdaten');
+            console.log('#369 finished cleanup okm');
+          }),
         this.dexie.clientChangeLog.where({ jobid }).delete()
-          .finally(() => console.log('#371 finished cleanup clientchangelog'))
+          .finally(() => {
+            syncLogMsg('Finished Reset Client-Change-Log');
+            console.log('#371 finished cleanup clientchangelog');
+          })
       ]);
+      syncLogMsg( 'Reset: Daten wurden zurückgesetzt!');
       console.log('#373 After cleanup');
-      this.settingsService.set('jobid-' + jobid + '-revision-id', 0);
-      this.settingsService.set('inventar-' + jobid + '-revision-id', 0);
-      this.settingsService.set('raeume-' + jobid + '-revision-id', 0);
-      this.settingsService.set('images-' + jobid + '-revision-id', 0);
-      this.settingsService.set('hersteller-' + jobid + '-revision-id', 0);
-      this.settingsService.set('objektKatalogGlobal-' + jobid + '-revision-id', 0);
-      this.settingsService.set('objektKatalogMandant-' + jobid + '-revision-id', 0);
+      await Promise.all([
+        this.settingsService.set('jobid-' + jobid + '-revision-id', 0),
+        this.settingsService.set('inventar-' + jobid + '-revision-id', 0),
+        this.settingsService.set('raeume-' + jobid + '-revision-id', 0),
+        this.settingsService.set('images-' + jobid + '-revision-id', 0),
+        this.settingsService.set('hersteller-' + jobid + '-revision-id', 0),
+        this.settingsService.set('objektKatalogGlobal-' + jobid + '-revision-id', 0),
+        this.settingsService.set('objektKatalogMandant-' + jobid + '-revision-id', 0)
+      ]);
+      syncLogMsg( 'Reset: Revision-Ids wurden zurückgesetzt!');
       console.log('#362 loadInventurDataByInventurId');
     }
 
+    syncLogMsg( 'Import: Starte Server-Download!');
+    console.log('#477 loadInventurDataByInventurId, start parallel data-imports.');
     return await Promise
       .all([
         this.loadTableDataByUrl<DBDIGebaeude>(
@@ -438,19 +490,22 @@ export class DataService {
         this.loadTableDataByUrl<DBDIObjektKatalogGlobal>(
           'objektKatalogGlobal', `api/inventur/${jobid}/katalog`, tblStatus, { jobid, reset }),
         this.loadTableDataByUrl<DBDIObjektKatalogMandant>(
-          'objektKatalogMandant', `api/inventur/${jobid}/artikelids`, tblStatus, { jobid, reset })
-        // ,this.loadTableDataByUrl<DBDIObjektbuchBarcodesLookup>(
-        //   'objektbuchBarcodesLookup', `api/inventur/${jobid}/objektbuchLookup`, tblStatus, { jobid, reset })
+          'objektKatalogMandant', `api/inventur/${jobid}/artikelids`, tblStatus, { jobid, reset }),
+
+        this.loadTableDataByUrl<DBDIObjektbuchBarcodesLookup>(
+           'objektbuchBarcodesLookup', `api/inventur/${jobid}/objektbuchLookup`, tblStatus, { jobid, reset })
       ])
       .then( async (results) => {
         const maxRevId = results.reduce( (carry, item) => {
           if (isNaN(item.revisionId)) {
+            console.log('#501 data.service item.revisionId not found', { carry, item });
             return carry;
           }
           const max = Math.max(carry, item.revisionId || 0);
           console.log('#414 data.service reduce to maxRevId', { carry, item, max });
           return Math.max(carry, item.revisionId);
         }, 0);
+
         this.settingsService.set('jobid-' + jobid + '-revision-id', maxRevId);
         console.log('#418 data.service.loadInventurDataByInventurId() Start rebuild of barcodeLookup Table');
         await this.barcodeLookup.rebuildByJobid(jobid);
@@ -462,7 +517,11 @@ export class DataService {
       });
   }
 
-  async loadTableDataByUrl<T>(table: string, url: string, cbTblStatus?: any, options?: any): Promise<LoadApiDataResult> {
+  async loadTableDataByUrl<T>(table: string, dataUrl: string, cbTblStatus?: any, options?: any): Promise<LoadApiDataResult> {
+    const syncLogMsg = this.dbSyncLogService.message.bind(this.dbSyncLogService, [options.jobid]);
+    const syncLogErr = this.dbSyncLogService.error.bind(this.dbSyncLogService, [options.jobid]);
+    const syncLogData = this.dbSyncLogService.log.bind(this.dbSyncLogService);
+
     console.log('#425  data.service loadTableDataByUrl ', table);
     if (cbTblStatus) {
       cbTblStatus(table, 'downloading');
@@ -476,65 +535,103 @@ export class DataService {
     const lastRevisionId = await this.settingsService.get( varLastRevisionId );
     const lastLoadSuccessDate = await this.settingsService.get( varLastLoadSuccess );
     const lastLoadAttemptDate = new Date();
+    let nextUrl = dataUrl;
     this.settingsService.set(varLastLoadAttempt, lastLoadAttemptDate);
 
     if (!reset && lastLoadSuccessDate) {
-      url += '?lastLoad=' + Date.parse( lastLoadSuccessDate ) + '&lastRevId=' + lastRevisionId;
+      nextUrl += '?lastLoad=' + Date.parse( lastLoadSuccessDate ) + '&lastRevId=' + lastRevisionId;
     }
 
     let inserts = 0;
     let total = 0;
     let revisionId = 0;
+    let numChunks = 0;
+    syncLogMsg('Starte Download und Import: ' + table + ' from ' + nextUrl);
+    if (!nextUrl) {
+      console.error('#551  this.loadTableDataByUrl nextUrl is Empty', { table, dataUrl, nextUrl, reset });
+    }
 
-    console.log({ function: 'loadTableDataByUrl', table, url, cbTblStatus, options });
-    return await this.api.get<any>( url).toPromise()
-      .then( (data: ApiCollectionDataResponse<T>) => {
 
-        console.log('#452 data.service: Retrieved Data ', table, ' for processing!');
-        this.settingsService.set(varLastRevisionId, data.revisionId);
-        this.settingsService.set(varLastLoadSuccess, lastLoadAttemptDate);
-        this.settingsService.set(varLastLoadEntries, data.rows.length);
+    const logData = (puts: number) => {
+      return {
+        jobid,
+        table,
+        revisionId,
+        total,
+        puts,
+        modified: 0,
+        deleted: 0
+      };
+    };
 
-        if (cbTblStatus) {
-          cbTblStatus(table, 'process import ' + data.rows.length);
-          cbTblStatus(table, 'total: ' + data.rows.length);
-        }
+    while (nextUrl) {
+      const url = nextUrl;
 
-        inserts = 0;
-        total = data.rows.length;
-        revisionId = data.revisionId || 0;
+      console.log({ function: 'loadTableDataByUrl', table, url, cbTblStatus, options });
+      await this.api.get<any>( url).toPromise()
+        .then( (data: ApiCollectionDataResponse<T>) => {
 
-        const stepSize = parseInt((data.rows.length / 10).toString(), 10);
-        if (!data.rows) {
-          console.error('#468 data.service loadTableDataByUrl Invalid Data-Structure from ', { url, data});
-        }
+          nextUrl = ('nextUrl' in data) ? data.nextUrl : '';
 
-        const asyncJobs: Promise<any>[] = data.rows.map((item: T, i) => {
-          if (((i + 1) % stepSize === 0 || (i + 1) === total) && cbTblStatus) {
-            cbTblStatus(table, i + 1);
+          console.log('#452 data.service: Retrieved Data ', table, ' for processing!');
+
+          if (cbTblStatus) {
+            cbTblStatus(table, 'process import ' + data.rows.length);
+            cbTblStatus(table, 'total: ' + data.rows.length);
           }
-          return this.dexie.table(table).put(item).then(() => {
-            inserts += 1;
-            return true;
+
+          numChunks++;
+          const numRows = data.rows.length;
+          if ('total' in data) {
+            total = data.total;
+          } else {
+            total = numRows;
+          }
+          revisionId = data.revisionId || 0;
+          this.settingsService.set(varLastLoadSuccess, lastLoadAttemptDate);
+          this.settingsService.set(varLastLoadEntries, inserts + numRows);
+
+          const stepSize = parseInt((data.rows.length / 10).toString(), 10);
+          if (!data.rows) {
+            console.error('#468 data.service loadTableDataByUrl Invalid Data-Structure from ', { url, data});
+          }
+
+          const asyncJobs: Promise<any>[] = data.rows.map((item: T, i) => {
+            if (((i + 1) % stepSize === 0 || (i + 1) === total) && cbTblStatus) {
+              cbTblStatus(table, i + 1);
+            }
+            return this.dexie.table(table).put(item).then(() => {
+              inserts += 1;
+              if (inserts % 100 === 0) {
+                syncLogData( logData(inserts) );
+              }
+              return true;
+            });
           });
+          return asyncJobs;
         });
-        return asyncJobs;
-      })
-      .then( () => {
-        if (cbTblStatus) {
-          cbTblStatus(table, 'finished');
-        }
+    }
 
-        console.log( '#487 data.service loadTableDataByUrl Finished Importprocess Data ', table );
+    if (revisionId) {
+      this.settingsService.set(varLastRevisionId, revisionId);
+    }
+    syncLogData( logData(inserts) );
+    syncLogMsg('Finished Table ' + table);
 
-        return {
-          success: true,
-          errorMsg: '',
-          total,
-          inserts,
-          revisionId,
-        } as LoadApiDataResult;
-      });
+    if (cbTblStatus) {
+      cbTblStatus(table, 'finished');
+    }
+
+    console.log( '#543 data.service loadTableDataByUrl Finished Importprocess Data ', table, ' inserts', inserts );
+
+    return {
+      success: true,
+      errorMsg: '',
+      total,
+      inserts,
+      numChunks,
+      revisionId,
+    } as LoadApiDataResult;
   }
 
   async getClient(clientID: number): Promise<DBDIMandanten> | null {
