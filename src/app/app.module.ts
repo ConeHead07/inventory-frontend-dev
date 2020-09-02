@@ -53,6 +53,7 @@ import { DbsyncComponent } from './inventory/components/dbsync/dbsync.component'
 import { SettingsComponent } from './inventory/components/settings/settings.component';
 import { environment } from '../environments/environment';
 import { ServiceWorkerModule } from '@angular/service-worker';
+import { EditRaumComponent } from './invent-form/modals/edit-raum/edit-raum.component';
 
 const appRoutes: Routes = [
   { path: '', component: AuthComponent },
@@ -98,7 +99,8 @@ persist();
     GesamtListRestComponent,
     GesamtListDoneComponent,
     DbsyncComponent,
-    SettingsComponent
+    SettingsComponent,
+    EditRaumComponent
 ],
   imports: [
     BrowserModule,
@@ -133,7 +135,8 @@ persist();
     RaumListDoneComponent,
     RaumListRestComponent,
     GesamtListRestComponent,
-    GesamtListDoneComponent
+    GesamtListDoneComponent,
+    EditRaumComponent
   ],
   providers: [
     {

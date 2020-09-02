@@ -1,7 +1,7 @@
 import {Injectable} from '@angular/core';
 import {ApiService} from '../../api.service';
 import {
-  DBDIArtikel, DBDIDevices,
+  DBDIArtikel, DBDIArtikelMitHersteller, DBDIDevices,
   DBDIGebaeude, DBDIHersteller, DBDIImages,
   DBDIInventar,
   DBDIInventuren, DBDIInventurenGebaeude,
@@ -365,6 +365,7 @@ export class DataService {
 
   async loadInventurDataByInventurId(jobid: number, reset: boolean = false): Promise<LoadApiDataResult[]> {
     console.log('#324 called loadInventurDataByInventurId(', jobid, reset, ')');
+    this.setLoadingStarted( jobid );
     const syncLogMsg = this.dbSyncLogService.message.bind(this.dbSyncLogService, [jobid]);
     const syncLogErr = this.dbSyncLogService.error.bind(this.dbSyncLogService, [jobid]);
 
@@ -393,6 +394,7 @@ export class DataService {
       console.log('#340 loadInventurDataByInventurId', {numUnsyncedClientChanges});
       if (numUnsyncedClientChanges) {
         console.log('#342 loadInventurDataByInventurId START SYNC', {numUnsyncedClientChanges});
+        this.setLoadingFinished();
         const syncJobResult = await this.DbSyncService.syncJob(jobid);
         return [{
           success: true,
@@ -401,6 +403,7 @@ export class DataService {
         }] as LoadApiDataResult[];
       } else {
         console.log('#346 loadInventurDataByInventurId NOTHING TO SYNC');
+        this.setLoadingFinished();
         return [{
           success: true,
           errorMsg: '',
@@ -475,7 +478,7 @@ export class DataService {
 
     syncLogMsg( 'Import: Starte Server-Download!');
     console.log('#477 loadInventurDataByInventurId, start parallel data-imports.');
-    return await Promise
+    const loadingResult = await Promise
       .all([
         this.loadTableDataByUrl<DBDIGebaeude>(
           'gebaeude', `api/inventur/${jobid}/gebaeude`, tblStatus, { jobid, reset }),
@@ -501,20 +504,35 @@ export class DataService {
             console.log('#501 data.service item.revisionId not found', { carry, item });
             return carry;
           }
+
           const max = Math.max(carry, item.revisionId || 0);
           console.log('#414 data.service reduce to maxRevId', { carry, item, max });
           return Math.max(carry, item.revisionId);
         }, 0);
 
         this.settingsService.set('jobid-' + jobid + '-revision-id', maxRevId);
-        console.log('#418 data.service.loadInventurDataByInventurId() Start rebuild of barcodeLookup Table');
+        console.log('#511 data.service.ts loadInventurDataByInventurId() Start rebuild of barcodeLookup Table');
         await this.barcodeLookup.rebuildByJobid(jobid);
-        console.log('435 data.service.loadInventurDataByInventurId() finished', 'arguments', arguments);
+        console.log('#513 data.service.ts loadInventurDataByInventurId() finished', 'arguments', arguments);
         return results;
       })
       .finally( () => {
         this.dexie.stopChangeLogForImport( false );
       });
+    this.setLoadingFinished();
+    return loadingResult;
+  }
+
+  setLoadingStarted(jobid: number) {
+    this.DbSyncService.setFullImportJobiId(jobid);
+  }
+
+  setLoadingFinished() {
+    this.DbSyncService.setFullImportJobiId(0);
+  }
+
+  getLoadingJobId() {
+    return this.DbSyncService.getFullImportJobId();
   }
 
   async loadTableDataByUrl<T>(table: string, dataUrl: string, cbTblStatus?: any, options?: any): Promise<LoadApiDataResult> {
@@ -759,20 +777,40 @@ export class DataService {
       .then( (gebaeude: DBDIGebaeude) => this.getFullRaumData(raum, gebaeude));
   }
 
-  public getRaeumeByGebaeudeId(gid: number): Promise<DBDIRaeume[]> {
+  public getRaeumeByGebaeudeId(gid: number, jobid: number): Promise<DBDIRaeume[]> {
     console.log('#625 data.service Search in rooms by gid', gid);
-    return this.dexie.raeume.where({ gid }).toArray();
+    return this.dexie.raeume.where({ gid, for_jobid: jobid }).toArray();
   }
 
-  public async getArtikelListByClientId(mid: number): Promise<DBDIArtikel[]> {
+  public async getArtikelListByClientId(mid: number): Promise<DBDIArtikelMitHersteller[]> {
     console.log('#630 data.service Search in Global Katalog by mid', mid);
 
     const artikelRefs = await this.dexie.objektKatalogMandant
       .where({ mid }).toArray();
 
-    const artikelData = await Promise.all(artikelRefs.map( async (ref) => this.dexie.objektKatalogGlobal.get( ref.gcid )));
+    const artikelData = await Promise.all(artikelRefs.map( async (ref) => {
+      console.log('#774 getArtikelListByClientId ', { ref });
+      return await this.dexie.objektKatalogGlobal.get( ref.gcid );
+    }));
+    const artikelHst = await Promise.all(artikelData.map( async (ref) => {
+      if (!ref.hid) {
+        return '';
+      }
+      const hst = await this.dexie.hersteller.get( ref.hid );
+      if (hst) {
+        return hst.Hersteller;
+      }
+      return '';
+    } ));
 
-    return artikelRefs.map( (ref, i) => ({...artikelData[i], ...ref, ...{ mcuuid: ref.uuid }}) );
+    return artikelRefs.map( (ref, i) => (
+      {
+        ...artikelData[i],
+        ...ref,
+        ...{ mcuuid: ref.uuid },
+        ...{ Hersteller: artikelHst[i] } // artikelHst[i].Hersteller
+      })
+    );
   }
 
   public async bcLookup(barcode: string, mid: number): Promise<IUnionLookupAssignedObject> {

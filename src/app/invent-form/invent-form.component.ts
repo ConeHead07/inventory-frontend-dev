@@ -4,7 +4,7 @@ import {Location} from '@angular/common';
 import {DataService, InventarData} from '../inventory/service/data.service';
 import {DBDIMandanten} from '../inventory/models/client.model';
 import {DBDIGebaeude} from '../inventory/models/building.model';
-import {faCamera, faImage, faSearch, faCheck, faDoorClosed, faDoorOpen } from '@fortawesome/free-solid-svg-icons';
+import {faCamera, faImage, faSearch, faEdit, faCheck, faDoorClosed, faDoorOpen } from '@fortawesome/free-solid-svg-icons';
 import {InventoryProgress, InventoryProgressService} from '../inventory-progress.service';
 
 import {ScanDetectData} from '../inventory/components/scannerdetection/scannerdetection.component';
@@ -45,6 +45,7 @@ import {GesamtListDoneComponent} from './modals/gesamt-list-done/gesamt-list-don
 import {SoundsService} from '../sounds.service';
 import { ToastrService } from 'ngx-toastr';
 import {Subscription} from "rxjs";
+import {EditRaumComponent} from "./modals/edit-raum/edit-raum.component";
 
 interface ScannerConfiguration {
   minLength?: number; // 7
@@ -122,6 +123,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
 
   faSearch = faSearch;
   faCamera = faCamera;
+  faEdit = faEdit;
   faImage = faImage;
   faCheck = faCheck;
   faDoorOpen = faDoorOpen;
@@ -468,6 +470,15 @@ export class InventFormComponent implements OnInit, OnDestroy {
     });
   }
 
+  openEditArtikelImage() {
+    const modalRef = this.modalService.open(CreateArtikelImageComponent);
+    modalRef.componentInstance.name = this.formInventar.Bezeichnung + '/' + this.formInventar.Typ;
+    modalRef.componentInstance.setGcuuid( this.formInventar.gcuuid );
+    modalRef.result.then( () => {
+      this.reloadImageExistsStatus();
+    });
+  }
+
   openShowArtikelImage() {
     const modalRef = this.modalService.open(ShowArtikelImageComponent);
     modalRef.componentInstance.name = 'World';
@@ -487,6 +498,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
         valid: data.valid,
         target: inputElm
       };
+      modalRef.close();
       this.handleScanData( scan );
     });
   }
@@ -589,6 +601,18 @@ export class InventFormComponent implements OnInit, OnDestroy {
     });
   }
 
+  openEditRaum() {
+    const modalRef = this.modalService.open(EditRaumComponent);
+    this.modalWatch(modalRef, 'EditRaum');
+    modalRef.componentInstance.raumId = this.roomID;
+    modalRef.componentInstance.raumChanged.subscribe( (raum: DBDIRaeume) => {
+      this.loadRaumByData(raum);
+    });
+    modalRef.componentInstance.scannerRequest.subscribe( (target: HTMLElement) => {
+      this.openScanner(target);
+    });
+  }
+
   openSelectCreateRaum() {
     const modalRef = this.modalService.open(SelectCreateRaumComponent);
     this.modalWatch(modalRef, 'SelectCreateRaum');
@@ -610,6 +634,9 @@ export class InventFormComponent implements OnInit, OnDestroy {
     const modalRef = this.modalService.open( GesamtListDoneComponent, { size: 'xl', scrollable: true } );
     this.modalWatch(modalRef, 'GesamtListDone');
     modalRef.componentInstance.gebaeude = gebaeude;
+    modalRef.componentInstance.raumSelected.subscribe( (rid: number) => {
+      this.loadRaumById(rid);
+    });
     modalRef.componentInstance.requestGesamtRest.subscribe( (g: DBDIGebaeude) => {
       this.openGesamtListRest(g);
     });
@@ -628,6 +655,9 @@ export class InventFormComponent implements OnInit, OnDestroy {
     const modalRef = this.modalService.open( GesamtListRestComponent );
     this.modalWatch(modalRef, 'GesamtListRest');
     modalRef.componentInstance.gebaeude = gebaeude;
+    modalRef.componentInstance.raumSelected.subscribe( (rid: number) => {
+      this.loadRaumById(rid);
+    });
     modalRef.componentInstance.requestGesamtDone.subscribe( (g: DBDIGebaeude) => {
       this.openGesamtListDone(g);
     });
@@ -810,10 +840,12 @@ export class InventFormComponent implements OnInit, OnDestroy {
     }
 
     const RaumCreateModal = this.getModalRefByName('SelectCreateRaum');
+    const RaumEditModal = this.getModalRefByName('EditRaum');
 
     if (RaumCreateModal && RaumCreateModal.componentInstance) {
       if (bcResult.lookupResultTable === LookupResultTable.None) {
         const modalComp: SelectCreateRaumComponent = RaumCreateModal.componentInstance;
+        alert('transfer Code to Input SelectCreateRaumComponentraumDaten.code!');
         modalComp.raumDaten.code = bcResult.barcode;
         this.playSuccess();
         return true;
@@ -823,6 +855,25 @@ export class InventFormComponent implements OnInit, OnDestroy {
           'Gebe einen gülten Barcode ein oder schließe den Dialog "Neuen Raum anlegen"!' +
           '<br>' + barcode,
           'Ungültiger Barcode für Raum-Neu-Erfassung:'
+        );
+        if (0) alert('Ungültiger Barcode für Raum-Neu-Erfassung! ' +
+          'Gebe einen gülten Barcode ein oder schließe den Dialog "Neuen Raum anlegen"!');
+        return false;
+      }
+    }
+    if (RaumEditModal && RaumEditModal.componentInstance) {
+      if (bcResult.lookupResultTable === LookupResultTable.None) {
+        const modalComp: EditRaumComponent = RaumEditModal.componentInstance;
+        alert('transfer Code to Input EditRaumComponent.raumInput.code!');
+        modalComp.raumInput.code = bcResult.barcode;
+        this.playSuccess();
+        return true;
+      } else {
+        this.playError();
+        this.toastr.error(
+          'Gebe einen gülten Barcode ein oder schließe den Dialog "Neuen aktualisieren"!' +
+          '<br>' + barcode,
+          'Ungültiger Barcode für Raum-Aktualisierung:'
         );
         if (0) alert('Ungültiger Barcode für Raum-Neu-Erfassung! ' +
           'Gebe einen gülten Barcode ein oder schließe den Dialog "Neuen Raum anlegen"!');

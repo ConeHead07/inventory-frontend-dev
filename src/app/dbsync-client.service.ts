@@ -215,6 +215,7 @@ export class DBSyncClientService {
   public processStarted = new EventEmitter<SyncJobResult>();
   public processFinished = new EventEmitter<SyncJobResult>();
   private syncIntervalTimer = null;
+  private fullImportJobid = 0;
 
   @Output() autoSyncChange = new EventEmitter<boolean>();
 
@@ -231,6 +232,14 @@ export class DBSyncClientService {
 
   autoSyncIsRunning() {
     return this.syncIntervalTimer !== null;
+  }
+
+  setFullImportJobiId(jobid: number) {
+    this.fullImportJobid = jobid;
+  }
+
+  getFullImportJobId(): number {
+    return this.fullImportJobid;
   }
 
   autoSyncStart(startNow: boolean = false) {
@@ -376,6 +385,14 @@ export class DBSyncClientService {
     this.clearFinishedProcesses();
     const jobid = useJobid;
     const syncJobResult = useJobResult || new SyncJobResult(jobid);
+
+    if (this.getFullImportJobId() === useJobid ) {
+      return this.finishProcess(
+        syncJobResult,
+        SyncJobStatus.AlreadyStarted,
+        'Synchronisation wurde abgebrochen, da Import noch läuft!'
+      );
+    }
 
     if (!this.networkService.hasInternetAccess) {
       console.error('#369 dbsync-client.service sendByJobId() Synchronisatioon wurde abgebrochen wegen fehlender Serververbindung!');
@@ -573,7 +590,9 @@ export class DBSyncClientService {
                   tableLogs[chg.table].deleted++;
                   console.log('#329 ' + ci + '/' + chgLen +
                     ' dbsync-client delete ' + chg.table + ' by uuid ' + chg.uuid );
-                  await this.dexieService.table(chg.table).delete({uuid: chg.uuid});
+                  await this.dexieService.table(chg.table)
+                    .where({uuid: chg.uuid})
+                    .delete();
               }
 
               executed++;

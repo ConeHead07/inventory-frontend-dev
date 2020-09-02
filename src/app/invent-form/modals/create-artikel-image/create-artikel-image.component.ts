@@ -7,7 +7,7 @@ import {
   faCropAlt,
   faSearchPlus, faSearchMinus,
   faUndo, faRedo, faTrashAlt, faTrashRestore, faTrashRestoreAlt,
-  faCheck, faBan, faSave,
+  faCheck, faBan, faSave, faCamera,
   faArrowsAlt, faArrowsAltH, faArrowsAltV,
   faDownload, faUpload } from '@fortawesome/free-solid-svg-icons';
 
@@ -36,7 +36,14 @@ export class CreateArtikelImageComponent implements OnInit {
   @ViewChild('prepareImgCanvas', { static: true })
   public prepareImgCanvas: ElementRef;
 
+  @ViewChild('inputUploadFile', { static: true })
+  public inputUploadFile: ElementRef;
+
+  @ViewChild('inputUploadImage', { static: true })
+  public inputUploadImage: ElementRef;
+
   // Editor-Button-Icons
+  faCamera = faCamera;
   faCrop = faCropAlt;
   faMove = faArrowsAlt;
   faSearchPlus = faSearchPlus;
@@ -96,6 +103,37 @@ export class CreateArtikelImageComponent implements OnInit {
   imageUrl?: string;
 
   constructor(public activeModal: NgbActiveModal, private imageService: ImagesService) {
+  }
+
+  setGcuuid(gcuuid: string) {
+    console.log('called setGcuuid', this.gcuuid);
+    const $self = this;
+    this.gcuuid = gcuuid;
+    this.inputFile = null;
+    if (gcuuid) {
+      this.imageService.getImage(gcuuid)
+          .then( image => {
+            this.imageUrl = image.data_url;
+            const b: any = this.converterDataURItoBlob(image.data_url);
+            b.lastModifiedDate = new Date();
+            b.name = image.name;
+            b.size = image.size;
+            b.type = image.type;
+            this.inputFile = b as unknown as File;
+            this.prepareInputImageFile();
+          })
+          .catch( err => {
+            console.error( err );
+          });
+    }
+  }
+
+  openInputUploadFile() {
+    this.inputUploadFile.nativeElement.dispatchEvent(new MouseEvent('click'));
+  }
+
+  openInputUploadImage() {
+    this.inputUploadImage.nativeElement.dispatchEvent(new MouseEvent('click'));
   }
 
   cropMove(data) {
@@ -170,6 +208,28 @@ export class CreateArtikelImageComponent implements OnInit {
     }
     this.prepareInputImageFile();
   }
+
+  converterDataURItoBlob(dataURI): Blob {
+    let byteString;
+    let mimeString;
+    let ia;
+
+    if (dataURI.split(',')[0].indexOf('base64') >= 0) {
+      byteString = atob(dataURI.split(',')[1]);
+    } else {
+      byteString = encodeURI(dataURI.split(',')[1]);
+    }
+    // separate out the mime component
+    mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0];
+
+    // write the bytes of the string to a typed array
+    ia = new Uint8Array(byteString.length);
+    for (let i = 0; i < byteString.length; i++) {
+      ia[i] = byteString.charCodeAt(i);
+    }
+    return new Blob([ia], {type: mimeString });
+  }
+
 
   prepareInputImageFile() {
     if (!this.inputFile) {
@@ -321,16 +381,18 @@ export class CreateArtikelImageComponent implements OnInit {
     this.inputImgSavedData = null;
     this.inputImgData = null;
   }
+
   close() {
     this.escape();
     this.activeModal.close();
   }
+
   async save() {
     console.log('save this.angularCropper:', this.angularCropper);
     this.angularCropper.cropper.disable();
     const cropData = this.angularCropper.cropper.getImageData();
     this.inputImgSavedData = this.angularCropper.cropper.getCroppedCanvas().toDataURL('image/jpeg');
-    return this.imageService.insertImage({
+    return this.imageService.putImage({
       name: this.name,
       type: 'image/jpeg',
       size: this.inputImgSavedData.toString().length,

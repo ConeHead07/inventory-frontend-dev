@@ -30,7 +30,7 @@
     <tr *ngFor="let item of raeumeListDone">
       <th scope="row">{{ item.rid }}</th>
       <th>{{ item.Etage }}</th>
-      <td>{{ item.Raum }}</td>
+      <td><span class="btn btn-link" (click)="onSelectRaum(item.rid)">{{ item.Raum }}</span></td>
       <td>
         <fa-icon *ngIf="item.editStatus === 2; else elseInProgress"  [attr.class]="'text-success'" [icon]="faCheck"></fa-icon>
         <ng-template #elseInProgress><fa-icon [attr.class]="'text-info'" [icon]="faInWork"></fa-icon></ng-template>

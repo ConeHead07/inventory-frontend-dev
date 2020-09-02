@@ -1,0 +1,117 @@
+<div class="modal-header p-0" style="padding:0.1rem">
+  <div class="btn-group row no-gutters w-100">
+    <button type="button" class="btn btn-danger col-2" (click)="activeModal.dismiss('Cross click')">
+      <span aria-hidden="true">&times;</span>
+    </button>
+  </div>
+</div>
+<div class="modal-header">
+  <h4 class="modal-title" id="modal-basic-title">Raum bearbeiten</h4>
+</div>
+<div class="modal-body">
+  <form #raumForm="ngForm">
+
+    <div class="form-group" [ngClass]="{
+        'has-error': raum.dirty && (raum.invalid || raumExistsStatus === 1),
+        'has-info': raum.dirty && raumExistsStatus === -1
+        }">
+      <label for="dateOfBirth" class="d-none">Raum-Nr.: </label>
+      <div class="input-group mb-1">
+        <div class="input-group-prepend">
+          <span class="input-group-text">RNr</span>
+        </div>
+        <input id="Raum" class="form-control" placeholder="Raumnr"
+               name="Raum"
+               [(ngModel)]="raumInput.Raum"
+               #raum="ngModel"
+               (change)="checkIfRaumExists()"
+               required
+        >
+      </div>
+      <div *ngIf="raum.valid">
+        <div *ngIf="raumExistsStatus===-1" class="help-block">Raumangabe wird geprüft</div>
+        <div *ngIf="raumExistsStatus===1" class="help-block">Raum existiert bereits</div>
+      </div>
+    </div>
+
+    <div class="form-group" [ngClass]="{
+        'has-warning': bezeichnung.dirty && (bezeichnung.invalid || bezeichnungExistsStatus === 1),
+        'has-info': bezeichnung.dirty && bezeichnungExistsStatus === -1
+        }">
+      <label for="Bezeichnung" class="d-none">Raum-Bez.: </label>
+      <div class="input-group mb-1">
+        <div class="input-group-prepend">
+          <span class="input-group-text">Bezg</span>
+        </div>
+        <input id="Bezeichnung" class="form-control" placeholder="Raumbezeichnung"
+               name="Bezeichnung"
+               [(ngModel)]="raumInput.Raumbezeichnung"
+               #bezeichnung="ngModel"
+               (change)="checkIfRaumbezeichnungExists()"
+        >
+      </div>
+      <div *ngIf="bezeichnung.valid">
+        <div *ngIf="bezeichnungExistsStatus===-1" class="help-block">Bezeichnung wird geprüft</div>
+        <div *ngIf="bezeichnungExistsStatus===1" class="help-block">Es existiert bereits ein Raum mit dieser Bezeichnung</div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="Etage" class="d-none">Etage: </label>
+      <div class="input-group mb-1">
+        <div class="input-group-prepend">
+          <span class="input-group-text">Etage</span>
+        </div>
+        <input id="Etage" class="form-control" placeholder="Etage"
+               name="Etage"
+               [(ngModel)]="raumInput.Etage"
+               [ngbTypeahead]="searchEtage"
+               #etage="ngModel"
+               required
+        >
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="editRaumBarcode" class="d-none">Barcode: </label>
+      <div class="input-group mb-1">
+        <div class="input-group-prepend">
+          <span class="input-group-text">BCode</span>
+        </div>
+        <input readonly id="editRaumBarcode" #editRaumBarcode (change)="formValidate()" class="form-control formcontrol-edit-barcode" (paste)="$event.preventDefault()" placeholder="Barcode"
+               name="code"
+               [(ngModel)]="raumInput.code"
+               #code="ngModel"
+        >
+        <div class="input-group-append">
+          <button class="btn btn-outline-success" type="button" (click)="openScanner(editRaumBarcode)"><fa-icon [icon]="faCamera"></fa-icon></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-group" *ngIf="false">
+      <label for="dateOfBirth">Datum (Dummy)</label>
+      <div class="input-group">
+        <input id="dateOfBirth" class="form-control" placeholder="yyyy-mm-dd" name="dp" ngbDatepicker #dp="ngbDatepicker">
+        <div class="input-group-append">
+          <button class="btn btn-outline-secondary calendar" (click)="dp.toggle()" type="button"></button>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
+<ngb-alert [type]="'danger'" [dismissible]="false" *ngFor="let vError of validationErrors">
+  {{ vError }}
+</ngb-alert>
+<div class="modal-footer">
+  <button type="button" class="btn btn-outline-dark" (click)="onSubmit($event)">Raum aktualisieren</button>
+  <div *ngIf="formError" class="alert-danger"> {{formError}} </div>
+  formIsValid: {{formIsValid | json }} <br>
+  raumForm.form.valid: {{ raumForm.form.valid | json }}
+</div>
+
+<!-- button class="btn btn-lg btn-outline-primary" (click)="open(content)">Raum zuordnen</button -->
+
+<hr>
+
+<pre>{{closeResult}}</pre>

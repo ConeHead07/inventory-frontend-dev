@@ -5,7 +5,9 @@ import {BehaviorSubject} from 'rxjs';
 import {DataService} from '../../../inventory/service/data.service';
 import {BarcodeService} from '../../data-services/barcode.service';
 import {BarcodeLookupSimpleResult, DBDIImages, LookupResultTable} from '../../../dexie.service';
-import {faBan, faCheck} from '@fortawesome/free-solid-svg-icons';
+import {faTrashAlt, faCheck} from '@fortawesome/free-solid-svg-icons';
+import {ImagesService} from '../../data-services/images.service';
+
 
 export interface ScannerBarcodeData {
   barcode?: string;
@@ -41,7 +43,7 @@ export class ScannerComponent implements OnInit {
   ngVersion = VERSION.full;
 
   faCheck = faCheck;
-  faBan = faBan;
+  faRemove = faTrashAlt;
 
   availableDevices: MediaDeviceInfo[];
   currentDevice: MediaDeviceInfo = null;
@@ -62,6 +64,7 @@ export class ScannerComponent implements OnInit {
   @ViewChild('barcodeChangedPart', { static: true })
   barcodeChangedPart: ElementRef;
 
+  allowBarcodeInput = false;
   qrResultString: string;
   scannedUnchangedPart: string;
   scannedChangedPart: string;
@@ -81,7 +84,8 @@ export class ScannerComponent implements OnInit {
 //    private readonly _dialog: MatDialo,
     public activeModal: NgbActiveModal,
     private dataService: DataService,
-    private bcLookup: BarcodeService
+    private bcLookup: BarcodeService,
+    private imageService: ImagesService
   ) {}
 
 
@@ -90,6 +94,7 @@ export class ScannerComponent implements OnInit {
 
   clearResult(): void {
     this.qrResultString = null;
+    this.scanResultCurrent = null;
   }
 
   bctest(test) {
@@ -100,12 +105,14 @@ export class ScannerComponent implements OnInit {
   }
 
   applyResult(): void {
-    this.onScan.emit({
+    const emitScanResult = {
       barcode: this.scanBCLookupSimpleResult.barcode,
       length: this.scanBCLookupSimpleResult.barcode.length,
       valid: true,
       result: this.scanBCLookupSimpleResult
-    } as ScannerBarcodeData);
+    } as ScannerBarcodeData;
+    console.log('apply applyResult ', { emitScanResult });
+    this.onScan.emit( emitScanResult );
   }
 
   bcLookupTypToString(typ: bcLookupTyp): string {
@@ -115,8 +122,10 @@ export class ScannerComponent implements OnInit {
   showResult(result: BarcodeLookupSimpleResult): void {
     this.scanBCLookupSimpleResult = result;
     this.scannedBarcodeInfoImg = result.image;
+    let bezeichnung = '';
     switch (result.lookupResultTable) {
       case LookupResultTable.None:
+        bezeichnung = 'Neuer Barcode';
         this.scannedBarcodeRsltTyp = bcLookupTyp.Neu;
         this.scannedBarcodeInfos = this.bcInfoToString({
           Gefunden: 'Neuer oder unbekannter Barcode'
@@ -124,8 +133,22 @@ export class ScannerComponent implements OnInit {
         break;
 
       case LookupResultTable.Raeume:
+        const g = (result.gebaeude.Gebaeude || result.gebaeude.Adresse);
+        if (g) {
+          bezeichnung += `${g} :: `;
+        }
+        bezeichnung += result.raum.Raum;
+        if (result.raum.Raumbezeichnung) {
+          bezeichnung += ' / ' + result.raum.Raumbezeichnung;
+        }
+        if (result.raum.Etage) {
+          bezeichnung += ' :: ' + result.raum.Etage;
+        }
+        bezeichnung = (result.gebaeude.Gebaeude || result.gebaeude.Adresse);
         this.scannedBarcodeRsltTyp = bcLookupTyp.Raum;
-        this.scannedBarcodeInfos = this.bcInfoToString({
+        this.scannedBarcodeInfos = bezeichnung;
+
+        this.bcInfoToString({
           Gefunden: 'Raum',
           Gebaeude: result.gebaeude.Gebaeude || result.gebaeude.Adresse,
           Raum: result.raum.Raum,
@@ -135,8 +158,23 @@ export class ScannerComponent implements OnInit {
         break;
 
       case LookupResultTable.Inventar:
+        if (result.artikelData.Typ) {
+          bezeichnung = result.artikelData.Typ + ' :: ';
+        }
+        bezeichnung += result.artikelData.Bezeichnung;
+        if (result.artikelData.Farbe) {
+          bezeichnung += ' :: ' + result.artikelData.Farbe;
+        }
+        if (result.artikelData.Groesse) {
+          bezeichnung += ' :: ' + result.artikelData.Groesse;
+        }
+        if (result.artikelData.Kategorie) {
+          bezeichnung += ' :: ' + result.artikelData.Kategorie;
+        }
         this.scannedBarcodeRsltTyp = bcLookupTyp.Inventar;
-        this.scannedBarcodeInfos = this.bcInfoToString({
+        this.scannedBarcodeInfos = bezeichnung;
+
+        this.bcInfoToString({
           Gefunden: 'Inventar',
           InventarNr: result.inventar.iv_nr,
           Bezeichnung: result.artikelData.Bezeichnung,
@@ -148,8 +186,20 @@ export class ScannerComponent implements OnInit {
         break;
 
       case LookupResultTable.ObjektKatalogMandant:
+        bezeichnung = result.artikelData.Bezeichnung;
+        if (result.artikelData.Farbe) {
+          bezeichnung += ' :: ' + result.artikelData.Farbe;
+        }
+        if (result.artikelData.Groesse) {
+          bezeichnung += ' :: ' + result.artikelData.Groesse;
+        }
+        if (result.artikelData.Kategorie) {
+          bezeichnung += ' :: ' + result.artikelData.Kategorie;
+        }
+
         this.scannedBarcodeRsltTyp = bcLookupTyp.Artikel;
-        this.scannedBarcodeInfos = this.bcInfoToString({
+        this.scannedBarcodeInfos = bezeichnung;
+        this.bcInfoToString({
           Gefunden: 'Artikel',
           Bezeichnung: result.artikelData.Bezeichnung,
           Typ: result.artikelData.Typ,
@@ -160,14 +210,17 @@ export class ScannerComponent implements OnInit {
         break;
 
       default:
+        bezeichnung = 'Unerwartetes Ergebnis';
         this.scannedBarcodeRsltTyp = bcLookupTyp.Unbekannt;
-        this.scannedBarcodeInfos = this.bcInfoToString({
-          Gefunden: 'Unerwartetes Ergebnise',
+        this.scannedBarcodeInfos = bezeichnung;
+        this.bcInfoToString({
+          Gefunden: 'Unerwartetes Ergebnis',
           Objekt: LookupResultTable[result.lookupResultTable]
         });
     }
 
     const newHistoryItem = (this.scanResultCurrent) ? { ...this.scanResultCurrent } : null;
+
 
     this.scanResultCurrent = {
       typ: this.scannedBarcodeRsltTyp,
@@ -177,6 +230,20 @@ export class ScannerComponent implements OnInit {
       image: this.scannedBarcodeInfoImg,
       result
     };
+    const lastResult = this.scanResultCurrent;
+
+    if (this.scannedBarcodeInfoImg && this.scannedBarcodeInfoImg.gcuuid) {
+      this.loadImageByGcuuid(this.scannedBarcodeInfoImg.gcuuid).then( img => {
+        if (this.scanResultCurrent === lastResult) {
+          this.scanResultCurrent.image.data_url = img.data_url;
+        } else {
+          const lastResultFound = this.scanResultHistory.find( r => r === lastResult);
+          if (lastResultFound) {
+            lastResultFound.image.data_url = img.data_url;
+          }
+        }
+      });
+    }
 
     this.addHistoryResult(newHistoryItem );
   }
@@ -192,11 +259,20 @@ export class ScannerComponent implements OnInit {
   }
 
   removeResult(result: any): void {
+    this.scanResultHistory = this.scanResultHistory.filter( r => r !== result);
     console.log('remove Result', { result });
+    // alert(JSON.stringify(result));
   }
 
-  applyHistoryResult(result: any): void {
-  console.log('apply Result', { result });
+  applyHistoryResult(result: ScanResultItem): void {
+    const emitScanResult = {
+      barcode: this.scanBCLookupSimpleResult.barcode,
+      length: this.scanBCLookupSimpleResult.barcode.length,
+      valid: true,
+      result: this.scanBCLookupSimpleResult
+    } as ScannerBarcodeData;
+    console.log('apply applyHistoryResult', { emitScanResult });
+    this.onScan.emit( emitScanResult );
   }
 
   clearHistory(): void {
@@ -205,6 +281,7 @@ export class ScannerComponent implements OnInit {
 
   onCamerasFound(devices: MediaDeviceInfo[]): void {
     this.availableDevices = devices;
+    this.allowBarcodeInput = false;
     this.hasDevices = Boolean(devices && devices.length);
     if (this.hasDevices) {
       for (const dev of this.availableDevices) {
@@ -215,6 +292,12 @@ export class ScannerComponent implements OnInit {
 
   bcInfoToString(json: any): string {
     return JSON.stringify( json ).substr(1).split('').slice(0, -1).join('');
+    let tbl = '<table>';
+    for (const k of Object.keys(json)) {
+      tbl += '<tr><th>' + k + '</th><td>' + json[k] + '</td>';
+    }
+    tbl += '</table>';
+    return tbl;
   }
 
   onCodeResult(resultString: string) {
@@ -254,9 +337,26 @@ export class ScannerComponent implements OnInit {
     }
   }
 
+  async loadImageByGcuuid(gcuuid: string): Promise<DBDIImages|null> {
+    console.log('called loadImageByGcuuid', gcuuid);
+    if (gcuuid) {
+      return this.imageService.getImage(gcuuid)
+        .then( image => {
+          return image;
+        })
+        .catch( err => {
+          console.error( err );
+          return null;
+        });
+    } else {
+      return null;
+    }
+  }
+
   onDeviceSelectChange(selected: string) {
     const device = this.availableDevices.find(x => x.deviceId === selected);
     this.currentDevice = device || null;
+    this.allowBarcodeInput = !device;
   }
 
   openFormatsDialog() {

@@ -4,6 +4,7 @@ import {Guid} from 'guid-typescript';
 import {AuthService} from '../../auth/auth.service';
 import {DbInsertResult, DbUpdateResult} from './data-interfaces';
 import {throwError} from 'rxjs';
+import {BasedataService} from "../../basedata.service";
 
 export interface RaumBasisDaten {
   gid?: number;
@@ -44,7 +45,9 @@ export class RaumService {
 
   raumStatusChanged = new EventEmitter<RaumIDAndStatus>();
 
-  constructor(private dexie: DexieService, private authService: AuthService) {
+  constructor(private dexie: DexieService,
+              private authService: AuthService,
+              private baseDataService: BasedataService) {
   }
 
   public async raumExists(gid: number, raum: string): Promise<boolean> {
@@ -67,22 +70,50 @@ export class RaumService {
     return 0 < numRaeume;
   }
 
-  public async insert(daten: RaumBasisDaten): Promise<DBInsertRaumResult> {
+  public async codeExistsInInventur(jobid: number, rid: number, code: string): Promise<boolean> {
+    const numRaeume = await this.dexie.raeume
+      .where('code')
+      .equalsIgnoreCase(code.trim())
+      .filter(itm => itm.rid !== rid && itm.for_jobid !== jobid)
+      .count();
+
+    return 0 < numRaeume;
+  }
+
+  public async raumExistsInInventur(jobid: number, rid: number, Raum: string): Promise<boolean> {
+    const numRaeume = await this.dexie.raeume
+      .where('Raum')
+      .equalsIgnoreCase(Raum.trim())
+      .filter(itm => itm.rid !== rid && itm.for_jobid !== jobid)
+      .count();
+
+    return 0 < numRaeume;
+  }
+
+  async get(rid: number): Promise<DBDIRaeume> {
+    return this.dexie.raeume.get(rid);
+  }
+
+  public async insert(daten: RaumBasisDaten, useJobId?: number): Promise<DBInsertRaumResult> {
+    const jobid = useJobId || this.baseDataService.getCurrentJobid();
+
     const insertData: DBDIRaeume = {
       gid: daten.gid,
       uuid: Guid.create().toString(),
       hash: '',
+      for_jobid: jobid,
       code: '',
       raumid: '',
       Raum: daten.Raum,
       Raumbezeichnung: daten.Raumbezeichnung,
       Etage: daten.Etage,
       created_at: new Date(),
+      created_jobid: jobid,
       created_uid: this.authService.getUser().id,
       modified_at: null,
       modified_uid: null
     };
-    const log = { log: true }
+    const log = { log: true };
 
     let newId = 0;
     let newItem = null;
@@ -108,10 +139,37 @@ export class RaumService {
     };
   }
 
-  public async update(raum: DBDIRaeume): Promise<DBUpdateRaumResult> {
+  public async updateById(rid: number, raum: DBDIRaeume|RaumBasisDaten): Promise<DBUpdateRaumResult> {
+    console.log('#143 raum.service.ts updateById:', { rid, raum });
+    const numChanges = await this.dexie.raeume.update(rid, raum);
+    const savedData = await this.dexie.raeume.get(rid);
     return {
-      success: false
+      success: numChanges > 0,
+      id: rid,
+      item: savedData,
+      data: raum
     };
+  }
+
+  public async updateByUuid(uuid: string, raum: DBDIRaeume|RaumBasisDaten): Promise<DBUpdateRaumResult> {
+    const numChanges = await this.dexie.raeume.where({ uuid }).modify(raum);
+    const savedData = await this.dexie.raeume.where({ uuid }).first();
+    return {
+      success: numChanges > 0,
+      id: savedData.rid,
+      item: savedData,
+      data: raum
+    };
+  }
+
+  public async getEtagenByGidInInventur(jobid: number, gid: number): Promise<string[]> {
+    const etagen: string[] = [];
+    return this.dexie.raeume
+      .where({ for_jobid: jobid, gid }).each( raum => {
+      if (etagen.indexOf(raum.Etage) === -1) {
+        etagen.push( raum.Etage );
+      }
+    }).then( () => etagen );
   }
 
   public async getRaumStatus(rid: number): Promise<DBDIRaumEditStatus> {

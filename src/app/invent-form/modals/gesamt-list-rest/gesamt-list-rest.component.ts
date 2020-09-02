@@ -1,4 +1,4 @@
-import {Component, EventEmitter, OnInit} from '@angular/core';
+import {Component, EventEmitter, OnInit, Output} from '@angular/core';
 import {NgbActiveModal} from '@ng-bootstrap/ng-bootstrap';
 import {BasedataService} from '../../../basedata.service';
 import {RaumService, RaumStatusProgress} from '../../data-services/raum.service';
@@ -14,6 +14,8 @@ export class GesamtListRestComponent implements OnInit {
   gebaeudeDaten?: DBDIGebaeude;
   raeumeListDone?: RaumStatusProgress[];
 
+  @Output() raumSelected = new EventEmitter<number>();
+
   constructor(
     public activeModal: NgbActiveModal,
     private baseData: BasedataService,
@@ -26,6 +28,11 @@ export class GesamtListRestComponent implements OnInit {
   set gebaeude(gebaeude: DBDIGebaeude) {
     this.gebaeudeDaten = gebaeude;
     this.loadGebaeudeStat();
+  }
+
+  onSelectRaum(rid) {
+    this.raumSelected.emit( rid );
+    this.activeModal.close();
   }
 
   loadGebaeudeStat(useJobid?: number) {

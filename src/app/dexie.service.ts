@@ -545,6 +545,9 @@ export interface BarcodeLookupSimpleResult {
 export interface DBDIArtikel extends DBDIObjektKatalogMandant, DBDIObjektKatalogGlobal {
   mcuuid?: string;
 }
+export interface DBDIArtikelMitHersteller extends DBDIArtikel {
+  Hersteller?: string;
+}
 
 export interface DBDIRaumGebaeude extends DBDIRaeume, DBDIGebaeude {}
 

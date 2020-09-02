@@ -25,7 +25,7 @@
   </div>
   <div class="form-group col-4">
     <label for="raum" class="mb-0">Raum</label>
-    <input id="raum" class="form-control" [readOnly]="true" [attr.value]="raumNr">
+    <input id="raum" [ngClass]="{ 'bg-danger': !raum }" class="form-control" [readOnly]="true" [attr.value]="raumNr">
   </div>
 </div>
 
@@ -90,7 +90,7 @@
     <div class="input-group-prepend">
       <span class="input-group-text">BCode</span>
     </div>
-    <input id="raumCode" #raumBarcode type="text"
+    <input id="raumCode" readonly #raumBarcode type="text"
            class="form-control" [value]="formInventar.RaumBarcode" (input)="onRaumBarcodeInput( $event )" placeholder="Raum-Barcode" aria-label="Raumcode">
     <div class="input-group-append">
       <button class="btn btn-outline-success" type="button" (click)="openScanner(raumBarcode)"><fa-icon [icon]="faCamera"></fa-icon></button>
@@ -103,7 +103,7 @@
     <div class="input-group-prepend">
       <span class="input-group-text">Nr</span>
     </div>
-    <input id="raumNr" type="text" [value]="formInventar.Raum" class="form-control" placeholder="Raumnr" aria-label="Raumnummer">
+    <input id="raumNr" readonly type="text" [value]="formInventar.Raum" class="form-control" placeholder="Raumnr" aria-label="Raumnummer">
     <div class="input-group-append">
       <button class="btn btn-outline-success" type="button" (click)="openSelectSearchRaum()">...</button>
     </div>
@@ -115,56 +115,61 @@
     <div class="input-group-prepend">
       <span class="input-group-text">Bez.</span>
     </div>
-    <!-- div class="col" -->
-      <input  id="raumBez" type="text" [value]="formInventar.Raumbezeichnung"
-              placeholder="Raumbezeichnung" class="form-control">
-    <!-- /div -->
+    <input  id="raumBez" readonly type="text" [value]="formInventar.Raumbezeichnung"
+            placeholder="Raumbezeichnung" class="form-control">
+    <div class="input-group-append">
+      <button class="btn btn-outline-success" type="button" (click)="openEditRaum()">
+        <fa-icon [icon]="faEdit"></fa-icon>
+      </button>
+    </div>
   </div>
 </div>
 
 <div class="row mt-4">
   <label for="raumCode" class="col"><strong>Inventar-Daten</strong></label>
 </div>
-<div class="form-group row">
+<ng-container *ngIf="raum; else MissingRaum">
+  <div class="form-group row">
+      <div class="col input-group mb-1">
+        <div class="input-group-prepend">
+          <span class="input-group-text">BCode</span>
+        </div>
+        <input id="elmBarcode" #invBarcode readonly
+               required
+               [ngClass]="{'bg-danger': waitingForNewInventarBarcode }" type="text"
+               [attr.value]="formInventar.Barcode" class="form-control"
+               [placeholder]="!waitingForNewInventarBarcode ? 'Inventar-Barcode ...' : 'Warte auf Inventar-Barcode ...'" aria-label="Barcode">
+        <div class="input-group-append">
+          <button class="btn btn-outline-success" type="button" (click)="openScanner(invBarcode)">
+            <fa-icon [icon]="faCamera"></fa-icon>
+          </button>
+        </div>
+      </div>
+  </div>
+  <div class="form-group row">
+      <div class="col input-group mb-1">
+        <div class="input-group-prepend">
+          <span class="input-group-text">Bez.</span>
+        </div>
+        <input id="elmArtBez" readonly type="text" [attr.value]="formInventar.Bezeichnung" class="form-control" placeholder="Artikelbezeichnung" aria-label="Artikelbezeichnung">
+        <div class="input-group-append">
+          <button class="btn btn-outline-success" type="button" (click)="openSelectCreateArtikel()">...</button>
+        </div>
+      </div>
+  </div>
+  <div class="form-group row">
     <div class="col input-group mb-1">
       <div class="input-group-prepend">
-        <span class="input-group-text">BCode</span>
+        <span class="input-group-text">Typ</span>
       </div>
-      <input id="elmBarcode" #invBarcode readonly
-             required
-             [ngClass]="{'bg-danger': waitingForNewInventarBarcode }" type="text"
-             [attr.value]="formInventar.Barcode" class="form-control"
-             [placeholder]="!waitingForNewInventarBarcode ? 'Inventar-Barcode ...' : 'Warte auf Inventar-Barcode ...'" aria-label="Barcode">
-      <div class="input-group-append">
-        <button class="btn btn-outline-success" type="button" (click)="openScanner(invBarcode)">
-          <fa-icon [icon]="faCamera"></fa-icon>
-        </button>
-      </div>
-    </div>
-</div>
-<div class="form-group row">
-    <div class="col input-group mb-1">
-      <div class="input-group-prepend">
-        <span class="input-group-text">Bez.</span>
-      </div>
-      <input id="elmArtBez" readonly type="text" [attr.value]="formInventar.Bezeichnung" class="form-control" placeholder="Artikelbezeichnung" aria-label="Artikelbezeichnung">
+      <input  id="elmArtTyp" type="text" [attr.value]="formInventar.Typ" class="form-control">
       <div class="input-group-append">
         <button class="btn btn-outline-success" type="button" (click)="openSelectCreateArtikel()">...</button>
       </div>
     </div>
-</div>
-<div class="form-group row">
-  <div class="col input-group mb-1">
-    <div class="input-group-prepend">
-      <span class="input-group-text">Typ</span>
-    </div>
-    <!-- div class="col" -->
-      <input  id="elmArtTyp" type="text" [attr.value]="formInventar.Typ" class="form-control">
-    <!-- /div -->
   </div>
-</div>
 
-<div class="form-group row">
+  <div class="form-group row">
   <!-- label for="elmArtTyp" class="col-2 col-sm-2 col-md-2 col-lg-2 d-none">Bild</label -->
   <div class="col input-group mb-1">
     <div class="input-group-prepend">
@@ -173,13 +178,21 @@
   <!-- div class="col">
     <div class="btn-group btn-group-lg" role="group" aria-label="Large button group" -->
     <div class="input-group-append">
-      <button type="button" class="btn btn-success" *ngIf="!artikelImageExists" [disabled]="!formInventar.gcuuid" (click)="openCreateArtikelImage()"><fa-icon [icon]="faCamera"></fa-icon> anlegen </button>
       <button type="button" class="btn btn-info" *ngIf="artikelImageExists" (click)="openShowArtikelImage()"><fa-icon [icon]="faImage"></fa-icon> anzeigen</button>
+      <button type="button" class="btn btn-success" *ngIf="artikelImageExists" [disabled]="!formInventar.gcuuid" (click)="openEditArtikelImage()"><fa-icon [icon]="faCamera"></fa-icon> bearbeiten </button>
+      <button type="button" class="btn btn-success" *ngIf="!artikelImageExists" [disabled]="!formInventar.gcuuid" (click)="openCreateArtikelImage()"><fa-icon [icon]="faCamera"></fa-icon> anlegen </button>
+
     </div>
     <!-- /div>
   </div -->
   </div>
 </div>
+</ng-container>
+<ng-template #MissingRaum>
+  <ngb-alert [type]="'danger'" [dismissible]="false">
+    Bitte wählen Sie einen Raum aus!
+  </ngb-alert>
+</ng-template>
 <hr>
 <h5>Barcode-Scanning Test</h5>
 <div class="row">

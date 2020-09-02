@@ -55,7 +55,14 @@ export class ImagesService {
     return rs;
   }
 
-  async getImage(gcuuid: number): Promise<DBDIImages> {
+  async putImage(image: ImageBaseData, useJobid?: number): Promise<number> {
+
+    await this.dexie.images.where({ gcuuid: image.gcuuid }).delete();
+
+    return this.insertImage(image, useJobid);
+  }
+
+  async getImage(gcuuid: string): Promise<DBDIImages> {
     return this.dexie.images.get({ gcuuid });
   }
 

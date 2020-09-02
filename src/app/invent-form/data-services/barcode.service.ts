@@ -12,13 +12,17 @@ import {
 } from '../../dexie.service';
 import Dexie from 'dexie';
 
+interface RebuildProcess {
+  jobid: number;
+  table: string;
+}
 @Injectable({
   providedIn: 'root'
 })
 export class BarcodeService {
   lastErrors: any[] = [];
   lkup: Dexie.Table<DBDIBarcodeLookup, string>;
-  rebuildProcesses: string[] = [];
+  rebuildProcesses: RebuildProcess[] = [];
 
   constructor(private db: DexieService) {
     this.lkup = this.db.barcodeLookup;
@@ -38,6 +42,7 @@ export class BarcodeService {
   }
 
   async indexLookup(barcode: string): Promise<BarcodeLookupSimpleResult> {
+    barcode = this.bcTrimZero(barcode);
     const found = await this.lkup.get( barcode );
 
     const result: BarcodeLookupSimpleResult = {
@@ -142,7 +147,16 @@ export class BarcodeService {
     return result;
   }
 
+  bcTrimZero(barcode: string) {
+    barcode = barcode.trim();
+    while (barcode.charAt(0) === '0') {
+      barcode = barcode.substr(1).trim();
+    }
+    return barcode;
+  }
+
   async fullLookup(barcode: string) {
+    barcode = this.bcTrimZero(barcode);
     const simpleResult = await this.simpleLookup(barcode);
     const lookupResultTableText = LookupResultTable[simpleResult.lookupResultTable];
     console.log(`#146 fullLookup for ${barcode} found ${lookupResultTableText}`, { simpleResult });
@@ -203,10 +217,10 @@ export class BarcodeService {
   }
 
   async rebuildTable<I extends DBDITableWithBarcode>(table: Dexie.Table<I, number>): Promise<boolean> {
-    if (this.rebuildProcesses.indexOf(table.name) !== -1) {
+    if (this.rebuildProcesses.find( p => p.table === table.name) ) {
       return false;
     }
-    this.rebuildProcesses.push( table.name );
+    this.rebuildProcesses.push( { jobid: 0, table: table.name });
     const keyName: string = table.schema.primKey.keyPath.toString();
     const tblName = table.name;
     console.log('#212 barcode.service rebuildTable delete barcodeLookup for table ', tblName);
@@ -227,36 +241,40 @@ export class BarcodeService {
       })
       .then( () => true)
       .finally( () => {
-        this.rebuildProcesses = this.rebuildProcesses.filter( procName => procName !== tblName);
+        this.rebuildProcesses = this.rebuildProcesses.filter( p => p.table !== tblName);
       });
   }
 
   async rebuildByJobid(jobid: number) {
+    console.log('#235 barcode.service.ts rebuildByJobid', { jobid });
     return Promise.all([
       this.rebuildTableByJobid<DBDIInventar>(this.db.inventar, jobid),
       this.rebuildTableByJobid<DBDIRaeume>(this.db.raeume, jobid),
       this.rebuildTableByJobid<DBDIObjektKatalogMandant>(this.db.objektKatalogMandant, jobid)
     ]).then( (results) => {
       const numErrors = results.filter( re => !re).length;
-      this.addError( 'Beim Rebuild des Lookup-Indexes sind ' + numErrors + ' aufgetreten!');
+      this.addError( '#242 Beim Rebuild des Lookup-Indexes sind ' + numErrors + ' aufgetreten!');
       return numErrors === 0;
     });
   }
 
   async rebuildTableByJobid<I extends DBDITableWithBarcode>(table: Dexie.Table<I, number>, jobid: number): Promise<boolean> {
-    if (this.rebuildProcesses.indexOf(table.name) !== -1) {
+    if (this.rebuildProcesses.find( p => (p.jobid === 0 || p.jobid === jobid) && p.table === table.name) ) {
+      console.error('Abort barcode rebuild, it is already running');
       return false;
     }
-    this.rebuildProcesses.push( table.name );
+
+    this.rebuildProcesses.push( { jobid, table: table.name} );
     const keyName: string = table.schema.primKey.keyPath.toString();
     const tblName = table.name;
     console.log('#253.. barcode.service rebuildTableByJobid delete barcodeLookup for table ', tblName, jobid);
     await this.db.barcodeLookup.where( { table: tblName, for_jobid: jobid }).delete();
     console.log('#255 barcode.service rebuildTableByJobid processing for table ', tblName, jobid);
-
+    let count = 0;
     return this.db
       .transaction( 'rw', [table, this.db.barcodeLookup], () => {
-        table.where({for_jobid: jobid}).each( (item) => {
+        table.where({ for_jobid: jobid }).each( (item) => {
+          count += 1;
           this.db.barcodeLookup.put({
             code: item.code,
             table: tblName,
@@ -268,7 +286,7 @@ export class BarcodeService {
         });
       })
       .then( () => {
-        console.log('#270 barcode.serve rebuildTableByJobid finished successful', tblName, jobid);
+        console.log('#270 barcode.serve rebuildTableByJobid finished successful', { tblName, jobid, count });
         return  true;
       })
       .catch( () => {
@@ -276,7 +294,7 @@ export class BarcodeService {
         return false;
       })
       .finally( () => {
-        this.rebuildProcesses = this.rebuildProcesses.filter( procName => procName !== tblName);
+        this.rebuildProcesses = this.rebuildProcesses.filter( p => p.jobid !== jobid && p.table !== tblName);
       });
   }
 
@@ -315,36 +333,44 @@ export class BarcodeService {
   }
 
   async rebuildTableOnRunningSystemByJobid<I extends DBDITableWithBarcode>(table: Dexie.Table<I, number>, jobid: number) {
-    if (this.rebuildProcesses.indexOf(table.name) !== -1) {
+    if (this.rebuildProcesses.find( p => (p.jobid === 0 || p.jobid === jobid) && p.table === table.name) ) {
       return false;
     }
-    this.rebuildProcesses.push( table.name );
+    this.rebuildProcesses.push( { jobid, table: table.name } );
     const keyName: string = table.schema.primKey.keyPath.toString();
     const tblName = table.name;
     const tblBarcodeLookup = this.db.barcodeLookup;
+    let count = 0;
 
     await this.db.transaction('rw', [tblBarcodeLookup, table], () => {
       tblBarcodeLookup
         .where( { table: tblName, for_jobid: jobid, updateHelper: 1 })
         .modify({ updateHelper: 2 })
         .then( () => {
-          table.where({for_jobid: jobid }).filter( (item) => !!item.code).each ( (item) => {
-            const forJobid = ('for_jobid' in item) ? item.for_jobid : 0;
-            tblBarcodeLookup.put({
-              code: item.code,
-              table: tblName,
-              key: keyName,
-              for_jobid: forJobid,
-              uuid: item.uuid,
-              updateHelper: 1
+          table.where({for_jobid: jobid })
+            .filter( (item) => !!item.code)
+            .each ( (item) => {
+              const forJobid = ('for_jobid' in item) ? item.for_jobid : 0;
+              count += 1;
+              tblBarcodeLookup.put({
+                code: item.code,
+                table: tblName,
+                key: keyName,
+                for_jobid: forJobid,
+                uuid: item.uuid,
+                updateHelper: 1
             });
           });
         });
     } );
 
-    await tblBarcodeLookup.where( {table: tblName, for_jobid: jobid, updateHelper: 2}).delete();
+    const numDeletes = await tblBarcodeLookup.where( {table: tblName, for_jobid: jobid, updateHelper: 2}).delete();
+
+    console.log('#356 barcode.service.ts rebuildTableOnRunningSystemByJobid finished', {
+      jobid, table: table.name, count, numDeletes
+    });
     // Clear Finished Process from ProcessList
-    this.rebuildProcesses = this.rebuildProcesses.filter( procName => procName !== tblName);
+    this.rebuildProcesses = this.rebuildProcesses.filter( p => p.jobid !== jobid && p.table !== tblName);
   }
 
   async rebuildOnRunningSystem() {
@@ -365,10 +391,10 @@ export class BarcodeService {
   }
 
   async rebuildTableOnRunningSystem<I extends DBDITableWithBarcode>(table: Dexie.Table<I, number>): Promise<boolean> {
-    if (this.rebuildProcesses.indexOf(table.name) !== -1) {
+    if (this.rebuildProcesses.find( p => p.table === table.name)) {
       return false;
     }
-    this.rebuildProcesses.push( table.name );
+    this.rebuildProcesses.push( { jobid: 0, table: table.name } );
     const keyName: string = table.schema.primKey.keyPath.toString();
     const tblName = table.name;
     const tblBarcodeLookup = this.db.barcodeLookup;
@@ -398,7 +424,7 @@ export class BarcodeService {
     console.log('rebuildTableOnRunningSystem delete Barcodes for no more existing entries in ' + table.name);
     await tblBarcodeLookup.where( {table: tblName, updateHelper: 2}).delete();
     // Clear Finished Process from ProcessList
-    this.rebuildProcesses = this.rebuildProcesses.filter( procName => procName !== tblName);
+    this.rebuildProcesses = this.rebuildProcesses.filter( p => p.table !== tblName);
     return true;
   }
 

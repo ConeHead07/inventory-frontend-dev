@@ -1,8 +1,8 @@
-import {Component, EventEmitter, OnInit} from '@angular/core';
+import {Component, EventEmitter, OnInit, Output} from '@angular/core';
 import {NgbActiveModal} from '@ng-bootstrap/ng-bootstrap';
 import {BasedataService} from '../../../basedata.service';
 import {RaumService, RaumStatusProgress} from '../../data-services/raum.service';
-import {DBDIGebaeude} from '../../../dexie.service';
+import {DBDIGebaeude, DBDIRaeume} from '../../../dexie.service';
 import {
   faCheck,
   faSpinner,
@@ -36,6 +36,8 @@ export class GesamtListDoneComponent implements OnInit {
   faThreeQuarter = faBatteryThreeQuarters;
   faFull = faBatteryFull;
 
+  @Output() raumSelected = new EventEmitter<number>();
+
   constructor(
     public activeModal: NgbActiveModal,
     private baseData: BasedataService,
@@ -48,6 +50,11 @@ export class GesamtListDoneComponent implements OnInit {
   set gebaeude(gebaeude: DBDIGebaeude) {
     this.gebaeudeDaten = gebaeude;
     this.loadGebaeudeStat();
+  }
+
+  onSelectRaum(rid) {
+    this.raumSelected.emit( rid );
+    this.activeModal.close();
   }
 
   getStatusIconNameByItem(item: RaumStatusProgress): string {

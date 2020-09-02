@@ -29,7 +29,7 @@
     <tr *ngFor="let item of raeumeListDone">
       <th scope="row">{{ item.rid }}</th>
       <th>{{ item.Etage }}</th>
-      <td>{{ item.Raum }}</td>
+      <td><span class="btn btn-link" (click)="onSelectRaum(item.rid)">{{ item.Raum }}</span></td>
       <td>{{ item.editStatus === 0 ? 'Nein' : 'Ja' }}</td>
       <td>{{ item.total }}</td>
       <td>{{ item.done }}</td>

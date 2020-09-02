@@ -92,15 +92,39 @@ export class SelectSearchArtikelComponent implements OnInit {
 
   async loadArtikels() {
     console.log('called loadArtikels');
+    states.length = 1;
     await this.dataService.getArtikelListByClientId( this.mid )
       .then( items => {
           console.log('process fetched artikels', items.length );
           return items.map( artikel => {
+            const nameParts = [];
+            if (artikel.Typ) {
+              nameParts.push(artikel.Typ);
+            }
+            if (artikel.Bezeichnung) {
+              nameParts.push(artikel.Bezeichnung);
+            }
+            if (artikel.Kategorie) {
+              nameParts.push(artikel.Kategorie);
+            }
+            if (artikel.Gruppe) {
+              nameParts.push(artikel.Gruppe);
+            }
+            if (artikel.Farbe) {
+              nameParts.push(artikel.Farbe);
+            }
+            if (artikel.Groesse) {
+              nameParts.push(artikel.Groesse);
+            }
+            if (artikel.Hersteller) {
+              nameParts.push(artikel.Hersteller);
+            }
+
             const option: ArtikelOption = {
               id: artikel.mcid,
               mcid: artikel.mcid,
               mcuuid: artikel.mcuuid,
-              name: artikel.Bezeichnung
+              name: nameParts.join(' :: ')
             };
             console.log('loadArtikels push ', { artikel, option });
             states.push( option );
