@@ -71,13 +71,31 @@ export class RaumService {
   }
 
   public async codeExistsInInventur(jobid: number, rid: number, code: string): Promise<boolean> {
+    const raeume = this.dexie.raeume
+      .where('code')
+      .equalsIgnoreCase(code.trim())
+      .filter(itm => itm.rid !== rid && itm.for_jobid !== jobid);
+
     const numRaeume = await this.dexie.raeume
       .where('code')
       .equalsIgnoreCase(code.trim())
       .filter(itm => itm.rid !== rid && itm.for_jobid !== jobid)
       .count();
+    const exists = 0 < numRaeume;
 
-    return 0 < numRaeume;
+    console.log('#85 raum.service.ts codeExistsInInventur', {
+      params: {
+        jobid,
+        rid,
+        code
+      },
+      result: {
+        exists,
+        raeume,
+        numRaeume
+      }
+    });
+    return exists;
   }
 
   public async raumExistsInInventur(jobid: number, rid: number, Raum: string): Promise<boolean> {

@@ -3,9 +3,11 @@ import {HttpClient, HttpErrorResponse} from '@angular/common/http';
 import {Router} from '@angular/router';
 import {catchError, tap } from 'rxjs/operators';
 import { throwError } from 'rxjs';
+import * as CryptoJS from "crypto-js";
 
 import { User } from './user.model';
 import {BasedataService} from '../basedata.service';
+import {WordArray} from "crypto-js";
 
 export interface AuthResponseData {
   kind: string;
@@ -36,8 +38,15 @@ export class AuthService {
     console.log('#34 AuthService.constructor', {originDomain}, 'this.url: ', this.url);
   }
 
+  logout() {
+    this.baseData.setCurrentUser( null );
+  }
+
   login(email: string, password: string) {
     console.log('#37 AuthService.login', {email, password}, 'this.url: ', this.url);
+    const pwSalt = 'Inventory';
+    const pwHash = CryptoJS.SHA3( pwSalt + password );
+
     return this.http.post<AuthResponseData>(
       this.url,
       {
@@ -56,7 +65,8 @@ export class AuthService {
             resData.auth_identifier,
             resData.access_token,
             +resData.expires_in,
-            +resData.clientDeviceId
+            +resData.clientDeviceId,
+            pwHash
           );
         })
       );
@@ -67,10 +77,11 @@ export class AuthService {
     userId: number,
     token: string,
     expiresIn: number,
-    clientDeviceId: number
+    clientDeviceId: number,
+    pwHash: WordArray
   ) {
     const expirationDate = new Date(new Date().getTime() + expiresIn * 1000);
-    this.user = new User(email, userId, token, expirationDate);
+    this.user = new User(email, userId, token, expirationDate, pwHash);
     const previousUser = this.baseData.getCurrentUser();
     if (previousUser) {
       this.baseData.setPreviousUser( previousUser );

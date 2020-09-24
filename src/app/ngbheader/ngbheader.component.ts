@@ -20,4 +20,8 @@ export class NgbheaderComponent {
 
     this.http.get(originDomain + ':8040/auth/me').subscribe( (data) => console.log(data) );
   }
+
+  continueLastInventory() {
+    //  routerLink="/form-inventory"
+  }
 }

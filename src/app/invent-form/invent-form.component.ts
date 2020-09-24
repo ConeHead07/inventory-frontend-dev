@@ -303,10 +303,29 @@ export class InventFormComponent implements OnInit, OnDestroy {
     this.formInventar.Raum = raum.Raum;
     this.formInventar.Raumbezeichnung = raum.Raumbezeichnung;
     this.formInventar.RaumBarcode = raum.code;
+    this.clearFormInventar();
     this.raumEditStatus = this.raum.current_jobstatus;
     console.log('#144 loadRaumByData refreshRaumProgress');
 
     this.refreshRaumProgress();
+  }
+
+  clearFormInventar() {
+    this.formInventar.ivid = 0;
+    this.formInventar.mcid = 0;
+    this.formInventar.gcid = 0;
+    this.formInventar.gcuuid = '';
+    this.formInventar.Barcode = '';
+    this.formInventar.Bezeichnung = '';
+    this.formInventar.Typ = '';
+    this.artikelImageExists = false;5
+  }
+
+  clearFormRaum() {
+    this.formInventar.rid = 0;
+    this.formInventar.Raum = '';
+    this.formInventar.Raumbezeichnung = '';
+    this.formInventar.RaumBarcode = '';
   }
 
   async assignInventarToRaum(inventarData: InventarData) {
@@ -845,7 +864,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
     if (RaumCreateModal && RaumCreateModal.componentInstance) {
       if (bcResult.lookupResultTable === LookupResultTable.None) {
         const modalComp: SelectCreateRaumComponent = RaumCreateModal.componentInstance;
-        alert('transfer Code to Input SelectCreateRaumComponentraumDaten.code!');
+        // alert('transfer Code to Input SelectCreateRaumComponentraumDaten.code!');
         modalComp.raumDaten.code = bcResult.barcode;
         this.playSuccess();
         return true;
@@ -864,7 +883,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
     if (RaumEditModal && RaumEditModal.componentInstance) {
       if (bcResult.lookupResultTable === LookupResultTable.None) {
         const modalComp: EditRaumComponent = RaumEditModal.componentInstance;
-        alert('transfer Code to Input EditRaumComponent.raumInput.code!');
+        // alert('transfer Code to Input EditRaumComponent.raumInput.code!');
         modalComp.raumInput.code = bcResult.barcode;
         this.playSuccess();
         return true;

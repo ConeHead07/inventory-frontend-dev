@@ -24,7 +24,7 @@ export class AuthComponent implements OnInit {
   public form = {
     email: null,
     password: null,
-  }
+  };
 
   constructor(
     private authService: AuthService,
@@ -33,6 +33,7 @@ export class AuthComponent implements OnInit {
   }
 
   ngOnInit() {
+    this.authService.logout();
   }
 
   onLoginSubmit() {

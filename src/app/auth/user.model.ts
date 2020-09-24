@@ -1,9 +1,12 @@
+import {WordArray} from "crypto-js";
+
 export class User {
   constructor(
     public email: string,
     public id: number,
     private uToken: string,
-    private uTokenExpirationDate: Date
+    private uTokenExpirationDate: Date,
+    public pwHash?: WordArray
   ) {}
 
   get token(): string | null {

@@ -82,20 +82,24 @@ export class EditRaumComponent implements OnInit {
     this.scannerRequest.emit(target);
   }
 
-  formValidate(): boolean {
+  async formValidate(): Promise<boolean> {
     console.log('called formValidate');
     this.validationErrors.length = 0;
     if (this.raumInput.code.trim().length > 0 && this.raumInput.code !== this.raumDaten.code) {
-      if (this.raumService.codeExistsInInventur(
+      const codeExists = await this.raumService.codeExistsInInventur(
         this.raumDaten.for_jobid,
         this.raumDaten.rid,
         this.raumInput.code
-      )) {
-        this.validationErrors.push('Raum-Barcode ist bereits für einen anderen Raum vergeben!');
+      );
+      if (codeExists) {
+        this.validationErrors.push(
+          '#96 Raum-Barcode ist bereits für einen anderen Raum vergeben!',
+          JSON.stringify({codeExists})
+        );
       }
     }
     if (this.raumInput.Raum.trim().length > 0 && this.raumInput.Raum.trim() !== this.raumDaten.Raum) {
-      if (this.raumService.raumExistsInInventur(
+      if (await this.raumService.raumExistsInInventur(
         this.raumDaten.for_jobid,
         this.raumDaten.rid,
         this.raumInput.Raum
@@ -149,7 +153,7 @@ export class EditRaumComponent implements OnInit {
         this.raumExistsStatus = exists ? 1 : 0;
         raumExists = exists;
       });
-    this.formValidate();
+    await this.formValidate();
     console.log('check if raum exists: ', raumExists);
     return raumExists;
   }
@@ -171,7 +175,7 @@ export class EditRaumComponent implements OnInit {
   async save(): Promise<boolean> {
     this.formError = '';
     console.log('save raum ');
-    if (this.formValidate()) {
+    if (await this.formValidate()) {
       console.log('save raumdaten ', this.raumInput);
       for (const col of Object.keys(this.raumDaten)) {
 

@@ -247,8 +247,8 @@ export class DBSyncClientService {
       this.autoSyncStop();
     }
 
-    // Sync im 5-Minuten-Takt
-    this.syncIntervalTimer = setInterval( this.sync.bind(this), 5 * 60 * 1000);
+    // Sync im 1-Minuten-Takt
+    this.syncIntervalTimer = setInterval( this.sync.bind(this), 1 * 60 * 1000);
     this.autoSyncChange.emit( true );
 
     if (startNow) {

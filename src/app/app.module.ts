@@ -59,8 +59,9 @@ const appRoutes: Routes = [
   { path: '', component: AuthComponent },
   { path: 'auth', component: AuthComponent },
   { path: 'select-inventory', component: SelectInventoryComponent },
-  { path: 'form-inventory/:clientid/:buildingid', component: InventFormComponent },
   { path: 'form-inventory/:clientid/:buildingid/:roomid', component: InventFormComponent },
+  { path: 'form-inventory/:clientid/:buildingid', component: InventFormComponent },
+  { path: 'form-inventory', component: InventFormComponent },
   { path: 'sync', component: DbsyncComponent },
   { path: 'settings', component: SettingsComponent }
 ];
