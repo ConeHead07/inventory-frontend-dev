@@ -92,6 +92,7 @@ export class SelectInventoryComponent implements OnInit, OnDestroy {
   listMetaMsg: {type: string, message: string}[] = [];
   lastMetaErr = '';
   lastMetaMsg = '';
+  showListmetaMsg = false;
 
   constructor(
     private dataService: DataService,

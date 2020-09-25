@@ -194,8 +194,9 @@
   </ngb-alert>
 </ng-template>
 <hr>
-<h5>Barcode-Scanning Test</h5>
-<div class="row">
+<div *ngIf="false">
+  <h5>Barcode-Scanning Test</h5>
+  <div class="row">
   <div class="col">
     <h6>Scanner Simulator</h6>
     <textarea #inputSimulateBarcode></textarea><br>
@@ -209,4 +210,5 @@
     </app-scannerdetection>
   </div>
   <div class="d-none">{{ formInventar | json }}</div>
+</div>
 </div>

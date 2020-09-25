@@ -140,7 +140,7 @@
     <ngb-alert [type]="'danger'" (close)="lastMetaErr = ''">{{ lastMetaErr }}</ngb-alert>
   </div>
 
-  <div>
+  <div *ngIf="showListmetaMsg">
     <p *ngFor="let msg of listMetaMsg">
       <ngb-alert [type]="msg.type" (close)="closeMsg(msg)">{{ msg.message }}</ngb-alert>
     </p>
