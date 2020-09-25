@@ -1,4 +1,4 @@
-import {WordArray} from "crypto-js";
+import {WordArray} from 'crypto-js';
 
 export class User {
   constructor(

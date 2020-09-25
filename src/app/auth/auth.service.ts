@@ -3,11 +3,11 @@ import {HttpClient, HttpErrorResponse} from '@angular/common/http';
 import {Router} from '@angular/router';
 import {catchError, tap } from 'rxjs/operators';
 import { throwError } from 'rxjs';
-import * as CryptoJS from "crypto-js";
+import * as CryptoJS from 'crypto-js';
 
 import { User } from './user.model';
 import {BasedataService} from '../basedata.service';
-import {WordArray} from "crypto-js";
+import {WordArray} from 'crypto-js';
 
 export interface AuthResponseData {
   kind: string;
