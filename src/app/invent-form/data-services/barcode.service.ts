@@ -1,4 +1,5 @@
 import {Injectable} from '@angular/core';
+import { DexieService } from '../../dexie.service';
 import {
   BarcodeLookupSimpleResult,
   DBDIBarcodeLookup,
@@ -7,9 +8,8 @@ import {
   DBDIObjektKatalogMandant,
   DBDIRaeume,
   DBDITableWithBarcode,
-  DexieService,
   LookupResultTable
-} from '../../dexie.service';
+} from '../../dexie.interfaces';
 import Dexie from 'dexie';
 
 interface RebuildProcess {
@@ -28,11 +28,11 @@ export class BarcodeService {
     this.lkup = this.db.barcodeLookup;
   }
 
-  async simpleLookup(barcode: string): Promise<BarcodeLookupSimpleResult> {
+  async simpleLookup(barcode: string, jobid: number): Promise<BarcodeLookupSimpleResult> {
     if (barcode.startsWith('R') || barcode.startsWith('A')) {
       return this.bcAnalyzeLookup(barcode);
     }
-    return this.indexLookup(barcode);
+    return this.indexLookup(barcode, jobid);
     /*
     return Promise.all([
       this.indexLookup(barcode),
@@ -41,9 +41,9 @@ export class BarcodeService {
      */
   }
 
-  async indexLookup(barcode: string): Promise<BarcodeLookupSimpleResult> {
+  async indexLookup(barcode: string, jobid: number): Promise<BarcodeLookupSimpleResult> {
     barcode = this.bcTrimZero(barcode);
-    const found = await this.lkup.get( barcode );
+    const found = await this.lkup.get( { code: barcode, for_jobid: jobid } );
 
     const result: BarcodeLookupSimpleResult = {
       barcode,
@@ -93,7 +93,7 @@ export class BarcodeService {
   async bcAnalyzeLookup(barcode: string): Promise<BarcodeLookupSimpleResult> {
 
     const matchesObjektbuchArtikel = barcode.match(/^(A)-(\d+)-/);
-    const matchesObjektbuchRaum = barcode.match(/^(R)-(\d+)-/);
+    const matchesObjektbuchRaum = !matchesObjektbuchArtikel ? barcode.match(/^(R)-(\d+)-/) : false;
 
     let foundTable: string;
     let foundTableKey: string;
@@ -155,9 +155,9 @@ export class BarcodeService {
     return barcode;
   }
 
-  async fullLookup(barcode: string) {
+  async fullLookup(barcode: string, jobid: number) {
     barcode = this.bcTrimZero(barcode);
-    const simpleResult = await this.simpleLookup(barcode);
+    const simpleResult = await this.simpleLookup(barcode, jobid);
     const lookupResultTableText = LookupResultTable[simpleResult.lookupResultTable];
     console.log(`#146 fullLookup for ${barcode} found ${lookupResultTableText}`, { simpleResult });
 

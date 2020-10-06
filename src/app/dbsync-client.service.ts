@@ -1,11 +1,11 @@
 import {EventEmitter, Injectable, Output} from '@angular/core';
 import {ApiService} from './api.service';
 import {BasedataService} from './basedata.service';
-import {DBDIClientChangeLog, DBDIInventuren, DexieService} from './dexie.service';
+import {DexieService} from './dexie.service';
+import {DBDIBarcodeLookup, DBDIClientChangeLog} from './dexie.interfaces';
 import {ConnectionService} from './connection-service.service';
 import {VariablesService} from './inventory/service/variables.service';
-import {DbsyncLogService, TableSyncProgress} from "./dbsync-log.service";
-import {IndexableType} from "dexie";
+import {DbsyncLogService, TableSyncProgress} from './dbsync-log.service';
 
 export interface TableSyncProgressList {
   [key: string]: TableSyncProgress;
@@ -267,7 +267,6 @@ export class DBSyncClientService {
   }
 
   async sync() {
-    console.log('#231 dbsync-client.service sync()');
     const isDBSyncService = (this instanceof DBSyncClientService);
     console.log('#233 dbsync-client.service sync() this is DBSyncClientService', { isDBSyncService });
     if (!isDBSyncService) {
@@ -323,7 +322,7 @@ export class DBSyncClientService {
     const devid = this.baseData.getCurrentDeviceId() || 0;
     const lastRevId = await this.getClientRevIdByJobid(jobid);
 
-    if (!this.networkService.hasInternetAccess) {
+    if (!this.networkService.hasServerAccess) {
       console.error('Abort Change-Request: No Internet!');
       return { success: false, errorMsg: 'Abort Change-Request: No Internet!', MaxRevisionId: -1, NumChanges: -1 };
     }
@@ -394,7 +393,7 @@ export class DBSyncClientService {
       );
     }
 
-    if (!this.networkService.hasInternetAccess) {
+    if (!this.networkService.hasServerAccess) {
       console.error('#369 dbsync-client.service sendByJobId() Synchronisatioon wurde abgebrochen wegen fehlender Serververbindung!');
       return this.finishProcess(
         syncJobResult,
@@ -640,6 +639,27 @@ export class DBSyncClientService {
     }
   }
 
+  async addBarcodeToLookupTable(
+    code: DBDIBarcodeLookup['code'], table: DBDIBarcodeLookup['table'],
+    uuid: DBDIBarcodeLookup['uuid'], forJobid: DBDIBarcodeLookup['for_jobid'],
+    id?: DBDIBarcodeLookup['id']): Promise<boolean> {
+
+    const tblBarcodeLookup = this.dexieService.barcodeLookup;
+    const updateHelper = 1;
+    const key = this.dexieService.table( table ).schema.primKey.keyPath as string;
+
+    tblBarcodeLookup.put({
+      code,
+      table,
+      key,
+      id,
+      for_jobid: forJobid,
+      uuid,
+      updateHelper
+    });
+    return true;
+  }
+
   async sendByJobId_ALT(useJobid: number, useLogs?: DBDIClientChangeLog[], useJobResult?: SyncJobResult): Promise<SyncJobResult> {
     console.log('[called sendByJobId](' + useJobid + ', useLogs, useJobResult)');
     this.clearFinishedProcesses();
@@ -666,7 +686,7 @@ export class DBSyncClientService {
     syncJobResult.sendClientDeviceId = devid;
     syncJobResult.committedIds = logs.map<number>( (itm) => itm.id );
 
-    if (!this.networkService.hasInternetAccess) {
+    if (!this.networkService.hasServerAccess) {
       return this.finishProcess(
         syncJobResult,
         SyncJobStatus.Offline,

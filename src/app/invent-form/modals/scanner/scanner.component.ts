@@ -4,10 +4,11 @@ import BarcodeFormat from '@zxing/library/esm/core/BarcodeFormat';
 import {BehaviorSubject} from 'rxjs';
 import {DataService} from '../../../inventory/service/data.service';
 import {BarcodeService} from '../../data-services/barcode.service';
-import {BarcodeLookupSimpleResult, DBDIImages, LookupResultTable} from '../../../dexie.service';
+import {BarcodeLookupSimpleResult, DBDIImages, LookupResultTable} from '../../../dexie.interfaces';
 import {faTrashAlt, faCheck} from '@fortawesome/free-solid-svg-icons';
 import {ImagesService} from '../../data-services/images.service';
-
+import {ZXingScannerComponent} from '@zxing/ngx-scanner';
+import {BasedataService} from '../../../basedata.service';
 
 export interface ScannerBarcodeData {
   barcode?: string;
@@ -61,9 +62,13 @@ export class ScannerComponent implements OnInit {
   hasDevices: boolean;
   hasPermission: boolean;
 
+  @ViewChild('scanner', { static: true })
+  scanner: ZXingScannerComponent;
+
   @ViewChild('barcodeChangedPart', { static: true })
   barcodeChangedPart: ElementRef;
 
+  jobid: number;
   allowBarcodeInput = false;
   qrResultString: string;
   scannedUnchangedPart: string;
@@ -85,11 +90,13 @@ export class ScannerComponent implements OnInit {
     public activeModal: NgbActiveModal,
     private dataService: DataService,
     private bcLookup: BarcodeService,
-    private imageService: ImagesService
+    private imageService: ImagesService,
+    private baseData: BasedataService
   ) {}
 
 
   ngOnInit() {
+    this.jobid = this.baseData.getCurrentJobid();
   }
 
   clearResult(): void {
@@ -300,14 +307,16 @@ export class ScannerComponent implements OnInit {
     return tbl;
   }
 
-  onCodeResult(resultString: string) {
+  onCodeResult(resultString: string) { // resultString: string
+    // const resultString = '0000037536';
     const oldBarcode: string = this.scannedBarcode || '';
     this.scannedBarcode = resultString;
     this.scannedBarcodeInfos = '';
     this.scannedBarcodeInfoImg = null;
-    this.bcLookup.fullLookup(resultString).then( (result) => {
+    this.bcLookup.fullLookup(resultString, this.jobid).then( (result) => {
       this.showResult( result );
     });
+
     const resultLength = resultString.length;
     let numMatchingStart = 0;
     const checkLength = Math.min(resultLength, oldBarcode.length);
@@ -330,6 +339,7 @@ export class ScannerComponent implements OnInit {
       htmlChangedPart.classList.remove('with-pulse-effect');
       void htmlChangedPart.offsetWidth;
       htmlChangedPart.classList.add('with-pulse-effect');
+
       console.log({ oldBarcode, resultString, checkLength, resultLength, numMatchingStart,
         scannedUnchangedPart: this.scannedUnchangedPart,
         scannedChangedPart: this.scannedChangedPart

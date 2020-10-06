@@ -15,7 +15,7 @@ export interface ConnectionState {
   /**
    * "True" if browser has Internet access. Determined by heartbeat system which periodically makes request to heartbeat Url.
    */
-  hasInternetAccess: boolean;
+  hasServerAccess: boolean;
 }
 
 /**
@@ -66,7 +66,7 @@ export class ConnectionService implements OnDestroy {
   private stateChangeEventEmitter = new EventEmitter<ConnectionState>();
 
   private currentState: ConnectionState = {
-    hasInternetAccess: false,
+    hasServerAccess: false,
     hasNetworkConnection: window.navigator.onLine
   };
   private offlineSubscription: Subscription;
@@ -82,7 +82,10 @@ export class ConnectionService implements OnDestroy {
     return _.clone(this.serviceOptions);
   }
 
-  constructor(private http: HttpClient, @Inject(ConnectionServiceOptionsToken) @Optional() options: ConnectionServiceOptions) {
+  constructor(private http: HttpClient,
+              @Inject(ConnectionServiceOptionsToken)
+              @Optional()
+                options: ConnectionServiceOptions) {
     this.serviceOptions = _.defaults({}, options, ConnectionService.DEFAULT_OPTIONS);
 
     this.checkNetworkState();
@@ -104,8 +107,8 @@ export class ConnectionService implements OnDestroy {
               // log error message
               tap(val => {
                 console.error('Http error:', val);
-                const lastAccess = this.currentState.hasInternetAccess;
-                this.currentState.hasInternetAccess = false;
+                const lastAccess = this.currentState.hasServerAccess;
+                this.currentState.hasServerAccess = false;
                 if (lastAccess !== false) {
                   this.emitEvent();
                 }
@@ -116,15 +119,15 @@ export class ConnectionService implements OnDestroy {
           )
         )
         .subscribe(result => {
-          const lastAccess = this.currentState.hasInternetAccess;
-          this.currentState.hasInternetAccess = true;
+          const lastAccess = this.currentState.hasServerAccess;
+          this.currentState.hasServerAccess = true;
           if (lastAccess !== true) {
             this.emitEvent();
           }
         });
     } else {
-      const lastAccess = this.currentState.hasInternetAccess;
-      this.currentState.hasInternetAccess = false;
+      const lastAccess = this.currentState.hasServerAccess;
+      this.currentState.hasServerAccess = false;
       if (lastAccess !== false) {
         this.emitEvent();
       }
@@ -189,11 +192,11 @@ export class ConnectionService implements OnDestroy {
     return this.currentState;
   }
 
-  get hasInternetAccess() {
-    return this.currentState.hasInternetAccess;
+  get hasServerAccess() {
+    return this.currentState.hasServerAccess;
   }
 
-  get hastNetworkConnection() {
+  get hasNetworkConnection() {
     return this.currentState.hasNetworkConnection;
   }
 

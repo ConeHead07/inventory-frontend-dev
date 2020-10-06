@@ -1,9 +1,10 @@
-import {EventEmitter, Injectable, Output} from '@angular/core';
-import {DBDIInventar, DexieService} from '../../dexie.service';
+import { EventEmitter, Injectable, Output} from '@angular/core';
+import { DBDIInventar} from '../../dexie.interfaces';
+import { DexieService } from '../../dexie.service';
 import { InventarData } from '../../inventory/service/data.service';
-import {Guid} from 'guid-typescript';
-import {BasedataService} from '../../basedata.service';
-import {DatabaseChangeType} from 'dexie-observable/api';
+import { Guid} from 'guid-typescript';
+import { BasedataService} from '../../basedata.service';
+import { DatabaseChangeType} from 'dexie-observable/api';
 
 export const enum InventarChangeType {
   Create = DatabaseChangeType.Create,
@@ -102,7 +103,7 @@ export class InventarService {
       created_uid: inventar.created_uid || uid,
       created_jobid: inventar.created_jobid || jobid
     };
-    const log = { log: true }
+    const log = { log: true };
 
     const id = await this.dexie.inventar.add( { ...item, ...log});
     item.ivid = id;
@@ -128,7 +129,7 @@ export class InventarService {
     const jobid = useJobid || this.baseData.getCurrentJobid();
     const uid = this.baseData.getCurrentUid();
     const devid = this.baseData.getCurrentDeviceId();
-    const log = { log: true }
+    const log = { log: true };
 
     console.log('InventoryEditorService.assignInventarToRaum', {
       ivid,

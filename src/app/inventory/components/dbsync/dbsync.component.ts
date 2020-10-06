@@ -1,10 +1,9 @@
 import {Component, OnDestroy, OnInit} from '@angular/core';
 import {DBSyncClientService, SyncJobResult, SyncJobStatus} from '../../../dbsync-client.service';
 import {BasedataService} from '../../../basedata.service';
-import {DBDIInventuren, DBDIUsers} from '../../../dexie.service';
+import {DBDIInventuren} from '../../../dexie.interfaces';
 import {faSync, faSyncAlt} from '@fortawesome/free-solid-svg-icons';
 import {DataService} from '../../service/data.service';
-import {VariablesService} from '../../service/variables.service';
 import {ConnectionService} from '../../../connection-service.service';
 import {Subscription} from 'rxjs';
 import {
@@ -14,6 +13,7 @@ import {
   SyncMessage,
   SyncError
 } from '../../../dbsync-log.service';
+import {User} from '../../../auth/user.model';
 
 interface TotalSyncProgressPct extends TotalSyncProgress {
   percent: number;
@@ -43,7 +43,7 @@ export class DbsyncComponent implements OnInit, OnDestroy {
   syncDurFormatted?: string;
   syncAutoRun?: boolean;
   currInventur?: DBDIInventuren;
-  currUser?: DBDIUsers;
+  currUser?: User;
   deviceId?: number;
   clientRevisionId?: number;
   serverRevisionId?: number;
@@ -139,7 +139,7 @@ export class DbsyncComponent implements OnInit, OnDestroy {
       });
 
     this.subscriptionNetworkService = this.networkService.monitor().subscribe( () => {
-      if (this.networkService.hasInternetAccess) {
+      if (this.networkService.hasServerAccess) {
         this.refreshStatusInfos();
       }
     });
@@ -207,9 +207,11 @@ export class DbsyncComponent implements OnInit, OnDestroy {
         this.numServerChanges = infos.NumChanges;
       }
     });
+
     this.dbsyncClient.getCurrentClientRevId().then( (revid) => {
       this.clientRevisionId = revid;
     });
+
     this.syncAutoRun = this.dbsyncClient.autoSyncIsRunning();
   }
 

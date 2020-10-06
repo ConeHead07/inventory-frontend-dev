@@ -4,9 +4,8 @@ import { debounceTime, distinctUntilChanged, map, filter} from 'rxjs/operators';
 import { DataService } from '../../../inventory/service/data.service';
 import { faPlus, faSearch, faSignOutAlt } from '@fortawesome/free-solid-svg-icons';
 
-import { NgbModal, ModalDismissReasons, NgbActiveModal} from '@ng-bootstrap/ng-bootstrap';
-import { DBDIArtikel } from '../../../dexie.service';
-import { ScannerBarcodeData } from '../scanner/scanner.component';
+import { NgbActiveModal} from '@ng-bootstrap/ng-bootstrap';
+import { DBDIArtikel } from '../../../dexie.interfaces';
 
 interface Artikel extends DBDIArtikel {
   id: number;

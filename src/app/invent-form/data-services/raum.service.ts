@@ -1,10 +1,11 @@
 import {EventEmitter, Injectable} from '@angular/core';
-import {DBDIRaeume, DBDIRaumEditStatus, DexieService} from '../../dexie.service';
+import {DBDIRaeume, DBDIRaumEditStatus} from '../../dexie.interfaces';
+import { DexieService } from '../../dexie.service';
 import {Guid} from 'guid-typescript';
 import {AuthService} from '../../auth/auth.service';
 import {DbInsertResult, DbUpdateResult} from './data-interfaces';
 import {throwError} from 'rxjs';
-import {BasedataService} from "../../basedata.service";
+import {BasedataService} from '../../basedata.service';
 
 export interface RaumBasisDaten {
   gid?: number;

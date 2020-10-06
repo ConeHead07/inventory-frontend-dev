@@ -2,7 +2,8 @@ import { Component, OnInit } from '@angular/core';
 import {VariablesService} from '../../service/variables.service';
 import {BasedataService} from '../../../basedata.service';
 import {BarcodeService} from '../../../invent-form/data-services/barcode.service';
-import {DBDIVariables, DexieService} from '../../../dexie.service';
+import {DBDIVariables} from '../../../dexie.interfaces';
+import {DexieService} from '../../../dexie.service';
 import {SoundsService} from '../../../sounds.service';
 
 @Component({

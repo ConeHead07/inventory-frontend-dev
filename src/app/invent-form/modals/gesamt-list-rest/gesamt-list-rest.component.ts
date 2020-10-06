@@ -2,7 +2,7 @@ import {Component, EventEmitter, OnInit, Output} from '@angular/core';
 import {NgbActiveModal} from '@ng-bootstrap/ng-bootstrap';
 import {BasedataService} from '../../../basedata.service';
 import {RaumService, RaumStatusProgress} from '../../data-services/raum.service';
-import {DBDIGebaeude} from '../../../dexie.service';
+import {DBDIGebaeude} from '../../../dexie.interfaces';
 
 @Component({
   selector: 'app-gesamt-list-rest',

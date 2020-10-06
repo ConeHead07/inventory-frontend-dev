@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
-import {DBDIHersteller, DexieService} from '../../dexie.service';
+import {DBDIHersteller} from '../../dexie.interfaces';
+import {DexieService} from '../../dexie.service';
 import {BasedataService} from '../../basedata.service';
 
 export interface HerstellerWithId {

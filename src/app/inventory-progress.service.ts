@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
-import {DBDIInventar, DBDIRaeume, DexieService} from './dexie.service';
+import {DBDIInventar, DBDIRaeume} from './dexie.interfaces';
+import { DexieService } from './dexie.service';
 import {BasedataService} from './basedata.service';
-import {IndexableType} from 'dexie';
 
 export interface InventoryProgress {
   total: number;

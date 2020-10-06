@@ -11,9 +11,18 @@
             [selected]="currentDevice && device.deviceId === currentDevice.deviceId">{{device.label}}</option>
   </select>
   <div class="scanner-view-port">
-    <zxing-scanner [style.height]="'5rem'" [torch]="torchEnabled" [(device)]="currentDevice" (scanSuccess)="onCodeResult($event)"
-                   [formats]="formatsEnabled" [tryHarder]="tryHarder" (permissionResponse)="onHasPermission($event)"
-                   (camerasFound)="onCamerasFound($event)" (torchCompatible)="onTorchCompatible($event)">
+    <zxing-scanner
+      #scanner
+      [style.height]="'5rem'"
+
+      [torch]="torchEnabled"
+      [(device)]="currentDevice"
+      (scanSuccess)="onCodeResult($event)"
+      [formats]="formatsEnabled"
+      [tryHarder]="tryHarder"
+      (permissionResponse)="onHasPermission($event)"
+      (camerasFound)="onCamerasFound($event)"
+      (torchCompatible)="onTorchCompatible($event)">
     </zxing-scanner>
     <div *ngIf="currentDevice" id="ScannerFocusRedLine"></div>
   </div>

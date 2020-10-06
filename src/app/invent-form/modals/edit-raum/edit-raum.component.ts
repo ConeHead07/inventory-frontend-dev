@@ -1,11 +1,11 @@
 import { Component, EventEmitter, OnInit, Output } from '@angular/core';
 
 import { ModalDismissReasons, NgbActiveModal} from '@ng-bootstrap/ng-bootstrap';
-import { faSearch, faCamera, faSignOutAlt } from '@fortawesome/free-solid-svg-icons';
-import { DBDIRaeume} from '../../../dexie.service';
+import { faCamera } from '@fortawesome/free-solid-svg-icons';
+import { DBDIRaeume} from '../../../dexie.interfaces';
 import { RaumService, RaumBasisDaten } from '../../data-services/raum.service';
-import {Observable} from "rxjs";
-import {debounceTime, distinctUntilChanged, filter, map} from "rxjs/operators";
+import {Observable} from 'rxjs';
+import {debounceTime, distinctUntilChanged, filter, map} from 'rxjs/operators';
 
 @Component({
   selector: 'app-edit-raum',
@@ -14,9 +14,9 @@ import {debounceTime, distinctUntilChanged, filter, map} from "rxjs/operators";
 })
 export class EditRaumComponent implements OnInit {
   closeResult: string;
-  faSearch = faSearch;
+  // faSearch = faSearch;
   faCamera = faCamera;
-  faSignOutAlt = faSignOutAlt;
+  // faSignOutAlt = faSignOutAlt;
 
   raumExistsStatus = -1;
   bezeichnungExistsStatus = -1;

@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
-import {DBDIImages, DBDIInventar, DexieService} from '../../dexie.service';
+import {DBDIImages } from '../../dexie.interfaces';
+import { DexieService } from '../../dexie.service';
 import {Guid} from 'guid-typescript';
 import {BasedataService} from '../../basedata.service';
 

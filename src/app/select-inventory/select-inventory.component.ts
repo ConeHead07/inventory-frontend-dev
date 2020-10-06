@@ -3,16 +3,14 @@ import { DataService   } from '../inventory/service/data.service';
 import {EventService} from '../event.service';
 import {NgForm} from '@angular/forms';
 import {ActivatedRoute, Router} from '@angular/router';
-import {DBDIGebaeude, DBDIInventuren, DBDIMandanten, DBDIRaeume} from '../dexie.service';
+import {DBDIGebaeude, DBDIInventuren, DBDIMandanten, DBDIRaeume} from '../dexie.interfaces';
 import {AuthService} from '../auth/auth.service';
 import {BasedataService} from '../basedata.service';
 import {InventoryProgress, InventoryProgressService} from '../inventory-progress.service';
 import { faSyncAlt } from '@fortawesome/free-solid-svg-icons';
-import {ConnectionService as NgConnectionService } from 'ng-connection-service';
 import {ConnectionService, ConnectionState} from '../connection-service.service';
-import {last} from 'rxjs/operators';
-import {Subscription} from "rxjs";
-import {DbsyncLogService, LoadingMetaData, LoadingMetaMessage} from "../dbsync-log.service";
+import {Subscription} from 'rxjs';
+import {DbsyncLogService, LoadingMetaData, LoadingMetaMessage} from '../dbsync-log.service';
 
 enum StatusLoadingInventories {
   None,
@@ -55,7 +53,6 @@ export class SelectInventoryComponent implements OnInit, OnDestroy {
   selectForm: NgForm;
 
   faSyncIcon = faSyncAlt;
-  ngHasConnection = false;
   hasConnection = false;
   hasServerConnection = false;
 
@@ -82,7 +79,6 @@ export class SelectInventoryComponent implements OnInit, OnDestroy {
   lastBuilding: DBDIGebaeude;
   lastRaum: DBDIRaeume;
   lastInventoryDetails: LastInventoryDetails;
-  private ngConnenctionSubscription: Subscription;
   private connectionSubscription: Subscription;
 
   subscriptionMetaMsg: Subscription;
@@ -103,7 +99,6 @@ export class SelectInventoryComponent implements OnInit, OnDestroy {
     private baseData: BasedataService,
     private progressService: InventoryProgressService,
     private connection: ConnectionService,
-    private ngConnection: NgConnectionService,
     private dbsyncLogService: DbsyncLogService) {
   }
 
@@ -129,16 +124,12 @@ export class SelectInventoryComponent implements OnInit, OnDestroy {
       console.log({params});
     });
 
-    this.ngConnenctionSubscription = this.ngConnection.monitor().subscribe( (hasConn: boolean) => {
-      this.ngHasConnection = hasConn;
-    });
-
-    this.hasConnection = this.connection.hasInternetAccess;
-    this.hasServerConnection = this.connection.hasInternetAccess;
+    this.hasConnection = this.connection.hasServerAccess;
+    this.hasServerConnection = this.connection.hasServerAccess;
 
     this.connectionSubscription = this.connection.monitor().subscribe( (conn: ConnectionState) => {
       this.hasConnection = conn.hasNetworkConnection;
-      this.hasServerConnection = conn.hasInternetAccess;
+      this.hasServerConnection = conn.hasServerAccess;
 
       if (this.statusLoadingUserInventories < StatusLoadingInventories.FinishedSuccessful) {
         this.checkLoadUserInventories();
@@ -175,6 +166,17 @@ export class SelectInventoryComponent implements OnInit, OnDestroy {
         message: data.message
       });
     });
+
+    if (!this.connection.hasNetworkConnection) {
+      this.loadUserInventories().then( (success) => {
+        this.statusLoadingUserInventories = success
+          ? StatusLoadingInventories.FinishedSuccessful
+          : StatusLoadingInventories.Failure;
+      }).catch( (err) => {
+        this.statusLoadingUserInventories = StatusLoadingInventories.Failure;
+        this.status = JSON.stringify( err );
+      });
+    }
   }
 
   closeMsg(msg: any) {
@@ -226,7 +228,7 @@ export class SelectInventoryComponent implements OnInit, OnDestroy {
     this.router.navigate( routeData );
   }
 
-  public checkLoadUserInventories() {
+  public checkLoadUserInventories(onlineOnly = true) {
     const stat = this.statusLoadingUserInventories;
     if (stat < StatusLoadingInventories.FinishedSuccessful) {
       if (stat < StatusLoadingInventories.Pending) {
@@ -372,7 +374,6 @@ export class SelectInventoryComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     this.routingSubscription.unsubscribe();
-    this.ngConnenctionSubscription.unsubscribe();
     this.connectionSubscription.unsubscribe();
 
     this.subscriptionMetaMsg.unsubscribe();

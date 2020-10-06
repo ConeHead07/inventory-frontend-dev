@@ -1,15 +1,13 @@
 import { Injectable } from '@angular/core';
 import {DbInsertResult, DbUpdateResult} from './data-interfaces';
 import {
-  DBDIArtikel, DBDIHersteller, DBDIImages, DBDIInventar,
+  DBDIArtikel, DBDIHersteller, DBDIInventar,
   DBDIObjektKatalogGlobal,
-  DBDIObjektKatalogMandant, DBDIRaeume,
-  DBDIRaumEditStatus,
-  DexieService
-} from '../../dexie.service';
+  DBDIObjektKatalogMandant
+} from '../../dexie.interfaces';
+import { DexieService } from '../../dexie.service';
 import {AuthService} from '../../auth/auth.service';
 import {Guid} from 'guid-typescript';
-import {DBInsertRaumResult, DBUpdateRaumResult, RaumBasisDaten} from './raum.service';
 import Dexie from 'dexie';
 import {throwError} from 'rxjs';
 import {
@@ -139,8 +137,7 @@ export class ArtikelService {
     const jobid = this.baseData.getCurrentJobid();
     const deviceid = this.baseData.getCurrentDeviceId();
     const uuid = Guid.create().toString();
-    const log = { log: true }
-
+    const log = { log: true };
 
     if (daten.hid && !daten.huuid) {
       const hst = await hersteller.get(daten.hid);
@@ -215,7 +212,7 @@ export class ArtikelService {
     const uuid = Guid.create().toString();
     const defaultMid = this.baseData.getCurrentMid();
     const devID = this.baseData.getCurrentDeviceId();
-    const log = { log: true }
+    const log = { log: true };
 
     if (!daten.gcid && !daten.gcuuid) {
       const artikelData = await this.insertArtikelData({ ...daten, ...log});

@@ -1,4 +1,3 @@
-import {WordArray} from 'crypto-js';
 
 export class User {
   constructor(
@@ -6,7 +5,7 @@ export class User {
     public id: number,
     private uToken: string,
     private uTokenExpirationDate: Date,
-    public pwHash?: WordArray
+    public pwHash?: string
   ) {}
 
   get token(): string | null {

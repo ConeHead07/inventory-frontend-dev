@@ -32,7 +32,7 @@ import {
   IUnionLookupAssignedObject,
   LookupResultTable,
   LookupResultType
-} from '../dexie.service';
+} from '../dexie.interfaces';
 import {SelectSearchRaumComponent} from './modals/select-search-raum/select-search-raum.component';
 import {BasedataService} from '../basedata.service';
 import {InventoryEditorService} from '../inventory-editor.service';
@@ -44,8 +44,8 @@ import {GesamtListRestComponent} from './modals/gesamt-list-rest/gesamt-list-res
 import {GesamtListDoneComponent} from './modals/gesamt-list-done/gesamt-list-done.component';
 import {SoundsService} from '../sounds.service';
 import { ToastrService } from 'ngx-toastr';
-import {Subscription} from "rxjs";
-import {EditRaumComponent} from "./modals/edit-raum/edit-raum.component";
+import {Subscription} from 'rxjs';
+import {EditRaumComponent} from './modals/edit-raum/edit-raum.component';
 
 interface ScannerConfiguration {
   minLength?: number; // 7
@@ -158,6 +158,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
     Typ: '',
   };
 
+  public jobid: number;
   public kunde?: DBDIMandanten;
   public gebaeude?: DBDIGebaeude;
   public raum?: DBDIRaeume;
@@ -175,6 +176,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
   public lastScanDetectClass = '';
   private lastScanDetectTimer = null;
   waitingForNewInventarBarcode = false;
+  waitingForInventarData = false;
   private openedCreateRaum = false;
   artikelImageExists = false;
 
@@ -282,6 +284,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
       console.log({params, kunde: this.kunde, gebaeude: this.gebaeude });
       this.refreshInventoryProgress();
     });
+    this.jobid = this.baseData.getCurrentJobid();
   }
 
   loadRaumById( roomID: number) {
@@ -318,7 +321,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
     this.formInventar.Barcode = '';
     this.formInventar.Bezeichnung = '';
     this.formInventar.Typ = '';
-    this.artikelImageExists = false;5
+    this.artikelImageExists = false;
   }
 
   clearFormRaum() {
@@ -412,12 +415,24 @@ export class InventFormComponent implements OnInit, OnDestroy {
     this.formInventar.gcuuid = artikel.uuid;
     this.formInventar.Bezeichnung = artikel.Bezeichnung;
     this.formInventar.Typ = artikel.Typ;
-    this.formInventar.Barcode = '';
     this.formInventar.ivid = null;
+
+    if (!this.waitingForInventarData && this.formInventar.Barcode.length > 1) {
+      this.formInventar.Barcode = '';
+    } else {
+      this.waitingForNewInventarBarcode = true;
+    }
 
     const tmp = {...this.formInventar};
     this.formInventar = {...tmp};
-    this.waitingForNewInventarBarcode = true;
+
+    if (this.waitingForInventarData) {
+      this.saveNewInventar();
+      this.playSuccess();
+      this.waitingForInventarData = false;
+      this.toastr.success('Neues Inventar-Objekt wurde hinzugefügt!');
+    }
+
     console.log('#351 loadArtikelByData', { waitingForNewInventarBarcode: this.waitingForNewInventarBarcode });
     console.log('Applied argument artikel', artikel, ' to formInventar', this.formInventar);
     this.reloadImageExistsStatus();
@@ -518,6 +533,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
         target: inputElm
       };
       modalRef.close();
+      console.log('scan', { data, scan });
       this.handleScanData( scan );
     });
   }
@@ -803,33 +819,9 @@ export class InventFormComponent implements OnInit, OnDestroy {
     }
 
     console.log('Start Barcode-Lookup');
-    bclResult.result = await this.dataService.bcLookup(barcode, this.kunde.mid)
+    bclResult.result = await this.dataService.bcLookup(barcode, this.kunde.mid);
 
     return bclResult;
-
-    // switch (result.type) {
-    //   case LookupResultType.Inventar:
-    //     bclResult.result = {
-    //       type: LookupResultType.Inventar,
-    //       inventar: result.inventar,
-    //       artikelRef: result.artikelRef,
-    //       artikelData: result.artikelData
-    //     };
-    //     break;
-    //
-    //   case LookupResultType.Raum:
-    //     bclResult.result = {
-    //       type: LookupResultType.Raum,
-    //       raum: result.raum,
-    //       gebaeude: result.gebaeude
-    //     };
-    //     break;
-    //
-    //   default:
-    //   // Nothing
-    // }
-    //
-    // return bclResult;
 
   }
 
@@ -837,7 +829,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
 
   async handleScanData(event: ScanDetectData) {
     console.log('#738 handleScanData', { waitingForNewInventarBarcode: this.waitingForNewInventarBarcode, event });
-    const bcResult = await this.bcLookup.fullLookup(event.barcode);
+    const bcResult = await this.bcLookup.fullLookup(event.barcode, this.jobid);
     console.log('#740 handleScanData', { waitingForNewInventarBarcode: this.waitingForNewInventarBarcode });
     const barcode = event.barcode;
     let expectedBarcodeType = this.waitingForNewInventarBarcode ? LookupResultType.Inventar : null;
@@ -875,8 +867,10 @@ export class InventFormComponent implements OnInit, OnDestroy {
           '<br>' + barcode,
           'Ungültiger Barcode für Raum-Neu-Erfassung:'
         );
-        if (0) alert('Ungültiger Barcode für Raum-Neu-Erfassung! ' +
-          'Gebe einen gülten Barcode ein oder schließe den Dialog "Neuen Raum anlegen"!');
+        if (0) {
+          alert('Ungültiger Barcode für Raum-Neu-Erfassung! ' +
+            'Gebe einen gülten Barcode ein oder schließe den Dialog "Neuen Raum anlegen"!');
+        }
         return false;
       }
     }
@@ -894,8 +888,10 @@ export class InventFormComponent implements OnInit, OnDestroy {
           '<br>' + barcode,
           'Ungültiger Barcode für Raum-Aktualisierung:'
         );
-        if (0) alert('Ungültiger Barcode für Raum-Neu-Erfassung! ' +
-          'Gebe einen gülten Barcode ein oder schließe den Dialog "Neuen Raum anlegen"!');
+        if (0) {
+          alert('Ungültiger Barcode für Raum-Neu-Erfassung! ' +
+            'Gebe einen gülten Barcode ein oder schließe den Dialog "Neuen Raum anlegen"!');
+        }
         return false;
       }
     }
@@ -924,8 +920,12 @@ export class InventFormComponent implements OnInit, OnDestroy {
     switch (bcResult.lookupResultTable) {
       case LookupResultTable.None:
         console.log('#800 handleScanData LookupResultTable.None');
-        this.playError();
-        if (0) alert('Barcode wurde nicht erkannt');
+        this.formInventar.Barcode = bcResult.barcode;
+        this.waitingForInventarData = true;
+
+        this.playError().then( () => {
+          this.openSelectSearchArtikel();
+        });
 
         this.toastr.error(
           'Barcode wurde nicht erkannt<br>' + barcode,
@@ -947,10 +947,12 @@ export class InventFormComponent implements OnInit, OnDestroy {
             'Der gescannte Raum-Barcode ist einem anderen Standort zugewiesen: ' + gebName,
             'Fehler: Raum kann nicht geladen werden!'
           );
-          if (0) alert('Fehler: Raum kann nicht geladen werden\n' +
-            'Der gescannte Raum-Barcode ist einem anderen Standort zugewiesen:\n' +
-            gebName
-          );
+          if (0) {
+            alert('Fehler: Raum kann nicht geladen werden\n' +
+              'Der gescannte Raum-Barcode ist einem anderen Standort zugewiesen:\n' +
+              gebName
+            );
+          }
         }
         break;
 
@@ -976,35 +978,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
       default:
         this.playError();
         this.toastr.error('Ungültiger oder nicht richtig erkannter Barcode!');
-        if (0) alert('Ungültiger oder nicht richtig erkannter Barcode!');
     }
-
-    // OLD-Part, dessen Lokik mit neuem BC-Lookup übernommen werden muss
-    if (0) this.barcodeLookup(barcode).then( (bclResult: BCLookupResult) => {
-
-      switch (bclResult.result.type) {
-        case LookupResultType.ObjektBuchRaum:
-        case LookupResultType.Raum:
-          this.loadRaumByData( bclResult.result.raum );
-          return true;
-
-        case LookupResultType.ObjektBuchArtikel:
-          this.loadArtikelByData({
-            ...bclResult.result.artikelRef,
-            ...bclResult.result.artikelData
-          });
-          return true;
-
-        case LookupResultType.Inventar:
-          this.assignInventarToRaum( bclResult.result );
-          return true;
-
-        default:
-          alert('Ungültiger oder nicht richtig erkannter Barcode!');
-      }
-    }).catch( (err) => {
-      console.error(err);
-    });
   }
 
   displayScannedBarcode(barcode: string) {
@@ -1053,7 +1027,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
     this.sounds.playSuccess();
   }
 
-  async playError() {
+  async playError(): Promise<void> {
     this.showBlobAlertError();
     this.sounds.playError();
   }

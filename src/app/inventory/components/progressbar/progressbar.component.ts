@@ -45,7 +45,7 @@ export class ProgressbarComponent implements OnInit {
   }
 
   get donePercentText(): string {
-    return !this.total || this.total === 100 ? '' : ' (' + this.progressAmount + '%)';
+    return !this.total || this.total === 100 ? '' : '' + this.progressAmount + ' %';
   }
 
   get totalText(): string {
@@ -57,15 +57,15 @@ export class ProgressbarComponent implements OnInit {
       ? '??'
       : (this.total - this.value) + ' Stk' + (!this.total || this.total === 100
         ? ''
-        : ' (' + this.progressRest + '%)'));
+        : ' (' + this.progressRest + ' %)'));
   }
 
   get restAmountText(): string {
-    return this.total ? '' + Math.max(0, this.total - this.value) + 'Stk' : '';
+    return this.total ? '' + Math.max(0, this.total - this.value) + ' Stk' : '';
   }
 
   get restPercentText(): string {
-    return this.total ? '' + this.progressRest + '%' : '';
+    return this.total ? '' + this.progressRest + ' %' : '';
   }
 
   constructor() { }

@@ -37,9 +37,6 @@ import { AngularCropperjsModule } from 'angular-cropperjs';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { ToastrModule } from 'ngx-toastr';
 
-// Scanner-Detection
-import { ScannerDetectionModule } from 'ngx-scanner-detection';
-
 // the scanner
 import { ZXingScannerModule } from '@zxing/ngx-scanner';
 import { ScannerComponent } from './invent-form/modals/scanner/scanner.component';

@@ -1,11 +1,3 @@
-import {DBDIRaeume} from '../../dexie.service';
-
-export interface RaumBasisDaten {
-  gid?: number;
-  Raum?: string;
-  Raumbezeichnung?: string;
-  Etage?: string;
-}
 
 export interface DbTransactionResult {
   success: boolean;

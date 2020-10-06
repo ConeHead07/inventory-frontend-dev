@@ -1,7 +1,7 @@
 import {Component, EventEmitter, OnInit, Output, ViewChild} from '@angular/core';
 import { ModalDismissReasons, NgbActiveModal, NgbTypeahead} from '@ng-bootstrap/ng-bootstrap';
 import { faSearch, faSignOutAlt } from '@fortawesome/free-solid-svg-icons';
-import {DBDIArtikel, DBDIHersteller } from '../../../dexie.service';
+import {DBDIArtikel, DBDIHersteller } from '../../../dexie.interfaces';
 import {
   ArtikelService,
   ArtikelBasisDaten,
@@ -163,7 +163,7 @@ export class SelectCreateArtikelComponent implements OnInit {
     this.artikelService.getGroupedArtikelGruppenKategorien().then( (list) => {
       gruppenKategorien.length = 0;
       list.forEach( itm => gruppenKategorien.push(itm));
-    })
+    });
 
     this.artikelService.getGroupedArtikelGruppen().then( list => {
       list.forEach( (it) => artikelGruppen.push( it ) );
@@ -374,7 +374,7 @@ export class SelectCreateArtikelComponent implements OnInit {
     this.artikelSelected.emit({
       id: item.mcid,
       mcid: item.mcid,
-      mcuuid:item.mcuuid,
+      mcuuid: item.mcuuid,
       name: item.Bezeichnung
     } as ArtikelOption);
     return;

@@ -11,7 +11,6 @@ import {
   DBDIObjektKatalogMandant,
   DBDIRaeume,
   DBDIRaumGebaeude,
-  DexieService,
   IUnionLookupAssignedObject,
   LookupAssignedInventar,
   LookupAssignedObjektbuchArtikel,
@@ -19,12 +18,10 @@ import {
   LookupNoMatches,
   LookupResult,
   LookupResultType
-} from '../../dexie.service';
-import {User} from '../../auth/user.model';
+} from '../../dexie.interfaces';
+import { DexieService } from '../../dexie.service';
 import {ConnectionService, ConnectionState} from '../../connection-service.service';
-import {throwError} from 'rxjs';
 import {VariablesService} from './variables.service';
-import {last} from 'rxjs/operators';
 import Dexie, {IndexableType } from 'dexie';
 import {DBSyncClientService, SyncJobResult} from '../../dbsync-client.service';
 import {BarcodeService} from '../../invent-form/data-services/barcode.service';
@@ -190,14 +187,13 @@ export class DataService {
     log.info(173, 'getUserAssignedInventories');
     let userInventuren: DBDIInventuren[] = [];
 
-    if (this.currentState.hasInternetAccess) {
+    if (this.currentState.hasServerAccess) {
       log.dbg(177, 'getUserAssignedInventories, call loadUserAssignedInventories');
       await this.loadUserAssignedInventories();
     } else {
       log.err(180,
         'getUserAssignedInventories no InternetAccess. Cannot call loadUserAssignedInventories',
-        { 'this.currentState': this.currentState, 'this.currentState.hasInternetAccess': this.currentState.hasInternetAccess });
-      return null;
+        { 'this.currentState': this.currentState, 'this.currentState.hasInternetAccess': this.currentState.hasServerAccess });
     }
 
     await Promise.all([
@@ -253,6 +249,7 @@ export class DataService {
 
     ])
       .then( async (results) => {
+        //log.dbg(247, { results });
         this.dbSyncLogService.metaMessage({ message: 'Inventuren Meta-Daten wurden heruntergeladen'});
         const authUser = results[0];
         const invUser = results[1];
@@ -260,11 +257,12 @@ export class DataService {
         const gebaeudeRslt = results[3];
         const inventurenRslt = results[4];
         const invGebaeude = results[5];
-        log.dbg(247, { results });
 
         this.dbSyncLogService.metaMessage({ message: 'Bereinige Inventur-Auswahl'});
         const del = await db.inventurenUser.where('uid').equals(authUser.id).delete();
-        await invUser.map((item: DBDIInventurenUser) => db.inventurenUser.add(item));
+        await invUser.map((item: DBDIInventurenUser) => {
+          return db.inventurenUser.add(item);
+        });
 
         this.dbSyncLogService.metaMessage({ message: 'Bereinige Gebäude-Auswahl'});
         const delG = await db.inventurenGebaeude.where('uid').equals(authUser.id).delete()
@@ -675,7 +673,7 @@ export class DataService {
 
   getFullArtikelData(link: DBDIObjektKatalogMandant, globalData: DBDIObjektKatalogGlobal): DBDIArtikel {
     console.log('#521  data.service');
-    return {...link, ...globalData} as DBDIArtikel;
+    return {...globalData, ...link, ...{mcuuid: link.uuid }} as DBDIArtikel;
   }
 
   getFullRaumData(raum: DBDIRaeume, gebaeude: DBDIGebaeude): DBDIRaumGebaeude {
@@ -685,12 +683,12 @@ export class DataService {
   }
 
   getArtikelRefByGcuuidMid(gcuuid: string, mid: number): Promise<DBDIObjektKatalogMandant> {
-    console.log('#532  data.service');
+    console.log('#532  data.service getArtikelRefByGcuuidMid');
     return this.dexie.objektKatalogMandant.where( { gcuuid, mid } ).first();
   }
 
   public async getArtikelRef(mcid: number): Promise<DBDIObjektKatalogMandant> {
-    console.log('#537  data.service');
+    console.log('#537  data.service getArtikelRef');
     return this.dexie.objektKatalogMandant.get( mcid );
   }
 

@@ -1,7 +1,8 @@
 import { Injectable } from '@angular/core';
-import {DBDIArtikel, DBDIInventar, DBDIRaeume, DexieService} from './dexie.service';
-import {BasedataService} from './basedata.service';
-import {DatabaseChangeType} from 'dexie-observable/api';
+import { DBDIArtikel} from './dexie.interfaces';
+import { DexieService } from './dexie.service';
+import { BasedataService} from './basedata.service';
+import { DatabaseChangeType} from 'dexie-observable/api';
 
 export interface InventoryEditorResultPresets {
   success?: boolean;

@@ -1,5 +1,5 @@
 import {Component, Directive, EventEmitter, OnInit, Output} from '@angular/core';
-import {DBDIInventar, DBDIRaeume} from '../../../dexie.service';
+import {DBDIInventar, DBDIRaeume} from '../../../dexie.interfaces';
 import {InventarService} from '../../data-services/inventar.service';
 import {InventarData} from '../../../inventory/service/data.service';
 import {NgbActiveModal} from '@ng-bootstrap/ng-bootstrap';

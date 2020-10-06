@@ -4,17 +4,16 @@ import { debounceTime, distinctUntilChanged, map, filter} from 'rxjs/operators';
 import { DataService } from '../../../inventory/service/data.service';
 import { faPlus, faSearch, faSearchLocation, faSignOutAlt } from '@fortawesome/free-solid-svg-icons';
 
-import {NgbModal, ModalDismissReasons, NgbActiveModal} from '@ng-bootstrap/ng-bootstrap';
-import {DBDIRaeume, DBDIRaumGebaeude} from '../../../dexie.service';
-import {ScannerBarcodeData} from '../scanner/scanner.component';
-import {BasedataService} from "../../../basedata.service";
+import { NgbActiveModal} from '@ng-bootstrap/ng-bootstrap';
+import { DBDIRaeume} from '../../../dexie.interfaces';
+import { BasedataService} from '../../../basedata.service';
 
 interface Raum extends DBDIRaeume {
   id: number;
   name: string;
 }
 
-let raeume: Raum[];
+const raeume: Raum[] = [];
 interface State {id: number; name: string; }
 
 const states: State[] = [];

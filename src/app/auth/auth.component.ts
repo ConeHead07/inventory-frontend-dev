@@ -1,16 +1,17 @@
-import { Component, OnInit, Input } from '@angular/core';
+import {Component, OnInit, Input, OnDestroy} from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import {AuthResponseData, AuthService} from "./auth.service";
-import {Observable} from "rxjs";
-import {Router} from "@angular/router";
+import {AuthResponseData, AuthService} from './auth.service';
+import {Observable, Subscription} from 'rxjs';
+import {Router} from '@angular/router';
 import {BasedataService} from '../basedata.service';
+import {ConnectionService, ConnectionState} from '../connection-service.service';
 
 @Component({
   selector: 'app-auth',
   templateUrl: './auth.component.html',
   styleUrls: ['./auth.component.scss']
 })
-export class AuthComponent implements OnInit {
+export class AuthComponent implements OnInit, OnDestroy {
   isLoginMode = true;
   isLoading = false;
   error: string = null;
@@ -21,6 +22,11 @@ export class AuthComponent implements OnInit {
   @Input() onlineStatusMessage: string;
   @Input() onlineStatus: string;
 
+  hasConnection = false;
+  hasServerConnection = false;
+
+  connectionSubscription: Subscription;
+
   public form = {
     email: null,
     password: null,
@@ -29,11 +35,23 @@ export class AuthComponent implements OnInit {
   constructor(
     private authService: AuthService,
     private router: Router,
+    private connection: ConnectionService,
     private baseData: BasedataService) {
   }
 
   ngOnInit() {
     this.authService.logout();
+    this.hasConnection = this.connection.hasServerAccess;
+    this.hasServerConnection = this.connection.hasServerAccess;
+
+    this.connectionSubscription = this.connection.monitor().subscribe( (conn: ConnectionState) => {
+      this.hasConnection = conn.hasNetworkConnection;
+      this.hasServerConnection = conn.hasServerAccess;
+    });
+  }
+
+  ngOnDestroy() {
+    this.connectionSubscription.unsubscribe();
   }
 
   onLoginSubmit() {

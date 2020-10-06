@@ -1,5 +1,6 @@
 import {EventEmitter, Injectable} from '@angular/core';
-import {DBDIVariables, DexieService} from '../../dexie.service';
+import {DBDIVariables} from '../../dexie.interfaces';
+import {DexieService} from '../../dexie.service';
 import {BasedataService} from '../../basedata.service';
 import Dexie from 'dexie';
 

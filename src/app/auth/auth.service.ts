@@ -2,12 +2,12 @@ import { Injectable } from '@angular/core';
 import {HttpClient, HttpErrorResponse} from '@angular/common/http';
 import {Router} from '@angular/router';
 import {catchError, tap } from 'rxjs/operators';
-import { throwError } from 'rxjs';
+import {Observable, throwError} from 'rxjs';
 import * as CryptoJS from 'crypto-js';
 
 import { User } from './user.model';
 import {BasedataService} from '../basedata.service';
-import {WordArray} from 'crypto-js';
+import {ConnectionService} from '../connection-service.service';
 
 export interface AuthResponseData {
   kind: string;
@@ -28,7 +28,11 @@ export class AuthService {
 
   private url = ':8040/auth/login/';
 
-  constructor(private http: HttpClient, private router: Router, private baseData: BasedataService) {
+  constructor(
+    private http: HttpClient,
+    private router: Router,
+    private connection: ConnectionService,
+    private baseData: BasedataService) {
     console.log('#29 AuthService.constructor', 'this.url: ', this.url);
     const originDomain = (window && window.location && window.location.origin)
       ? window.location.origin.split(':').slice(0, 2).join(':')
@@ -42,11 +46,39 @@ export class AuthService {
     this.baseData.setCurrentUser( null );
   }
 
-  login(email: string, password: string) {
+  login(email: string, password: string): Observable<any> {
     console.log('#37 AuthService.login', {email, password}, 'this.url: ', this.url);
     const pwSalt = 'Inventory';
     const pwHash = CryptoJS.SHA3( pwSalt + password );
 
+    const pwHashB64 = CryptoJS.enc.Base64.stringify(pwHash);
+    if (!this.connection.hasServerAccess) {
+      const lastUser = this.getUser();
+      let err = 'Es besteht aktuell keine Serververbindung! ';
+      if (lastUser) {
+        if (lastUser.email === email) {
+          if (lastUser.pwHash !== pwHashB64) {
+            err += 'Passwort stimmt nicht mit dem ihrer letzten Anmeldung überein!' + '<br>';
+            err += 'last pwHash: '  + lastUser.pwHash + '<br>';
+            err += 'this pwHash: '  + pwHashB64 + '<br>';
+            err += JSON.stringify(lastUser);
+          } else {
+            return new Observable( (observer) => {
+              observer.next(true);
+              observer.complete();
+            });
+          }
+        } else {
+          err += 'Die Email stimmt nicht mit der letzten Anmeldung überein. ';
+          err += 'Im Offline-Modus kann nur die letzte Sitzung wieder aufgebaut werden!';
+          err += 'Korrigieren Sie ihre Email-Angabe oder versuchen es erneut wenn sie online sind!';
+        }
+      } else {
+        err += 'Und aktuell existieren keine vorherigen Sitzungen, die wieder aufgebaut werden können.';
+        err += 'Versuchen Sie es später noch einmal!';
+      }
+      return throwError( err );
+    }
     return this.http.post<AuthResponseData>(
       this.url,
       {
@@ -66,7 +98,7 @@ export class AuthService {
             resData.access_token,
             +resData.expires_in,
             +resData.clientDeviceId,
-            pwHash
+            pwHashB64
           );
         })
       );
@@ -78,7 +110,7 @@ export class AuthService {
     token: string,
     expiresIn: number,
     clientDeviceId: number,
-    pwHash: WordArray
+    pwHash: string
   ) {
     const expirationDate = new Date(new Date().getTime() + expiresIn * 1000);
     this.user = new User(email, userId, token, expirationDate, pwHash);
@@ -110,8 +142,13 @@ export class AuthService {
 
     const userData = JSON.parse( localStorage.getItem('userData') );
 
-    if (userData && ('email' in userData) && ('id' in userData) && ('uToken' in userData) && ('uTokenExpirationDate' in userData)) {
-      return new User(userData.email, userData.id, userData.uToken, userData.uTokenExpirationDate);
+    if (userData &&
+      ('email' in userData) &&
+      ('id' in userData) &&
+      ('uToken' in userData) &&
+      ('uTokenExpirationDate' in userData) &&
+      ('pwHash' in userData)) {
+      return new User(userData.email, userData.id, userData.uToken, userData.uTokenExpirationDate, userData.pwHash);
     }
 
     return null;
