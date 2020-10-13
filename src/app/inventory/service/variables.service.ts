@@ -94,17 +94,31 @@ export class VariablesService {
       oldVal = await this.get(name);
       action = SettingsChangeAction.Update;
     }
-    if (name === 'jobid-2-revision-id' && value === 0 || oldVal > value) {
-      const err = 'Fehlerhafter Zugriff: Wert von ' + name + ' wurde versucht herunterzusetzen von ' + oldVal + ' auf ' + value;
-      console.error( err );
-      alert( err );
-      return;
+
+    const success = await this.variables.put({name, value})
+      .then(() => {
+        this.checkWatchVar(name, action, value, oldVal);
+        return true;
+      })
+      .catch((err) => false);
+
+    return success;
+  }
+
+  public async setRevId(name: string, value: any, logComment: string = ''): Promise<boolean> {
+    let oldVal;
+    let action = SettingsChangeAction.Insert;
+    if (await this.has(name)) {
+      oldVal = await this.get(name);
+      action = SettingsChangeAction.Update;
+    }
+    if (value === 0 || oldVal > value) {
+      const err = 'Kritischer Zugriff: Wert von ' + name + ' wurde versucht herunterzusetzen von ' + oldVal + ' auf ' + value;
+      console.error( err, { name, value, logComment, oldVal, action } );
+      return false;
     }
     const success = await this.variables.put({name, value})
       .then(() => {
-        if (name === 'jobid-2-revision-id') {
-          console.log('changed variable: ', { name, value, action, oldVal }, logComment);
-        }
         this.checkWatchVar(name, action, value, oldVal);
         return true;
       })

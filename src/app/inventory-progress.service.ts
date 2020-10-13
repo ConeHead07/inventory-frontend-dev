@@ -33,7 +33,7 @@ export class InventoryProgressService {
     };
 
     const ridListTmp = await raeume.where( {gid}).toArray();
-    const ridList = ridListTmp.filter( (rg) => rg.gid === gid).map( (rg) => rg.rid);
+    const ridList = ridListTmp.filter( (rg) => rg.gid === gid && rg.for_jobid === jobid).map( (rg) => rg.rid);
 
     const chunkSize = Math.ceil( ridList.length / 8 );
     const chunks = [];
@@ -43,7 +43,13 @@ export class InventoryProgressService {
 
     return await Promise.all([
       inventar.where( { jobid } ).count(),
-      Promise.all( chunks.map( async (ridChunkList) => inventar.where( 'rid' ).anyOf( ridChunkList ).count() ))
+      Promise.all(
+          chunks.map( async (ridChunkList) => inventar
+              .where( 'rid' ).anyOf( ridChunkList )
+              .and((inv) => inv.for_jobid === jobid)
+              .count()
+          )
+      )
     ]).then( (chunksTotalAndProgress) => {
       console.log({chunksTotalAndProgress});
       progress.done = chunksTotalAndProgress[0];

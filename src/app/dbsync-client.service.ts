@@ -312,7 +312,7 @@ export class DBSyncClientService {
     console.log('#298 dbsync-client.service setCurrentClientRevId(newRevId: ', newRevId, ')');
     const jobid = this.baseData.getCurrentJobid();
     const lastRevIdVar = `jobid-${jobid}-revision-id`;
-    return await this.settings.set( lastRevIdVar, newRevId);
+    return await this.settings.setRevId( lastRevIdVar, newRevId, 'dbsync-client.service.ts setCurrentClientRevId');
   }
 
   async askServerForChanges(jobid: number = 0): Promise<ServerChangesStatusInfo> {
@@ -599,7 +599,7 @@ export class DBSyncClientService {
               lastRevId = currRevId;
               console.log('511 ' + ci + '/' + chgLen +
                 ' dbsync-client.service await this.settings.set(', lastRevIdVar, chg.revision_id, ')');
-              await this.settings.set(lastRevIdVar, chg.revision_id, 'LogRow ' + ci + '/' + chgLen + '; RevId ' + currRevId);
+              await this.settings.setRevId(lastRevIdVar, chg.revision_id, 'LogRow ' + ci + '/' + chgLen + '; RevId ' + currRevId);
 
               if (executed === total || executed % 100 === 0) {
                 for (const logData of Object.values(tableLogs)) {

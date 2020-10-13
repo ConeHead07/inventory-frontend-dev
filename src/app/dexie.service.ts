@@ -17,6 +17,7 @@ import {
   DBDIObjektKatalogGlobal, DBDIObjektKatalogMandant, DBDIRaeume, DBDIUploads, DBDIUsers, DBDIVariables
 } from './dexie.interfaces';
 
+const database = 'merTensIventory';
 // Dexie.addons.push( dexieRelationships );
 Dexie.addons.push( relationships );
 
@@ -50,10 +51,26 @@ export class DexieService extends Dexie {
   stopClientLogForServerLoad = false;
 
   constructor(private syncClient: DexieSyncClientService, private baseData: BasedataService) {
-    super('merTensIventory'); // , { addons: [ relationships ] });
+    super( database ); // , { addons: [ relationships ] });
+    this.init();
+  }
+
+  async clearDB(): Promise<boolean> {
+    console.log('clear db');
+    return Promise.all(this.tables.map( (t) => t.clear() ))
+      .then( () => {
+        console.log('clear db finished');
+        return true;
+      }).catch( (r) => {
+        console.error(r);
+        return false;
+      });
+  }
+
+  init() {
     Dexie.Syncable.registerSyncProtocol('inventorySync', this.syncClient );
 
-    const DXVersion = this.version(11).stores({
+    this.version(11).stores({
       clientChangeLog:
        '++id,table,type,key,uuid,jobid,sync_done',
       devices:

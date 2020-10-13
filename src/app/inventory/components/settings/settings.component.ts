@@ -32,7 +32,7 @@ export class SettingsComponent implements OnInit {
   }
 
   async dbClear() {
-    this.dexieService.delete();
+    await this.dexieService.clearDB();
     this.baseData.setCurrentInventur(null);
     this.baseData.setCurrentRaum(null);
     this.baseData.setCurrentGebaeude(null);

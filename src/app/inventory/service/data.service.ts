@@ -461,14 +461,15 @@ export class DataService {
       ]);
       syncLogMsg( 'Reset: Daten wurden zurückgesetzt!');
       console.log('#373 After cleanup');
+      const resetCmt = 'data.service.tx loadInventurDataByInventurId() reset';
       await Promise.all([
-        this.settingsService.set('jobid-' + jobid + '-revision-id', 0),
-        this.settingsService.set('inventar-' + jobid + '-revision-id', 0),
-        this.settingsService.set('raeume-' + jobid + '-revision-id', 0),
-        this.settingsService.set('images-' + jobid + '-revision-id', 0),
-        this.settingsService.set('hersteller-' + jobid + '-revision-id', 0),
-        this.settingsService.set('objektKatalogGlobal-' + jobid + '-revision-id', 0),
-        this.settingsService.set('objektKatalogMandant-' + jobid + '-revision-id', 0)
+        this.settingsService.set('jobid-' + jobid + '-revision-id', 0, resetCmt),
+        this.settingsService.set('inventar-' + jobid + '-revision-id', 0, resetCmt),
+        this.settingsService.set('raeume-' + jobid + '-revision-id', 0, resetCmt),
+        this.settingsService.set('images-' + jobid + '-revision-id', 0, resetCmt),
+        this.settingsService.set('hersteller-' + jobid + '-revision-id', 0, resetCmt),
+        this.settingsService.set('objektKatalogGlobal-' + jobid + '-revision-id', 0, resetCmt),
+        this.settingsService.set('objektKatalogMandant-' + jobid + '-revision-id', 0, resetCmt)
       ]);
       syncLogMsg( 'Reset: Revision-Ids wurden zurückgesetzt!');
       console.log('#362 loadInventurDataByInventurId');
@@ -508,7 +509,7 @@ export class DataService {
           return Math.max(carry, item.revisionId);
         }, 0);
 
-        this.settingsService.set('jobid-' + jobid + '-revision-id', maxRevId);
+        this.settingsService.setRevId('jobid-' + jobid + '-revision-id', maxRevId, 'data.service.ts loadInventurDataByInventurId()');
         console.log('#511 data.service.ts loadInventurDataByInventurId() Start rebuild of barcodeLookup Table');
         await this.barcodeLookup.rebuildByJobid(jobid);
         console.log('#513 data.service.ts loadInventurDataByInventurId() finished', 'arguments', arguments);
