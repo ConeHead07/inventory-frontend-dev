@@ -1,10 +1,11 @@
-import { Component, OnInit } from '@angular/core';
+import {Component, EventEmitter, OnInit, Output} from '@angular/core';
 import {VariablesService} from '../../service/variables.service';
 import {BasedataService} from '../../../basedata.service';
 import {BarcodeService} from '../../../invent-form/data-services/barcode.service';
 import {DBDIVariables} from '../../../dexie.interfaces';
 import {DexieService} from '../../../dexie.service';
 import {SoundsService} from '../../../sounds.service';
+import {ScanDetectData} from "../scannerdetection/scannerdetection.component";
 
 @Component({
   selector: 'app-settings',
@@ -14,6 +15,9 @@ import {SoundsService} from '../../../sounds.service';
 export class SettingsComponent implements OnInit {
   variableList: DBDIVariables[] = [];
   buildBcLookup = false;
+  enableManualBCInput: boolean;
+
+  @Output() changedManualBCInput = new EventEmitter<boolean>();
 
   constructor(
     private dexieService: DexieService,
@@ -25,10 +29,20 @@ export class SettingsComponent implements OnInit {
 
   ngOnInit() {
     this.reloadVariableList();
+
+    this.variables.get('manualBarcodeInput', false).then( (val) => {
+      this.enableManualBCInput = !!val;
+    });
   }
 
   async reloadVariableList() {
     this.variableList = await this.variables.getAll();
+  }
+
+  async changeManualBCInput(event) {
+    console.log('changeManualBCInput', { event });
+    this.variables.set('manualBarcodeInput', this.enableManualBCInput);
+    this.changedManualBCInput.emit( this.enableManualBCInput);
   }
 
   async dbClear() {

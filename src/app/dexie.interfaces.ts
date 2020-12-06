@@ -201,6 +201,27 @@ export interface DBDIObjektKatalogMandant extends DBDITableWithBarcode {
   log?: boolean;
 }
 
+export interface DBDIObjektKatalogImages {
+  id?: number;
+  uuid?: string;
+  for_jobid?: number;
+  RefTable: string;
+  RefUuid: string;
+  ImgUuid: string;
+  RefText?: string;
+  Pos: number;
+  Kategorie: string;
+  created_at: Date;
+  created_uid?: number;
+  created_jobid?: string;
+  created_device_id?: number;
+  modified_at?: Date;
+  modified_uid?: number;
+  modified_jobid?: string;
+  modified_device_id?: number;
+}
+
+
 export interface DBDIRaeume extends DBDITableWithBarcode {
   rid?: number;
   gid: number;

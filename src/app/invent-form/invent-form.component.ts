@@ -46,6 +46,7 @@ import {SoundsService} from '../sounds.service';
 import { ToastrService } from 'ngx-toastr';
 import {Subscription} from 'rxjs';
 import {EditRaumComponent} from './modals/edit-raum/edit-raum.component';
+import {VariablesService} from "../inventory/service/variables.service";
 
 interface ScannerConfiguration {
   minLength?: number; // 7
@@ -205,6 +206,8 @@ export class InventFormComponent implements OnInit, OnDestroy {
   private blobAlertFailure = 'danger';
   private blobAlertOff = null;
   private blobAlertTimer = null;
+  private varChangeSubscription: Subscription = null;
+  manualBCInputEnabled: boolean;
   useOverlay = 0;
 
   constructor(
@@ -220,6 +223,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
     private imageService: ImagesService,
     private bcLookup: BarcodeService,
     private sounds: SoundsService,
+    private variables: VariablesService,
     private toastr: ToastrService) {
   }
 
@@ -285,6 +289,17 @@ export class InventFormComponent implements OnInit, OnDestroy {
       this.refreshInventoryProgress();
     });
     this.jobid = this.baseData.getCurrentJobid();
+
+    this.variables.get('manualBarcodeInput', false).then( (status) => {
+      this.manualBCInputEnabled = status;
+    });
+
+    this.variables.watch('manualBarcodeInput');
+    this.varChangeSubscription = this.variables.varChanged.subscribe( (setting) => {
+      if (setting.name === 'manualBarcodeInput') {
+        this.manualBCInputEnabled = setting.newValue;
+      }
+    });
   }
 
   loadRaumById( roomID: number) {

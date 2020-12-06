@@ -7,7 +7,7 @@ import {
   DBDIInventuren, DBDIInventurenGebaeude,
   DBDIInventurenUser,
   DBDIMandanten, DBDIObjektbuchBarcodesLookup,
-  DBDIObjektKatalogGlobal,
+  DBDIObjektKatalogGlobal, DBDIObjektKatalogImages,
   DBDIObjektKatalogMandant,
   DBDIRaeume,
   DBDIRaumGebaeude,
@@ -249,7 +249,6 @@ export class DataService {
 
     ])
       .then( async (results) => {
-        //log.dbg(247, { results });
         this.dbSyncLogService.metaMessage({ message: 'Inventuren Meta-Daten wurden heruntergeladen'});
         const authUser = results[0];
         const invUser = results[1];
@@ -443,20 +442,36 @@ export class DataService {
             syncLogMsg('Finished Reset Images');
             console.log('#365 finished cleanup images');
           }),
-        this.dexie.objektKatalogMandant.where( { for_jobid: jobid}).delete()
+        this.dexie.objektKatalogMandant
+          .where( { for_jobid: jobid}).delete()
           .finally(() => {
-            syncLogMsg('Finished Reset globale Katalogdaten');
+            syncLogMsg('Finished Reset Katalogdaten (Mandant)');
             console.log('#367 finished cleanup okg');
-          }),
-        this.dexie.objektKatalogGlobal.where( { created_jobid: jobid}).delete()
+
+            this.dexie.objektKatalogGlobal
+              .where( { created_jobid: jobid})
+              .each( (itm) => {
+                this.dexie.objektKatalogMandant.where({gcuuid: itm.uuid}).count().then( (num) => {
+                  if (num === 0) {
+                    this.dexie.objektKatalogGlobal.delete(itm.gcid);
+                  }
+                });
+              })
+              .finally(() => {
+                syncLogMsg('Finished Reset Mandanten-Spezifische Katalogdaten (Global)');
+                console.log('#463 finished cleanup okm');
+              });
+          })
+        ,
+        this.dexie.objektKatalogImages.where( { created_jobid: jobid}).delete()
           .finally(() => {
-            syncLogMsg('Finished Reset Mandanten-Spezifische Katalogdaten');
-            console.log('#369 finished cleanup okm');
+            syncLogMsg('Finished Reset Katalog/Raum-Images');
+            console.log('#459 finished cleanup okm');
           }),
         this.dexie.clientChangeLog.where({ jobid }).delete()
           .finally(() => {
             syncLogMsg('Finished Reset Client-Change-Log');
-            console.log('#371 finished cleanup clientchangelog');
+            console.log('#464 finished cleanup clientchangelog');
           })
       ]);
       syncLogMsg( 'Reset: Daten wurden zurückgesetzt!');
@@ -469,7 +484,8 @@ export class DataService {
         this.settingsService.set('images-' + jobid + '-revision-id', 0, resetCmt),
         this.settingsService.set('hersteller-' + jobid + '-revision-id', 0, resetCmt),
         this.settingsService.set('objektKatalogGlobal-' + jobid + '-revision-id', 0, resetCmt),
-        this.settingsService.set('objektKatalogMandant-' + jobid + '-revision-id', 0, resetCmt)
+        this.settingsService.set('objektKatalogMandant-' + jobid + '-revision-id', 0, resetCmt),
+        this.settingsService.set('objektKatalogImages-' + jobid + '-revision-id', 0, resetCmt)
       ]);
       syncLogMsg( 'Reset: Revision-Ids wurden zurückgesetzt!');
       console.log('#362 loadInventurDataByInventurId');
@@ -495,7 +511,10 @@ export class DataService {
           'objektKatalogMandant', `api/inventur/${jobid}/artikelids`, tblStatus, { jobid, reset }),
 
         this.loadTableDataByUrl<DBDIObjektbuchBarcodesLookup>(
-           'objektbuchBarcodesLookup', `api/inventur/${jobid}/objektbuchLookup`, tblStatus, { jobid, reset })
+           'objektbuchBarcodesLookup', `api/inventur/${jobid}/objektbuchLookup`, tblStatus, { jobid, reset }),
+
+        this.loadTableDataByUrl<DBDIObjektKatalogImages>(
+          'objektKatalogImages', `api/inventur/${jobid}/katalogImages`, tblStatus, { jobid, reset })
       ])
       .then( async (results) => {
         const maxRevId = results.reduce( (carry, item) => {

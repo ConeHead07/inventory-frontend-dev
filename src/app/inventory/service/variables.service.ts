@@ -1,4 +1,4 @@
-import {EventEmitter, Injectable} from '@angular/core';
+import {EventEmitter, Injectable, Output} from '@angular/core';
 import {DBDIVariables} from '../../dexie.interfaces';
 import {DexieService} from '../../dexie.service';
 import {BasedataService} from '../../basedata.service';
@@ -22,13 +22,22 @@ export interface SettingsChanged {
   oldSize?: number;
 }
 
+export interface VarChangeInfo<T> {
+  name: string;
+  action: string;
+  varType: string;
+  newValue: T;
+  oldValue: any;
+  oldSize: any;
+}
+
 @Injectable({
   providedIn: 'root'
 })
 export class VariablesService {
   variables?: Dexie.Table<DBDIVariables, any>;
   watchVariables: string[] = [];
-  varChanged = new EventEmitter<SettingsChanged>();
+  @Output() varChanged = new EventEmitter<SettingsChanged>();
 
   constructor(private db: DexieService, private baseData: BasedataService) {
     this.variables = this.db.variables;

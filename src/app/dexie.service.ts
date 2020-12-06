@@ -14,7 +14,8 @@ import {
   DBDIDevices, DBDIGebaeude, DBDIHersteller, DBDIImages,
   DBDIInventar, DBDIInventuren, DBDIInventurenGebaeude, DBDIInventurenUser,
   DBDILieferant, DBDIMandanten, DBDIObjektbuchBarcodesLookup,
-  DBDIObjektKatalogGlobal, DBDIObjektKatalogMandant, DBDIRaeume, DBDIUploads, DBDIUsers, DBDIVariables
+  DBDIObjektKatalogGlobal, DBDIObjektKatalogMandant, DBDIObjektKatalogImages,
+  DBDIRaeume, DBDIUploads, DBDIUsers, DBDIVariables
 } from './dexie.interfaces';
 
 const database = 'merTensIventory';
@@ -38,6 +39,7 @@ export class DexieService extends Dexie {
   mandanten: Dexie.Table<DBDIMandanten, number>;
   objektKatalogGlobal: Dexie.Table<DBDIObjektKatalogGlobal, number>;
   objektKatalogMandant: Dexie.Table<DBDIObjektKatalogMandant, number>;
+  objektKatalogImages: Dexie.Table<DBDIObjektKatalogImages, number>;
   raeume: Dexie.Table<DBDIRaeume, number>;
   images: Dexie.Table<DBDIImages, number>;
   uploads: Dexie.Table<DBDIUploads, number>;
@@ -97,6 +99,8 @@ export class DexieService extends Dexie {
        '++gcid,uuid,code,hid,Bezeichnung,Typ,Gruppe,Kategorie,Farbe,Groesse,created_jobid',
       objektKatalogMandant:
        '++mcid,uuid,gcid,gcuuid,code,mid,for_jobid,created_jobid',
+      objektKatalogImages:
+      '++id,uuid,for_jobid,RefTable,RefUuid,ImgUuid,Kategorie',
       raeume:
        '++rid,gid,[rid+gid],uuid,for_jobid,code,raumid,Raum,Raumbezeichnung,Etage,current_jobid,current_jobstatus',
       uploads:
@@ -108,18 +112,10 @@ export class DexieService extends Dexie {
       variables:
         '&name,value',
       barcodeLookup:
-        '&code,table,for_jobid,[table+for_jobid],updateHelper,[table+updateHelper]'
+        '&[code+for_jobid],table,for_jobid,[table+for_jobid],updateHelper,[table+updateHelper]'
     });
     // Now, add another version, just to trigger an upgrade for Dexie.Observable
     this.version(2).stores({}); // No need to add / remove tables. This is just to allow the addon to install its tables.
-    this.version(3).stores({
-      barcodeLookup:
-        '&[code+for_jobid],table,for_jobid,[table+for_jobid],updateHelper,[table+updateHelper]'
-    }); // No need to add / remove tables. This is just to allow the addon to install its tables.
-    this.version(4).stores({
-      inventurenUser:
-        '&[jobid+uid],jobid,uid'
-    });
 
     const validLogTables = [
       'hersteller',
@@ -127,6 +123,7 @@ export class DexieService extends Dexie {
       'images',
       'objektKatalogGlobal',
       'objektKatalogMandant',
+      'objektKatalogImages',
       'raeume'
     ];
 

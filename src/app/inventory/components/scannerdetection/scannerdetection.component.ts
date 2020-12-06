@@ -121,7 +121,11 @@ export class ScannerdetectionComponent implements OnInit {
       clearTimeout(this.lastTimer);
     }
     this.lastTimer = setTimeout( () => {
-      const barcode = this.input;
+      let input = this.input;
+      if (input.indexOf('ß') !== -1) {
+        input = input.split('ß').join('-');
+      }
+      const barcode = input;
       console.log('#138 scannerDetection Emit After Timeout', { key, barcode });
       this.input = '';
       if (barcode.length >= 5) {
