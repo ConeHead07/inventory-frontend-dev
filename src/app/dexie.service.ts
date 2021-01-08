@@ -15,7 +15,7 @@ import {
   DBDIInventar, DBDIInventuren, DBDIInventurenGebaeude, DBDIInventurenUser,
   DBDILieferant, DBDIMandanten, DBDIObjektbuchBarcodesLookup,
   DBDIObjektKatalogGlobal, DBDIObjektKatalogMandant, DBDIObjektKatalogImages,
-  DBDIRaeume, DBDIUploads, DBDIUsers, DBDIVariables
+  DBDIRaeume, DBDIUploads, DBDIUsers, DBDIVariables, DBDIInventurenUserStatus
 } from './dexie.interfaces';
 
 const database = 'merTensIventory';
@@ -35,6 +35,7 @@ export class DexieService extends Dexie {
   inventuren: Dexie.Table<DBDIInventuren, number>;
   inventurenGebaeude: Dexie.Table<DBDIInventurenGebaeude, [number, number, number]>;
   inventurenUser: Dexie.Table<DBDIInventurenUser, [number, number]>;
+  inventurenUserStatus: Dexie.Table<DBDIInventurenUserStatus, [number, number, number]>;
   lieferant: Dexie.Table<DBDILieferant, number>;
   mandanten: Dexie.Table<DBDIMandanten, number>;
   objektKatalogGlobal: Dexie.Table<DBDIObjektKatalogGlobal, number>;
@@ -44,9 +45,9 @@ export class DexieService extends Dexie {
   images: Dexie.Table<DBDIImages, number>;
   uploads: Dexie.Table<DBDIUploads, number>;
   users: Dexie.Table<DBDIUsers, number>;
-  objektbuchBarcodesLookup: Dexie.Table<DBDIObjektbuchBarcodesLookup, number>;
+  objektbuchBarcodesLookup: Dexie.Table<DBDIObjektbuchBarcodesLookup, string>;
 
-  barcodeLookup: Dexie.Table<DBDIBarcodeLookup, string>;
+  barcodeLookup: Dexie.Table<DBDIBarcodeLookup, [string, number]>;
   variables: Dexie.Table<DBDIVariables, string>;
 
   dbVersion = 1;
@@ -91,6 +92,8 @@ export class DexieService extends Dexie {
         '[jobid+gid+uid],jobid,gid,uid',
       inventurenUser:
         '&[jobid+uid],jobid,uid',
+      inventurenUserStatus:
+        '&[jobid+uid+device_id],jobid,uid,device_id,status,token',
       lieferant:
        '++hid,Lieferant',
       mandanten:
@@ -116,7 +119,10 @@ export class DexieService extends Dexie {
     });
     // Now, add another version, just to trigger an upgrade for Dexie.Observable
     this.version(2).stores({}); // No need to add / remove tables. This is just to allow the addon to install its tables.
-
+    this.version(4).stores({
+      inventurenUserStatus:
+        '&[jobid+uid+device_id],jobid,uid,device_id,status,token'
+    });
     const validLogTables = [
       'hersteller',
       'inventar',
@@ -124,7 +130,8 @@ export class DexieService extends Dexie {
       'objektKatalogGlobal',
       'objektKatalogMandant',
       'objektKatalogImages',
-      'raeume'
+      'raeume',
+      'barcodeLookup'
     ];
 
     this.on( 'changes', (changes, partial) => {
@@ -148,7 +155,12 @@ export class DexieService extends Dexie {
 
   async addChangeLog(change: IDatabaseChange) {
     const log = this.getChangeLogFlag(change);
-    if (log === undefined || !log) {
+    // if (log === undefined || !log) {
+    //   console.log('#152 addChangeLog Skip DB-Change-Logging - No Log-Flag', { change });
+    //   return;
+    // }
+    if (log !== undefined && log !== null && log === false) {
+      console.log('#152 addChangeLog Skip DB-Change-Logging for Server-Sync - Log-Flag === false', { log, change });
       return;
     }
     let uuid = this.getChangeLogUuid(change);
@@ -157,7 +169,7 @@ export class DexieService extends Dexie {
       const obj: any = await this.table( change.table ).get( change.key );
       uuid = ('uuid' in obj) ? obj.uuid : '';
 
-      console.log('Remove LogFlag from Entry ' + change.table + ' with id ' + change.key);
+      console.log('#161 addChangeLog Remove LogFlag from Entry ' + change.table + ' with id ' + change.key);
       delete obj.log;
       await this.table( change.table ).put( obj, change.key);
     }
@@ -181,7 +193,7 @@ export class DexieService extends Dexie {
           delete change.obj.log;
         }
         chlog.obj = change.obj;
-        console.log('#141 dexie.service on changes: An object was created: ', change.table, change.key, { chlog } );
+        console.log('#141  addChangeLog on changes: An object was created: ', change.table, change.key, { chlog } );
         break;
 
       case DatabaseChangeType.Update:
@@ -190,12 +202,17 @@ export class DexieService extends Dexie {
         if ('log' in chlog.mods) {
           delete chlog.mods.log;
         }
-        console.log('#211 dexie.service on changes: An object was updated: ', change.table, change.key, change.mods, { chlog } );
+        const colNames = Object.keys(chlog.mods);
+
+        if (colNames.length === 0 || (colNames.length === 1 && colNames[0].startsWith('modified_'))) {
+          return;
+        }
+        console.log('#211  addChangeLog on changes: An object was updated: ', change.table, change.key, change.mods, { chlog } );
         break;
 
       case DatabaseChangeType.Delete:
         const deleteChange = change as IDeleteChange;
-        console.log('#145 dexie.service on changes: ABORT! We dont log Deletess: ', change.table, change.key, deleteChange);
+        console.log('#145  addChangeLog on changes: ABORT! We dont log Deletess: ', change.table, change.key, deleteChange);
         return;
         break;
     }
@@ -224,15 +241,18 @@ export class DexieService extends Dexie {
     }
 
     if ( (typeof ch.obj === 'object') && ('log' in ch.obj) ) {
-      return !!ch.obj.log;
+      return ch.obj.log;
+      // return !!ch.obj.log;
     }
 
     if ( (typeof ch.mods === 'object') && ('log' in ch.mods)) {
-      return !!ch.mods.log;
+      return ch.mods.log;
+      // return !!ch.mods.log;
     }
 
     if ( (typeof ch.oldObj === 'object') && ('log' in ch.oldObj)) {
-      return !!ch.oldObj.log;
+      return ch.oldObj.log;
+      // return !!ch.oldObj.log;
     }
     return undefined;
   }

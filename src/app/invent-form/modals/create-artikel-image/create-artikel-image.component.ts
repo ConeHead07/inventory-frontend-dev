@@ -9,7 +9,7 @@ import {
   faUndo, faRedo, faTrashAlt, faTrashRestore, faTrashRestoreAlt,
   faCheck, faBan, faSave, faCamera,
   faArrowsAlt, faArrowsAltH, faArrowsAltV,
-  faDownload, faUpload } from '@fortawesome/free-solid-svg-icons';
+  faDownload, faUpload, faSignOutAlt } from '@fortawesome/free-solid-svg-icons';
 
 const infoLogWorkaround = (...args: any[]): void => {
   args.unshift('[INFO]');
@@ -111,7 +111,8 @@ export class CreateArtikelImageComponent implements OnInit {
     this.gcuuid = gcuuid;
     this.inputFile = null;
     if (gcuuid) {
-      this.imageService.getImage(gcuuid)
+      this.imageService
+        .getImage(gcuuid)
           .then( image => {
             this.imageUrl = image.data_url;
             const b: any = this.converterDataURItoBlob(image.data_url);
@@ -276,7 +277,7 @@ export class CreateArtikelImageComponent implements OnInit {
         } else {
           this.imageUrl = this.inputImgData;
         }
-      }
+      };
 
       console.log('Assign DataUrl to img. ', this.inputImgData);
       img.src = this.inputImgData;

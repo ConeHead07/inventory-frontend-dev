@@ -2,6 +2,7 @@ import { Component, Input, OnInit } from '@angular/core';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 import {Subject, Observable} from 'rxjs';
 import {WebcamImage, WebcamInitError, WebcamUtil} from 'ngx-webcam';
+import { faSignOutAlt } from '@fortawesome/free-solid-svg-icons';
 
 const infoLogWorkaround = (...args: any[]): void => {
   args.unshift('[INFO]');
@@ -21,6 +22,8 @@ const infoLog = (...args: any[]) => {
 })
 export class CreateArtikelImageWebcamComponent implements OnInit {
   @Input() name;
+
+  faSignOutAlt = faSignOutAlt;
 
   // toggle webcam on/off
   public showWebcam = true;

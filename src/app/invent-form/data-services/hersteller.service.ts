@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import {DBDIHersteller} from '../../dexie.interfaces';
 import {DexieService} from '../../dexie.service';
 import {BasedataService} from '../../basedata.service';
+import { Guid} from 'guid-typescript';
 
 export interface HerstellerWithId {
   Hersteller: string;
@@ -53,11 +54,20 @@ export class HerstellerService {
   async create(name: string): Promise<number> {
     const jobid = this.baseData.getCurrentJobid();
     const uid = this.baseData.getCurrentUid();
+    const uuid = Guid.create().toString();
+
     return await this.dexie.hersteller.add({
       Hersteller: name,
+      uuid,
+      for_jobid: jobid,
       created_at: new Date(),
       created_uid: uid,
       created_jobid: jobid
     });
+  }
+
+  async createAndGetData(name: string): Promise<DBDIHersteller> {
+    const hid = await this.create(name);
+    return this.dexie.hersteller.get(hid);
   }
 }

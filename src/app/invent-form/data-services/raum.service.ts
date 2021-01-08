@@ -160,6 +160,33 @@ export class RaumService {
 
   public async updateById(rid: number, raum: DBDIRaeume|RaumBasisDaten): Promise<DBUpdateRaumResult> {
     console.log('#143 raum.service.ts updateById:', { rid, raum });
+    const jobid = this.baseDataService.getCurrentJobid();
+    const savedRaumData = await this.dexie.raeume.get(rid);
+    // uuid: "5bd9a47f-4b0b-11eb-8949-0242ac140002"
+
+    if (savedRaumData.code !== raum.code) {
+      const lkupKey = {
+        code: savedRaumData.code,
+        for_jobid: jobid
+      };
+      const bcItem = await this.dexie.barcodeLookup.get(lkupKey);
+      if (bcItem) {
+        await this.dexie.barcodeLookup.update([savedRaumData.code, jobid], {
+          code: raum.code
+        });
+      } else {
+        this.dexie.barcodeLookup.put({
+          code: raum.code,
+          for_jobid: jobid,
+          id: rid,
+          key: 'rid',
+          table: 'raeume',
+          updateHelper: 1,
+          uuid: savedRaumData.uuid
+        });
+      }
+    }
+
     const numChanges = await this.dexie.raeume.update(rid, raum);
     const savedData = await this.dexie.raeume.get(rid);
     return {

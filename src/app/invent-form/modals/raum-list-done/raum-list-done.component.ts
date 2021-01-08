@@ -5,6 +5,8 @@ import {InventarData} from '../../../inventory/service/data.service';
 import {NgbActiveModal} from '@ng-bootstrap/ng-bootstrap';
 import {BasedataService} from '../../../basedata.service';
 
+import { faSignOutAlt } from '@fortawesome/free-solid-svg-icons';
+
 interface RaumInventarDone {
   mcid?: number;
   Bezeichnung?: string;
@@ -20,6 +22,9 @@ interface RaumInventarDone {
 export class RaumListDoneComponent implements OnInit {
 
   @Output() requestRestList = new EventEmitter<DBDIRaeume>();
+
+  faSignOutAlt = faSignOutAlt;
+
   inventarListDone: RaumInventarDone[] = [];
   inventarListGrouped: RaumInventarDone[] = [];
   inventarDetailList: InventarData[] = [];

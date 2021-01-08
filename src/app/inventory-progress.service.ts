@@ -1,5 +1,5 @@
-import { Injectable } from '@angular/core';
-import {DBDIInventar, DBDIRaeume} from './dexie.interfaces';
+import {EventEmitter, Injectable, Output} from '@angular/core';
+import {DBDIInventar, DBDIJobLockStatus, DBDIRaeume} from './dexie.interfaces';
 import { DexieService } from './dexie.service';
 import {BasedataService} from './basedata.service';
 
@@ -12,8 +12,119 @@ export interface InventoryProgress {
   providedIn: 'root'
 })
 export class InventoryProgressService {
+  @Output() inventurLockStatusChanged = new EventEmitter<DBDIJobLockStatus>();
 
   constructor(private dexieService: DexieService, private baseData: BasedataService) { }
+
+  async getCurrentInventurLockStatus(): Promise<DBDIJobLockStatus> {
+    const jobid = this.baseData.getCurrentJobid();
+    const uid = this.baseData.getCurrentUid();
+    const deviceId = this.baseData.getCurrentDeviceId();
+
+    return this.dexieService.inventurenUserStatus.get([jobid, uid, deviceId])
+      .then( (item) => {
+        if (item) {
+          return item.status;
+        }
+      })
+      .catch(() => {
+        return DBDIJobLockStatus.Init;
+      });
+  }
+
+  async setCurrentInventurLockStatusClosed(): Promise<boolean> {
+    const jobid = this.baseData.getCurrentJobid();
+    const uid = this.baseData.getCurrentUid();
+    const deviceId = this.baseData.getCurrentDeviceId();
+    const status = DBDIJobLockStatus.Locked;
+
+    const exists = await this.dexieService.inventurenUserStatus
+      .where({jobid, uid, device_id: deviceId})
+      .count();
+
+    if (exists) {
+      return this.dexieService.inventurenUserStatus
+        .update([jobid, uid, deviceId], {
+          status,
+          geschlossen_am: new Date(),
+          modified_at: new Date()
+        })
+        .then( () => {
+        this.inventurLockStatusChanged.emit( status );
+        return true;
+      })
+        .catch( () => {
+          return false;
+        });
+    } else {
+      return this.dexieService.inventurenUserStatus
+        .put({
+          jobid,
+          uid,
+          device_id: deviceId,
+          token: '',
+          status: DBDIJobLockStatus.Locked,
+          geladen_am: new Date(),
+          geschlossen_am: new Date(),
+          created_at: new Date(),
+          modified_at: new Date()
+        }, [jobid, uid, deviceId])
+        .then( () => {
+          this.inventurLockStatusChanged.emit( status );
+          return true;
+        })
+        .catch( () => {
+          return false;
+        });
+    }
+  }
+
+  async setCurrentInventurLockStatusOpened(): Promise<boolean> {
+    const jobid = this.baseData.getCurrentJobid();
+    const uid = this.baseData.getCurrentUid();
+    const deviceId = this.baseData.getCurrentDeviceId();
+    const status = DBDIJobLockStatus.Unlocked;
+
+    const exists = await this.dexieService.inventurenUserStatus
+      .where({jobid, uid, device_id: deviceId})
+      .count();
+
+    if (exists) {
+      return this.dexieService.inventurenUserStatus
+        .update([jobid, uid, deviceId], {
+        status,
+        geschlossen_am: new Date(),
+        modified_at: new Date()
+      })
+        .then( () => {
+          this.inventurLockStatusChanged.emit( status );
+          return true;
+        })
+        .catch( () => {
+          return false;
+        });
+    } else {
+      return this.dexieService.inventurenUserStatus
+        .put({
+        jobid,
+        uid,
+        device_id: deviceId,
+        token: '',
+        status,
+        geladen_am: new Date(),
+        geschlossen_am: null,
+        created_at: new Date(),
+        modified_at: new Date()
+      }, [jobid, uid, deviceId])
+        .then( () => {
+          this.inventurLockStatusChanged.emit( status );
+          return true;
+        })
+        .catch( () => {
+          return false;
+        });
+    }
+  }
 
   async getCurrentGebaeudeProgress(useGid?: number): Promise<InventoryProgress> {
     const gid = useGid || this.baseData.getCurrentGid();

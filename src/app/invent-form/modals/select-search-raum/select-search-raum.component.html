@@ -17,7 +17,7 @@
     <div class="input-group-prepend">
       <span class="input-group-text"><fa-icon [icon]="faSearch"></fa-icon></span>
     </div>
-  <input id="typeahead-prevent-manual-entry"  type="text" class="form-control"
+  <input id="typeahead-prevent-manual-entry" #searchInput type="text" class="form-control"
          (selectItem)="onSelectItem($event)"
          [(ngModel)]="model"
          [ngbTypeahead]="search"

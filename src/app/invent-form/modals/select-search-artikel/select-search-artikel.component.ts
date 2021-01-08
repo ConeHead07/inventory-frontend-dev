@@ -1,4 +1,4 @@
-import { Component, EventEmitter, OnInit, Output} from '@angular/core';
+import {Component, ElementRef, EventEmitter, OnInit, AfterViewInit, Output, ViewChild} from '@angular/core';
 import { Observable } from 'rxjs';
 import { debounceTime, distinctUntilChanged, map, filter} from 'rxjs/operators';
 import { DataService } from '../../../inventory/service/data.service';
@@ -28,7 +28,7 @@ export interface ArtikelOption {
   templateUrl: './select-search-artikel.component.html',
   styleUrls: ['./select-search-artikel.component.scss']
 })
-export class SelectSearchArtikelComponent implements OnInit {
+export class SelectSearchArtikelComponent implements OnInit, AfterViewInit {
 
   faPlus = faPlus;
   faSignOutAlt = faSignOutAlt;
@@ -40,6 +40,7 @@ export class SelectSearchArtikelComponent implements OnInit {
 
   @Output() artikelSelected = new EventEmitter<ArtikelOption>();
   @Output() artikelCreating = new EventEmitter<number>();
+  @ViewChild('searchArtikelInput', {static: false}) searchArtikelInput: ElementRef;
 
   formatter = (state: Artikel) => state.name;
 
@@ -61,6 +62,18 @@ export class SelectSearchArtikelComponent implements OnInit {
   constructor(private dataService: DataService, public activeModal: NgbActiveModal) { }
 
   ngOnInit() {
+  }
+
+  ngAfterViewInit() {
+    this.setSearchFocus();
+  }
+
+  setSearchFocus() {
+    if (this.searchArtikelInput && this.searchArtikelInput.nativeElement && this.searchArtikelInput.nativeElement.focus) {
+      this.searchArtikelInput.nativeElement.focus();
+    } else {
+      console.error('NOT FOUND this.searchArtikelInput.nativeElement');
+    }
   }
 
   showCreateForm(event) {
@@ -85,7 +98,9 @@ export class SelectSearchArtikelComponent implements OnInit {
     if (this.mid !== mid) {
       this.mid = mid;
       console.log( 'Reload Search-List' );
-      this.loadArtikels();
+      this.loadArtikels().then( () => {
+        this.setSearchFocus();
+      });
     }
   }
 
@@ -125,7 +140,7 @@ export class SelectSearchArtikelComponent implements OnInit {
               mcuuid: artikel.mcuuid,
               name: nameParts.join(' :: ')
             };
-            console.log('loadArtikels push ', { artikel, option });
+
             states.push( option );
             return { ...artikel, ...option };
         });

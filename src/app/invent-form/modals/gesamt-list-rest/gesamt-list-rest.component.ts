@@ -3,6 +3,7 @@ import {NgbActiveModal} from '@ng-bootstrap/ng-bootstrap';
 import {BasedataService} from '../../../basedata.service';
 import {RaumService, RaumStatusProgress} from '../../data-services/raum.service';
 import {DBDIGebaeude} from '../../../dexie.interfaces';
+import { faSignOutAlt } from '@fortawesome/free-solid-svg-icons';
 
 @Component({
   selector: 'app-gesamt-list-rest',
@@ -15,6 +16,8 @@ export class GesamtListRestComponent implements OnInit {
   raeumeListDone?: RaumStatusProgress[];
 
   @Output() raumSelected = new EventEmitter<number>();
+
+  faSignOutAlt = faSignOutAlt;
 
   constructor(
     public activeModal: NgbActiveModal,

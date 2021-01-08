@@ -1,4 +1,4 @@
-import {Component, EventEmitter, OnInit, Output} from '@angular/core';
+import {AfterViewInit, Component, ElementRef, EventEmitter, OnInit, Output, ViewChild} from '@angular/core';
 import { Observable } from 'rxjs';
 import { debounceTime, distinctUntilChanged, map, filter} from 'rxjs/operators';
 import { DataService } from '../../../inventory/service/data.service';
@@ -28,7 +28,7 @@ interface RaumOption extends DBDIRaeume {
   templateUrl: './select-search-raum.component.html',
   styleUrls: ['./select-search-raum.component.scss']
 })
-export class SelectSearchRaumComponent implements OnInit {
+export class SelectSearchRaumComponent implements OnInit, AfterViewInit {
 
   faPlus = faPlus;
   faSearch = faSearch;
@@ -42,6 +42,7 @@ export class SelectSearchRaumComponent implements OnInit {
 
   @Output() raumSelected = new EventEmitter<DBDIRaeume>();
   @Output() raumCreating = new EventEmitter<number>();
+  @ViewChild('searchInput', {static: true}) searchInput: ElementRef;
 
   formatter = (state: Raum) => state.name;
 
@@ -69,6 +70,18 @@ export class SelectSearchRaumComponent implements OnInit {
   ngOnInit() {
   }
 
+  ngAfterViewInit() {
+    this.setSearchFocus();
+  }
+
+  setSearchFocus() {
+    if (this.searchInput && this.searchInput.nativeElement && this.searchInput.nativeElement.focus) {
+      this.searchInput.nativeElement.focus();
+    } else {
+      console.error('NOT FOUND this.searchInput.nativeElement');
+    }
+  }
+
   showCreateForm(event) {
     console.log('showCreateForm');
     this.raumCreating.emit( this.gid );
@@ -92,7 +105,10 @@ export class SelectSearchRaumComponent implements OnInit {
       this.gid = gid;
       this.jobid = this.baseData.getCurrentJobid();
       console.log( 'Reload Search-List' );
-      this.loadRaeume();
+      this.loadRaeume().then( () => {
+        this.setSearchFocus();
+      });
+      this.setSearchFocus();
     }
   }
 

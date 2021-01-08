@@ -21,7 +21,7 @@ interface RebuildProcess {
 })
 export class BarcodeService {
   lastErrors: any[] = [];
-  lkup: Dexie.Table<DBDIBarcodeLookup, string>;
+  lkup: Dexie.Table<DBDIBarcodeLookup, [string, number]>;
   rebuildProcesses: RebuildProcess[] = [];
 
   constructor(private db: DexieService) {
@@ -30,9 +30,9 @@ export class BarcodeService {
 
   async simpleLookup(barcode: string, jobid: number): Promise<BarcodeLookupSimpleResult> {
     if (barcode.startsWith('R') || barcode.startsWith('A')) {
-      return this.bcAnalyzeLookup(barcode);
+      return await this.bcAnalyzeLookup(barcode);
     }
-    return this.indexLookup(barcode, jobid);
+    return await this.indexLookup(barcode, jobid);
     /*
     return Promise.all([
       this.indexLookup(barcode),
@@ -44,6 +44,7 @@ export class BarcodeService {
   async indexLookup(barcode: string, jobid: number): Promise<BarcodeLookupSimpleResult> {
     barcode = this.bcTrimZero(barcode);
     const found = await this.lkup.get( { code: barcode, for_jobid: jobid } );
+    console.log('#47 barcode.service.ts indexLookup(', { barcode, jobid}, ')', { found });
 
     const result: BarcodeLookupSimpleResult = {
       barcode,
@@ -229,14 +230,14 @@ export class BarcodeService {
     return this.db
       .transaction( 'rw', [table, this.db.barcodeLookup], () => {
         table.each( (item) => {
-          this.db.barcodeLookup.put({
+          this.db.barcodeLookup.put({...{
             code: item.code,
             table: tblName,
             for_jobid: item.for_jobid,
             key: keyName,
             uuid: item.uuid,
             updateHelper: 1
-          });
+          }, ...{log: false}});
         });
       })
       .then( () => true)
@@ -275,14 +276,14 @@ export class BarcodeService {
       .transaction( 'rw', [table, this.db.barcodeLookup], () => {
         table.where({ for_jobid: jobid }).each( (item) => {
           count += 1;
-          this.db.barcodeLookup.put({
+          this.db.barcodeLookup.put({...{
             code: item.code,
             table: tblName,
             for_jobid: item.for_jobid,
             key: keyName,
             uuid: item.uuid,
             updateHelper: 1
-          });
+          }, ...{log: false}});
         });
       })
       .then( () => {
@@ -305,7 +306,7 @@ export class BarcodeService {
     await list.forEach( item => {
       item.updateHelper = 11;
       console.log('called importObjektbuchBarcodesLookup import ', { item });
-      this.lkup.put(item ).then( (r) => {
+      this.lkup.put({...item, ...{log: false}} ).then( (r) => {
         // console.log('#229 result of put', item, r);
       }).catch( (err) => {
         console.error( '#231', err );
@@ -352,14 +353,14 @@ export class BarcodeService {
             .each ( (item) => {
               const forJobid = ('for_jobid' in item) ? item.for_jobid : 0;
               count += 1;
-              tblBarcodeLookup.put({
+              tblBarcodeLookup.put({...{
                 code: item.code,
                 table: tblName,
                 key: keyName,
                 for_jobid: forJobid,
                 uuid: item.uuid,
                 updateHelper: 1
-            });
+            }, ...{log: false}});
           });
         });
     } );
@@ -409,14 +410,14 @@ export class BarcodeService {
           console.log('rebuildTableOnRunningSystem rebuild Barcode for table ' + table.name);
           table.filter( (item) => !!item.code).each ( (item) => {
             const forJobid = ('for_jobid' in item) ? item.for_jobid : 0;
-            tblBarcodeLookup.put({
+            tblBarcodeLookup.put({...{
               code: item.code,
               table: tblName,
               key: keyName,
               for_jobid: forJobid,
               uuid: item.uuid,
               updateHelper: 1
-            });
+            }, ...{log: false}});
           });
         });
     } );
@@ -428,8 +429,8 @@ export class BarcodeService {
     return true;
   }
 
-  async addBarcode(item: DBDIBarcodeLookup): Promise<string> {
-    return this.db.barcodeLookup.put(item);
+  async addBarcode(item: DBDIBarcodeLookup, log: boolean = false): Promise<string> {
+    return this.db.barcodeLookup.put({...item, ...{log}}).then( (key) => key[0]);
   }
 
   addError( err: any) {

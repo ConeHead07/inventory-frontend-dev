@@ -4,6 +4,7 @@ import {InventarService} from '../../data-services/inventar.service';
 import {InventarData} from '../../../inventory/service/data.service';
 import {NgbActiveModal} from '@ng-bootstrap/ng-bootstrap';
 import {BasedataService} from '../../../basedata.service';
+import { faSignOutAlt } from '@fortawesome/free-solid-svg-icons';
 
 interface RaumInventarRest {
   mcid?: number;
@@ -20,6 +21,9 @@ interface RaumInventarRest {
 export class RaumListRestComponent implements OnInit {
 
   @Output() requestDoneList = new EventEmitter<DBDIRaeume>();
+
+  faSignOutAlt = faSignOutAlt;
+
   inventarListRest: RaumInventarRest[] = [];
   inventarListGrouped: RaumInventarRest[] = [];
   inventarDetailList: InventarData[] = [];

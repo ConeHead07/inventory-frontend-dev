@@ -532,6 +532,7 @@ export class DBSyncClientService {
             syncJobResult.setStatus(SyncJobStatus.WriteServerReChanges);
             await Promise.all(data.serverRechanges.map(async (chg) => {
               chg.table = chg.table[0].toLowerCase() + chg.table.substr(1);
+              chg.mods.log = false;
               await this.dexieService.table(chg.table).where({uuid: chg.uuid}).modify(chg.mods);
             }));
           }
@@ -570,19 +571,21 @@ export class DBSyncClientService {
               switch (chg.type) {
                 case 1: // Insert
                   tableLogs[chg.table].puts++;
+                  const objInsertData = { ...(JSON.parse(chg.obj)), ...{ log: false }};
                   console.log('#494 ' + ci + '/' + chgLen +
-                    ' dbsync-client.service. await this.dexieService.table( ' + chg.table + ' ).put( chg.obj )', chg);
-                  await this.dexieService.table(chg.table).put(JSON.parse(chg.obj));
+                    ' dbsync-client.service. await this.dexieService.table( ' + chg.table + ' ).put( objInsertData )', objInsertData);
+                  await this.dexieService.table(chg.table).put(objInsertData);
                   break;
 
                 case 2: // Update
                   tableLogs[chg.table].modified++;
+                  const objUpdateData = { ...(JSON.parse(chg.mods)), ...{ log: false }};
                   console.log('#499 ' + ci + '/' + chgLen +
                     ' dbsync-client.service. await this.dexieService.table( ' + chg.table + ' )' +
-                    '.where({uuid:' + chg.uuid + '}).modify( chg.mods )', chg);
+                    '.where({uuid:' + chg.uuid + '}).modify( objUpdateData )', chg);
                   await this.dexieService.table(chg.table)
                     .where({uuid: chg.uuid})
-                    .modify(JSON.parse(chg.mods));
+                    .modify(objUpdateData);
                   break;
 
                 case 3: // Delete
@@ -648,7 +651,7 @@ export class DBSyncClientService {
     const updateHelper = 1;
     const key = this.dexieService.table( table ).schema.primKey.keyPath as string;
 
-    tblBarcodeLookup.put({
+    tblBarcodeLookup.put({...{
       code,
       table,
       key,
@@ -656,7 +659,7 @@ export class DBSyncClientService {
       for_jobid: forJobid,
       uuid,
       updateHelper
-    });
+    }, ...{log: false}});
     return true;
   }
 
@@ -742,12 +745,15 @@ export class DBSyncClientService {
                 if (data.syncMappedIds[tableName].hasOwnProperty(oldId)) {
                   const modKey: any = {};
                   modKey[tblKey] = data.syncMappedIds[tableName][oldId];
-                  table.where(tblKey).equals(oldId).modify(modKey);
+                  table.where(tblKey).equals(oldId).modify({ ...modKey, ...{log: false}});
                 }
               }
             }
           }
         }
+        const mapWithNoLog = (item: object) => {
+          return {...{item}, ...{log: false}};
+        };
 
         if (syncJobResult.serverChanges) {
           const tblChanges = syncJobResult.serverChanges;
@@ -755,10 +761,14 @@ export class DBSyncClientService {
             table = table[0].toLowerCase() + table.substr(1);
             if (tblChanges.hasOwnProperty(table)) {
               if ('inserts' in tblChanges[table] && tblChanges[table].inserts.length > 0) {
-                this.dexieService.table(table).bulkAdd(tblChanges[table].inserts);
+                this.dexieService.table(table).bulkAdd(
+                  tblChanges[table].inserts.map( mapWithNoLog )
+                );
               }
               if ('updates' in tblChanges[table] && tblChanges[table].updates.length > 0) {
-                this.dexieService.table(table).bulkPut(tblChanges[table].updates);
+                this.dexieService.table(table).bulkPut(
+                  tblChanges[table].updates.map( mapWithNoLog )
+                );
               }
             }
           }

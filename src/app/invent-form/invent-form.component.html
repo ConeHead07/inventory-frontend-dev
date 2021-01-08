@@ -52,14 +52,45 @@
   <label for="raumCode" class="col-8"><strong>Raumdaten</strong></label>
 
   <div class="col-4 text-right">
-    <div #myDrop="ngbDropdown" ngbDropdown>
+    <div ngbDropdown style="display: inline-block">
+      <button [ngClass]="{
+        'btn-outline-success': jobLockStatus === 2,
+        'btn-outline-info': jobLockStatus === 1,
+        'btn-outline-secondary': jobLockStatus === 0
+        }"
+              ngbDropdownToggle
+              id="dropdownLockStatus"
+              class="btn btn-sm dropdown-toggle"
+              type="button" data-toggle="dropdown" aria-haspopup="true"
+              aria-expanded="false">
+        <ng-container [ngSwitch]="jobLockStatus">
+          <fa-icon *ngSwitchCase="2" [icon]="faLock"></fa-icon>
+          <fa-icon *ngSwitchCase="1" [icon]="faUnlockAlt"></fa-icon>
+          <fa-icon *ngSwitchDefault [icon]="faLock"></fa-icon>
+        </ng-container>
+      </button>
+      <div class="dropdown-menu dropdown-menu-right" [style.right]="0" ngbDropdownMenu aria-labelledby="dropdownLockStatus">
+        <button ngbDropdownItem class="dropdown-item"
+                (click)="setJobLockStatusClosed()"><fa-icon [attr.class]="'text-danger'" [icon]="faLock"></fa-icon>
+          Inventur schließen
+        </button>
+        <button ngbDropdownItem class="dropdown-item"
+                (click)="setJobLockStatusOpened()"><fa-icon [attr.class]="'text-success'" [icon]="faUnlockAlt"></fa-icon>
+          Inventur in Arbeit
+        </button>
+      </div>
+    </div>
+
+    <div #myDrop="ngbDropdown" ngbDropdown style="display: inline-block">
       <button [ngClass]="{
         'btn-outline-success': raumEditStatus === 2,
         'btn-outline-info': raumEditStatus === 1,
         'btn-outline-secondary': raumEditStatus === 0
-        }" class="btn btn-sm dropdown-toggle"
+        }"
+              ngbDropdownToggle
+              id="dropdownRaumStatus"
+              class="btn btn-sm dropdown-toggle"
               type="button" data-toggle="dropdown" aria-haspopup="true"
-              (click)="$event.stopPropagation(); myDrop.open();"
               aria-expanded="false">
         <ng-container [ngSwitch]="raumEditStatus">
           <fa-icon *ngSwitchCase="2" [icon]="faCheck"></fa-icon>
@@ -67,7 +98,7 @@
           <fa-icon *ngSwitchDefault [icon]="faDoorClosed"></fa-icon>
         </ng-container>
       </button>
-      <div class="dropdown-menu dropdown-menu-right" [style.right]="0" ngbDropdownMenu>
+      <div class="dropdown-menu dropdown-menu-right" [style.right]="0" ngbDropdownMenu aria-labelledby="dropdownRaumStatus">
         <button ngbDropdownItem class="dropdown-item"
                 (click)="setRaumEditStatusClosed()"><fa-icon [attr.class]="'text-success'" [icon]="faCheck"></fa-icon>
           Fertig
@@ -105,7 +136,9 @@
     </div>
     <input id="raumNr" readonly type="text" [value]="formInventar.Raum" class="form-control" placeholder="Raumnr" aria-label="Raumnummer">
     <div class="input-group-append">
-      <button class="btn btn-outline-success" type="button" (click)="openSelectSearchRaum()">...</button>
+      <button class="btn btn-outline-success" type="button" (click)="openSelectSearchRaum()">
+        <fa-icon [icon]="faBookReader"></fa-icon>
+      </button>
     </div>
   </div>
 </div>
@@ -118,7 +151,7 @@
     <input  id="raumBez" readonly type="text" [value]="formInventar.Raumbezeichnung"
             placeholder="Raumbezeichnung" class="form-control">
     <div class="input-group-append">
-      <button class="btn btn-outline-success" type="button" (click)="openEditRaum()">
+      <button class="btn btn-outline-success" [disabled]="!formInventar.rid" type="button" (click)="openEditRaum()">
         <fa-icon [icon]="faEdit"></fa-icon>
       </button>
     </div>
@@ -153,7 +186,9 @@
         </div>
         <input id="elmArtBez" readonly type="text" [attr.value]="formInventar.Bezeichnung" class="form-control" placeholder="Artikelbezeichnung" aria-label="Artikelbezeichnung">
         <div class="input-group-append">
-          <button class="btn btn-outline-success" type="button" (click)="openSelectCreateArtikel()">...</button>
+          <button class="btn btn-outline-success" type="button" (click)="openSelectCreateArtikel()">
+            <fa-icon [icon]="faBookReader"></fa-icon>
+          </button>
         </div>
       </div>
   </div>
@@ -164,7 +199,9 @@
       </div>
       <input  id="elmArtTyp" type="text" [attr.value]="formInventar.Typ" class="form-control">
       <div class="input-group-append">
-        <button class="btn btn-outline-success" type="button" (click)="openSelectCreateArtikel()">...</button>
+        <button class="btn btn-outline-success" [disabled]="!formInventar.ivid" type="button" (click)="openEditInventar()">
+          <fa-icon [icon]="faEdit"></fa-icon>
+        </button>
       </div>
     </div>
   </div>

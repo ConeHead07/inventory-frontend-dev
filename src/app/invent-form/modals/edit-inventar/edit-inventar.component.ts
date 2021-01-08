@@ -1,21 +1,20 @@
-import {Component, EventEmitter, OnInit, Output, ViewChild} from '@angular/core';
-import { ModalDismissReasons, NgbActiveModal, NgbTypeahead} from '@ng-bootstrap/ng-bootstrap';
-import { faSearch, faSignOutAlt } from '@fortawesome/free-solid-svg-icons';
-import {DBDIArtikel, DBDIHersteller } from '../../../dexie.interfaces';
-import {
-  ArtikelService,
-  ArtikelBasisDaten,
-  ArtikelPropertiesForQueryCount,
-  ArtikelHerstellerImg
-} from '../../data-services/artikel.service';
+import { Component, EventEmitter, OnInit, Output, ViewChild} from '@angular/core';
 
-import {Observable, Subject, merge} from 'rxjs';
-import {debounceTime, distinctUntilChanged, filter, map} from 'rxjs/operators';
+import { ModalDismissReasons, NgbActiveModal, NgbTypeahead} from '@ng-bootstrap/ng-bootstrap';
+import { faCamera, faSignOutAlt } from '@fortawesome/free-solid-svg-icons';
+import { DBDIArtikel, DBDIHersteller, DBDIInventar, DBDIRaeume} from '../../../dexie.interfaces';
+import {InventarService, InventarBasisDaten, InventarFoundResult} from '../../data-services/inventar.service';
+import {merge, Observable, Subject} from 'rxjs';
+import { debounceTime, distinctUntilChanged, filter, map } from 'rxjs/operators';
+import { ArtikelOption} from '../select-search-artikel/select-search-artikel.component';
 import {HerstellerService, HerstellerWithId} from '../../data-services/hersteller.service';
+import {
+  ArtikelHerstellerImg,
+  ArtikelPropertiesForQueryCount,
+  ArtikelService
+} from '../../data-services/artikel.service';
 import {BasedataService} from '../../../basedata.service';
 import {DataService} from '../../../inventory/service/data.service';
-import {ArtikelOption} from '../select-search-artikel/select-search-artikel.component';
-
 
 const states: HerstellerWithId[] = [];
 const stateNames: string[] = [];
@@ -48,32 +47,40 @@ interface HerstellerExistsStatus {
 }
 
 @Component({
-  selector: 'app-select-create-artikel',
-  templateUrl: './select-create-artikel.component.html',
-  styleUrls: ['./select-create-artikel.component.scss']
+  selector: 'app-edit-inventar',
+  templateUrl: './edit-inventar.component.html',
+  styleUrls: ['./edit-inventar.component.scss']
 })
-export class SelectCreateArtikelComponent implements OnInit {
-  closeResult: string;
-  faSearch = faSearch;
-  faSignOutAlt = faSignOutAlt;
+export class EditInventarComponent implements OnInit {
 
-  ArtikelExistsStatus = -1;
+  @Output() artikelSelected = new EventEmitter<ArtikelOption>();
+  @Output() artikelSearching = new EventEmitter<number>();
+  @Output() artikelCreated = new EventEmitter<DBDIArtikel>();
+  @Output() herstellerChanged = new EventEmitter<string>();
+  @Output() gruppeChanged = new EventEmitter<string>();
+  @Output() inputChanging = new EventEmitter();
+  @Output() inputChanged = new EventEmitter<Event>();
+  @Output() inventarChanged = new EventEmitter<InventarFoundResult>();
+  @Output() scannerRequest = new EventEmitter<HTMLElement>();
+
+  faSignOutAlt = faSignOutAlt;
+  faCamera = faCamera;
+
   numBezeichnungExists = -1;
 
-  public artikelDaten: ArtikelBasisDaten = {
-    mid: 0,
-    mcid: 0,
-    gcid: 0,
+  closeResult: string;
+  inventarDaten: InventarFoundResult = null;
+  public inventarInput: InventarBasisDaten = {
+    code: '',
+    ivid: 0,
     Bezeichnung: '',
     Gruppe: '',
     Kategorie: '',
     Typ: '',
     Hersteller: '',
-    hid: 0,
     Groesse: '',
-    Farbe: ''
+    Farbe: '',
   };
-  model: any;
 
   @ViewChild('instance', {static: true}) instance: NgbTypeahead;
   focus$ = new Subject<string>();
@@ -99,12 +106,6 @@ export class SelectCreateArtikelComponent implements OnInit {
   focusFa$ = new Subject<string>();
   clickFa$ = new Subject<string>();
 
-  formIsValid = false;
-  formError = '';
-
-  private gid: number;
-  private mid: number;
-
   existsStatus: ExistCountSimilarArticle = {
     Hersteller: { term: '', count: 0 },
     Bezeichnung: { term: '', count: 0 },
@@ -129,61 +130,124 @@ export class SelectCreateArtikelComponent implements OnInit {
   page = 1;
   maxSize = 6;
 
-  @Output() artikelSelected = new EventEmitter<ArtikelOption>();
-  @Output() artikelSearching = new EventEmitter<number>();
-  @Output() artikelCreated = new EventEmitter<DBDIArtikel>();
-  @Output() herstellerChanged = new EventEmitter<string>();
-  @Output() gruppeChanged = new EventEmitter<string>();
-  @Output() inputChanging = new EventEmitter();
-  @Output() inputChanged = new EventEmitter<Event>();
+  public validationErrors: string[] = [];
+  public formIsValid = true;
+  public formError = '';
+  private id = 0;
+
+  private gid: number;
+  private mid: number;
 
   constructor(
-    // private modalService: NgbModal,
     public activeModal: NgbActiveModal,
+    public inventarService: InventarService,
     private artikelService: ArtikelService,
     private herstellerService: HerstellerService,
     private baseData: BasedataService,
-    private dataService: DataService
-  ) {
-  }
+    private dataService: DataService ) { }
+
+    async loadHersteller(): Promise<number> {
+      return this.herstellerService.getAllHerstellerWithIds()
+        .then( list => {
+          while (states.length > 0) {
+            states.pop();
+            stateNames.pop();
+          }
+          list.forEach( item =>  {
+            states.push(item);
+            stateNames.push(item.Hersteller);
+          });
+          console.log('#118 ngOnInit', { states, stateNames });
+          return states.length;
+        })
+        .catch( () => -1);
+    }
+
+    async loadGruppenKategorien(): Promise<number> {
+      return this.artikelService.getGroupedArtikelGruppenKategorien()
+        .then( (list) => {
+          gruppenKategorien.length = 0;
+          list.forEach( itm => gruppenKategorien.push(itm));
+          return gruppenKategorien.length;
+        })
+        .catch( () => -1);
+    }
+
+    async loadGruppen(): Promise<number> {
+      return this.artikelService.getGroupedArtikelGruppen()
+        .then( list => {
+          artikelGruppen.length = 0;
+          list.forEach( (it) => artikelGruppen.push( it ) );
+          return artikelGruppen.length;
+        })
+        .catch( () => -1);
+    }
+
+    async loadKategorien(): Promise<number> {
+      return this.artikelService.getGroupedArtikelKategorien()
+        .then( list => {
+          artikelKategorien.length = 0;
+          list.forEach( (it) => artikelKategorien.push( it ) );
+          return artikelKategorien.length;
+        })
+        .catch( () => -1);
+    }
+
+    async loadArtikeltypen(): Promise<number> {
+      return this.artikelService.getGroupedArtikelProperties('Typ')
+        .then( list => {
+          artikelTypen.length = 0;
+          list.forEach( (it) => artikelTypen.push( it ) );
+          return artikelTypen.length;
+        })
+        .catch( () => -1);
+    }
+
+    async loadFarben(): Promise<number> {
+      return this.artikelService.getGroupedArtikelFarben()
+        .then( list => {
+          artikelFarben.length = 0;
+          list.forEach( (it) => artikelFarben.push( it ) );
+          return artikelFarben.length;
+        })
+        .catch( () => -1);
+    }
+
+    async loadGroessen(): Promise<number> {
+      return this.artikelService.getGroupedArtikelGroessen()
+        .then( list => {
+          artikelGroessen.length = 0;
+          list.forEach( (it) => artikelGroessen.push( it ) );
+          return artikelGroessen.length;
+        })
+        .catch( () => -1);
+    }
 
   ngOnInit() {
-    this.herstellerService.getAllHerstellerWithIds().then( list => {
-      while (states.length > 0) {
-        states.pop();
-        stateNames.pop();
-      }
-      list.forEach( item =>  {
-        states.push(item);
-        stateNames.push(item.Hersteller);
+    this.mid = this.baseData.getCurrentMid();
+    Promise.all([
+      this.loadHersteller(),
+      this.loadGruppenKategorien(),
+      this.loadGruppen(),
+      this.loadKategorien(),
+      this.loadArtikeltypen(),
+      this.loadFarben(),
+      this.loadGroessen()
+    ])
+      .then( (result) => {
+        console.log('loaded all ArtikelData', {
+          result,
+          states,
+          stateNames,
+          artikelTypen,
+          'gruppenKategorien.length': gruppenKategorien.length,
+          'artikelGruppen.length': artikelGruppen.length,
+          'artikelKategorien.length': artikelKategorien.length,
+          'artikelTypen.length': artikelTypen.length,
+          'artikelFarben.length': artikelFarben.length,
+          'artikelGroessen.length': artikelGroessen.length
+        });
       });
-      console.log('#118 ngOnInit', { states, stateNames });
-    });
-
-    this.artikelService.getGroupedArtikelGruppenKategorien().then( (list) => {
-      gruppenKategorien.length = 0;
-      list.forEach( itm => gruppenKategorien.push(itm));
-    });
-
-    this.artikelService.getGroupedArtikelGruppen().then( list => {
-      list.forEach( (it) => artikelGruppen.push( it ) );
-    });
-
-    this.artikelService.getGroupedArtikelKategorien().then( list => {
-      list.forEach( (it) => artikelKategorien.push( it ) );
-    });
-
-    this.artikelService.getGroupedArtikelProperties('Typ').then( list => {
-      list.forEach( (it) => artikelTypen.push( it ) );
-    });
-
-    this.artikelService.getGroupedArtikelFarben().then( list => {
-      list.forEach( (it) => artikelFarben.push( it ) );
-    });
-
-    this.artikelService.getGroupedArtikelGroessen().then( list => {
-      list.forEach( (it) => artikelGroessen.push( it ) );
-    });
 
     this.herstellerChanged.subscribe( () => {
       this.checkHersteller().then( () => {
@@ -211,30 +275,74 @@ export class SelectCreateArtikelComponent implements OnInit {
     });
   }
 
+  openScanner(target) {
+    this.scannerRequest.emit(target);
+  }
+
+  get inventarId() {
+    console.log('called get raumId() ', this.id);
+    return this.id;
+  }
+
+  set inventarId(id: number) {
+    this.id = id;
+    this.inventarService.getInventar(id).then( result => {
+      this.inventarDaten = result;
+      if (result && result.success) {
+        this.inventarInput.ivid = id;
+        this.inventarInput.code = result.inventar.code;
+        this.inventarInput.Bezeichnung = result.artikelData.Bezeichnung;
+        this.inventarInput.Gruppe = result.artikelData.Gruppe;
+        this.inventarInput.Kategorie = result.artikelData.Kategorie;
+        this.inventarInput.Typ = result.artikelData.Typ;
+        this.inventarInput.Hersteller = result.hersteller.Hersteller;
+        this.inventarInput.Groesse = result.artikelData.Groesse;
+        this.inventarInput.Farbe = result.artikelData.Farbe;
+        this.inventarInput.mcid = result.inventar.mcid;
+        this.inventarInput.mcuuid = result.inventar.mcuuid;
+        this.inventarInput.gcid = result.artikelRef.gcid;
+        this.inventarInput.gcuuid = result.artikelRef.gcuuid;
+        this.inventarInput.hid = result.artikelData.hid;
+        this.inventarInput.huuid = result.artikelData.huuid;
+        this.inventarInput.Zustand = result.inventar.Zustand;
+      }
+    });
+  }
+
+  async formValidate(): Promise<boolean> {
+    return true;
+  }
+
   getWhereInputsOf(artikelProperties: string[]): any {
-    const daten = { ...this.artikelDaten };
-    console.log('#201 getWhereInputsOf', { artikelProperties, daten, artikelDaten: this.artikelDaten });
+    const daten = { ...this.inventarInput };
+    console.log('#201 getWhereInputsOf', { artikelProperties, daten, inventarInput: this.inventarInput });
     const where = artikelProperties
       .filter( p => {
         const hasInput = (p in daten)
-        && daten[p] !== 0
-        && daten[p] !== ''
-        && !!daten[p];
-        console.log('#206 getWhereInputsOf', { p, hasInput, daten, artikelDaten: { ...this.artikelDaten},
-          value: this.artikelDaten[p], dvalue: daten[p] });
+          && daten[p] !== 0
+          && daten[p] !== ''
+          && !!daten[p];
+        console.log('#206 getWhereInputsOf', {
+          p, hasInput, daten, artikelDaten: { ...this.inventarInput},
+          value: this.inventarInput[p], dvalue: daten[p]
+        });
         return hasInput;
       })
-      .reduce( (o, p) => { o[p] = this.artikelDaten[p]; return o; }, {} as any);
-    console.log('#210 getWhereInputsOf', { artikelProperties, where, artikelDaten: this.artikelDaten });
+      .reduce( (o, p) => { o[p] = this.inventarInput[p]; return o; }, {} as any);
+    console.log('#210 getWhereInputsOf', { artikelProperties, where, artikelDaten: this.inventarInput });
     return where;
   }
 
-  async rebuildTypeaheadGruppen() {
-    const where = this.getWhereInputsOf(['hid']);
-    this.artikelService.getGroupedArtikelGruppen(where).then( list => {
-      artikelGruppen.length = 0;
-      list.forEach( (it) => artikelGruppen.push( it ) );
-    });
+  async delegateListArticleMatches(delay?: number) {
+    const funcName = 'listArticleMatches';
+    const delayMS = isNaN(delay) ? 2000 : delay;
+    if (funcName in this.delayedTrigger) {
+      clearTimeout( this.delayedTrigger[funcName] );
+      delete this.delayedTrigger[funcName];
+    }
+
+    console.log('delegate listArticleMatches');
+    this.delayedTrigger[funcName] = setTimeout( this.listArticleMatches.bind(this), delayMS );
   }
 
   async rebuildTypeaheadKategorien(gruppe?: string) {
@@ -268,14 +376,6 @@ export class SelectCreateArtikelComponent implements OnInit {
     });
   }
 
-  async rebuildTypeaheadGroessen() {
-    const where = this.getWhereInputsOf(['hid']);
-    this.artikelService.getGroupedArtikelGroessen(where).then( list => {
-      artikelGroessen.length = 0;
-      list.forEach( (it) => artikelGroessen.push( it ) );
-    });
-  }
-
   async rebuildTypeaheadFarben() {
     const where = this.getWhereInputsOf(['hid']);
     this.artikelService.getGroupedArtikelFarben(where).then( list => {
@@ -284,33 +384,9 @@ export class SelectCreateArtikelComponent implements OnInit {
     });
   }
 
-  async delegateCheckHersteller() {
-    const funcName = 'checkHersteller';
-    const delayMS = 1000;
-    if (funcName in this.delayedTrigger) {
-      clearTimeout( this.delayedTrigger[funcName] );
-      delete this.delayedTrigger[funcName];
-    }
-
-    console.log('delegate checkHersteller');
-    this.delayedTrigger[funcName] = setTimeout( this.checkHersteller.bind(this), delayMS );
-  }
-
-  async delegateListArticleMatches(delay?: number) {
-    const funcName = 'listArticleMatches';
-    const delayMS = isNaN(delay) ? 2000 : delay;
-    if (funcName in this.delayedTrigger) {
-      clearTimeout( this.delayedTrigger[funcName] );
-      delete this.delayedTrigger[funcName];
-    }
-
-    console.log('delegate listArticleMatches');
-    this.delayedTrigger[funcName] = setTimeout( this.listArticleMatches.bind(this), delayMS );
-  }
-
   async checkHersteller(): Promise<boolean> {
     console.log('called checkHersteller');
-    const input = this.artikelDaten.Hersteller;
+    const input = this.inventarInput.Hersteller;
     const term = (typeof input === 'string') ? input.trim() : '';
 
     if (term !== this.herstellerExistsStatus.term) {
@@ -342,7 +418,7 @@ export class SelectCreateArtikelComponent implements OnInit {
     console.log('#175 called listArticleMatches');
     const mid = this.baseData.getCurrentMid();
     const oInputStatus = this.existsStatus;
-    const d = this.artikelDaten;
+    const d = this.inventarInput;
     const oCheckData: ArtikelPropertiesForQueryCount = {};
 
     await this.checkHersteller();
@@ -361,35 +437,91 @@ export class SelectCreateArtikelComponent implements OnInit {
       ' for', { mid, hid, oCheckData } );
   }
 
+  async checkIfArtikelExistsMandant(): Promise<boolean> {
+    console.log('check if bezeichnung exists');
+    this.numBezeichnungExists = -1;
+
+    let globalArtikelIds: number[] = [];
+
+    await this.artikelService
+      .artikelGlobalByBezeichnung( this.inventarInput.Bezeichnung )
+      .then( items => {
+        globalArtikelIds = items.map<number>( item => item.gcid );
+      });
+
+    if (globalArtikelIds.length === 0) {
+      return false;
+    }
+
+    return 0 < await this.artikelService
+      .artikelMcidByGcids( this.mid, globalArtikelIds )
+      .then( items => {
+        return items.length;
+        // mandantArtikelIds = items.map<number>( itm => itm.mcid );
+      });
+  }
+
+  async save(): Promise<boolean> {
+    this.formError = '';
+    console.log('save inventar');
+    if (await this.formValidate()) {
+      const ivid = this.id;
+      const result = await this.inventarService.updateById(ivid, this.inventarInput);
+      if (result.success) {
+        this.inventarChanged.emit(result);
+
+        this.inventarInput.hid = result.hersteller.hid;
+        this.inventarInput.huuid = result.hersteller.uuid;
+        this.inventarInput.mcid = result.artikelRef.mcid;
+        this.inventarInput.mcuuid = result.artikelRef.uuid;
+        this.inventarInput.gcid = result.artikelData.gcid;
+        this.inventarInput.gcuuid = result.artikelData.uuid;
+
+      } else {
+        this.formError = 'Daten konnten nicht aktualisiert werden!<br>';
+        return false;
+      }
+      return true;
+    } else {
+      this.formError = 'Bitte die Angaben vervollständigen, Raum darf noch nicht vergeben sein';
+      return false;
+    }
+  }
+
   async applyItemAsArtikel(item: any) {
+    this.applyItemAsInput(item);
     console.log('#361 applyItemAsArtikel', { item });
     if (!item.mcid || !item.mcuuid) {
-      let artikelRef = await this.dataService.getArtikelRefByGcuuidMid(item.gcuuid, this.clientId);
+      let artikelRef = await this.dataService.getArtikelRefByGcuuidMid(item.gcuuid, this.mid);
       if (!artikelRef) {
         artikelRef = await this.artikelService.insertArtikelRef(item);
       }
       item.mcid = artikelRef.mcid;
       item.mcuuid = artikelRef.uuid;
     }
-    this.artikelSelected.emit({
-      id: item.mcid,
-      mcid: item.mcid,
-      mcuuid: item.mcuuid,
-      name: item.Bezeichnung
-    } as ArtikelOption);
+
+    if (this.inventarDaten.inventar.mcid !== item.mcid) {
+      await this.inventarService.updateRefs(this.id, item.mcid, item.mcuuid, {
+        Zustand: this.inventarInput.Zustand,
+        code: this.inventarInput.code
+      });
+    }
+    const result = await this.inventarService.getInventar(this.id);
+
+    this.inventarChanged.emit(result);
     return;
   }
 
   applyItemAsInput(item: any) {
     console.log('#367 applyItemAsInput', { item });
-    this.artikelDaten.Hersteller = item.Hersteller;
-    this.artikelDaten.hid = item.hid;
-    this.artikelDaten.Bezeichnung = item.Bezeichnung;
-    this.artikelDaten.Gruppe = item.Gruppe;
-    this.artikelDaten.Kategorie = item.Kategorie;
-    this.artikelDaten.Farbe = item.Farbe;
-    this.artikelDaten.Groesse = item.Groesse;
-    this.artikelDaten.Typ = item.Typ;
+    this.inventarInput.Hersteller = item.Hersteller;
+    this.inventarInput.hid = item.hid;
+    this.inventarInput.Bezeichnung = item.Bezeichnung;
+    this.inventarInput.Gruppe = item.Gruppe;
+    this.inventarInput.Kategorie = item.Kategorie;
+    this.inventarInput.Farbe = item.Farbe;
+    this.inventarInput.Groesse = item.Groesse;
+    this.inventarInput.Typ = item.Typ;
     return;
   }
 
@@ -473,10 +605,11 @@ export class SelectCreateArtikelComponent implements OnInit {
     const foundHst = states.find( (st) => st.Hersteller === selected.item);
     console.log('selected:', selected, 'selected.item: ', selected.item,
       'foundHst:', foundHst);
-    this.artikelDaten.hid = (foundHst) ? foundHst.hid : null;
-    console.log('this.artikelDaten.Hersteller: ', this.artikelDaten.Hersteller, { selected });
+    this.inventarInput.hid = (foundHst) ? foundHst.hid : null;
+    console.log('this.artikelDaten.Hersteller: ', this.inventarInput.Hersteller, { selected });
     this.herstellerChanged.emit(selected.item);
   }
+
   onChangeHersteller(event: Event) {
     console.log('Hersteller changed', event);
     if (event.target instanceof HTMLInputElement) {
@@ -488,6 +621,7 @@ export class SelectCreateArtikelComponent implements OnInit {
     console.log('Gruppe selected', selected);
     this.gruppeChanged.emit(selected.item);
   }
+
   onChangeGruppe(event: Event) {
     console.log('Gruppe changed', event);
     if (event.target instanceof HTMLInputElement) {
@@ -499,18 +633,10 @@ export class SelectCreateArtikelComponent implements OnInit {
     console.log('Kategorien selected', selected);
     this.inputChanged.emit();
   }
-  onChangeKategorie(event) {
-    console.log('Kategorien changed', event);
-    this.inputChanged.emit(event);
-  }
 
   onSelectTypen(selected) {
     console.log('Typen selected', selected);
     this.inputChanged.emit();
-  }
-  onChangeTyp(event) {
-    console.log('Typ changed', event);
-    this.inputChanged.emit(event);
   }
 
   onSelectFarben(selected) {
@@ -523,114 +649,6 @@ export class SelectCreateArtikelComponent implements OnInit {
     this.inputChanged.emit();
   }
 
-  private getDismissReason(reason: any): string {
-    if (reason === ModalDismissReasons.ESC) {
-      return 'by pressing ESC';
-    } else if (reason === ModalDismissReasons.BACKDROP_CLICK) {
-      return 'by clicking on a backdrop';
-    } else {
-      return  `with: ${reason}`;
-    }
-  }
-
-  formValidate(): boolean {
-    console.log('called formValidate');
-    this.formIsValid =
-      this.artikelDaten.Bezeichnung.length > 0
-      && this.numBezeichnungExists === 0;
-
-    console.log('called formValidate return ', this.formIsValid);
-    return this.formIsValid;
-  }
-
-  showSearchForm(event) {
-    console.log('called showSearchForm');
-    this.artikelSearching.emit(1);
-    this.activeModal.close();
-  }
-
-  get gebaeudeId() {
-    console.log('called get gebaeudeId() ', this.gid);
-    return this.gid;
-  }
-
-  set gebaeudeId(gid: number) {
-    console.log( 'called set gebaeudeId', 'param', gid, 'old-gid', this.gid);
-    this.gid = gid;
-  }
-
-  get clientId() {
-    console.log('called get clientId() ', this.mid);
-    return this.mid;
-  }
-
-  set clientId(mid: number) {
-    console.log( 'called set clientId', 'param', mid, 'old-mid', this.mid);
-    this.mid = mid;
-  }
-
-  async checkIfABezeichnungExistsGlobal(): Promise<number> {
-    console.log('check if Artikel exists');
-    this.delegateListArticleMatches();
-    this.numBezeichnungExists = -1;
-    let NumBezgenExists = 0;
-    await this.artikelService
-      .artikelBezeichnungExistsGlobal( this.artikelDaten.Bezeichnung )
-      .then( numExists => {
-        this.numBezeichnungExists = numExists;
-        NumBezgenExists = numExists;
-      });
-    this.formValidate();
-    console.log('check if Artikel exists: ', NumBezgenExists);
-    this.listArticleMatches();
-    return NumBezgenExists;
-  }
-
-  async checkIfArtikelExistsMandant(): Promise<boolean> {
-    console.log('check if bezeichnung exists');
-    this.numBezeichnungExists = -1;
-
-    let globalArtikelIds: number[] = [];
-
-    await this.artikelService
-      .artikelGlobalByBezeichnung( this.artikelDaten.Bezeichnung )
-      .then( items => {
-        globalArtikelIds = items.map<number>( item => item.gcid );
-      });
-
-    if (globalArtikelIds.length === 0) {
-      return false;
-    }
-
-    return 0 < await this.artikelService
-      .artikelMcidByGcids( this.mid, globalArtikelIds )
-      .then( items => {
-        return items.length;
-        // mandantArtikelIds = items.map<number>( itm => itm.mcid );
-      });
-  }
-
-  async save(): Promise<boolean> {
-    this.formError = '';
-    console.log('save Artikel ');
-    if (this.formValidate()) {
-      this.artikelDaten.mid = this.mid;
-      console.log('save Artikeldaten ', this.artikelDaten);
-      const result = await this.artikelService.insert( this.artikelDaten );
-      console.log('save Artikeldaten result ', result);
-      if (!result.success) {
-        this.formError = 'Daten konnten nicht gespeichert werden!<br>' + result.errorMsg;
-        return false;
-      } else {
-        this.artikelCreated.emit( result.newItem );
-        this.activeModal.close();
-        return true;
-      }
-    } else {
-      this.formError = 'Bitte die Angaben vervollständigen, Artikel-Bezeichnung darf noch nicht vergeben sein';
-    }
-  }
-
   onPageChange(page: number) {
     this.collectionSize = this.listExistingArticleMatches.length;
     this.pageSize = 8;
@@ -641,8 +659,8 @@ export class SelectCreateArtikelComponent implements OnInit {
   }
 
   onSubmit(event) {
-    console.log( 'onSubmit', this.artikelDaten );
+    console.log( 'onSubmit', this.inventarInput );
     this.save();
   }
-}
 
+}

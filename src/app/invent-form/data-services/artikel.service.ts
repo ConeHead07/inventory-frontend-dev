@@ -37,6 +37,13 @@ export interface ArtikelBasisDaten {
   log?: boolean;
 }
 
+export interface ArtikelRefInsertData {
+  gcid: number;
+  gcuuid: string;
+  mid?: number;
+  for_jobid?: number;
+}
+
 export interface DBInsertArtikelResult extends DbInsertResult {
   newItem?: DBDIArtikel;
 }
@@ -204,6 +211,50 @@ export class ArtikelService {
     return insertData;
   }
 
+  public async insertArtikelRefByGcidGcuuid(gcid: number, gcuuid?: string): Promise<DBDIObjektKatalogMandant> {
+    const db = this.dexie;
+    const artikelRef = db.objektKatalogMandant;
+    const jobid = this.baseData.getCurrentJobid();
+    const mid = this.baseData.getCurrentMid();
+    const uid = this.authService.getUser().id;
+    const uuid = Guid.create().toString();
+    const devID = this.baseData.getCurrentDeviceId();
+    const log = { log: true };
+    let code = uuid;
+
+    if (!gcuuid) {
+      gcuuid = await db.objektKatalogGlobal.get(gcid).then( (rslt) => {
+        return rslt.uuid;
+      }).catch( () => '');
+    }
+
+    const insertData = {
+      ...{ gcid, gcuuid },
+      ...{
+        mid,
+        code: uuid,
+        for_jobid: jobid,
+        created_at: new Date(),
+        created_uid: uid,
+        created_device_id: devID,
+        uuid
+      },
+      ...log
+    } as DBDIObjektKatalogMandant;
+    const mcid = await artikelRef.add( insertData );
+
+    code = `A-${mcid}-${mid}-${gcid}`;
+    if (code.length < 14) {
+      code = (code + '-' + uuid.substr(4, 15)).substr(0, 15);
+      if (code.endsWith('-')) {
+        code = code.substr(0, code.length - 1);
+      }
+    }
+    await artikelRef.update(mcid, { code });
+
+    return artikelRef.get(mcid);
+  }
+
   public async insertArtikelRef(daten: ArtikelBasisDaten): Promise<DBDIObjektKatalogMandant> {
     const db = this.dexie;
     const artikelRef = db.objektKatalogMandant;
@@ -223,7 +274,6 @@ export class ArtikelService {
     const insertData: DBDIArtikel = {
       mid: daten.mid || defaultMid,
       gcid: daten.gcid,
-      mcid: 0,
       uuid: Guid.create().toString(),
       hash: '',
       code: uuid,

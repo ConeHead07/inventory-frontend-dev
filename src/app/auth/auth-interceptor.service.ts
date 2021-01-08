@@ -12,13 +12,14 @@ import {Observable, throwError} from 'rxjs';
 import {take, exhaustMap, catchError} from 'rxjs/operators';
 
 import { AuthService } from './auth.service';
+import {Router} from '@angular/router';
 
 @Injectable({
   providedIn: 'root'
 })
 export class AuthInterceptorService implements HttpInterceptor {
 
-  constructor(private authService: AuthService) { }
+  constructor(private authService: AuthService, private router: Router) { }
 
   private addAuthHeader(request: HttpRequest<any>): HttpRequest<any> {
     const user = this.authService.getUser();
@@ -38,8 +39,11 @@ export class AuthInterceptorService implements HttpInterceptor {
     // Business error
     if (error.status === 400) {
       // Show message
-    } else if (error.status === 401) {
+    } else if (error.status === 401 || error.status === 403) {
       console.error('Login ist abgelaufen. Bitte neu einloggen!');
+      if (this.router.url.indexOf('/auth') === -1) {
+        this.router.navigateByUrl('/auth');
+      }
     }
 
     return throwError(error);

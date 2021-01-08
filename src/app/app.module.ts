@@ -51,6 +51,7 @@ import { SettingsComponent } from './inventory/components/settings/settings.comp
 import { environment } from '../environments/environment';
 import { ServiceWorkerModule } from '@angular/service-worker';
 import { EditRaumComponent } from './invent-form/modals/edit-raum/edit-raum.component';
+import { EditInventarComponent } from './invent-form/modals/edit-inventar/edit-inventar.component';
 
 const appRoutes: Routes = [
   { path: '', component: AuthComponent },
@@ -99,6 +100,7 @@ persist();
     DbsyncComponent,
     SettingsComponent,
     EditRaumComponent
+    , EditInventarComponent
 ],
   imports: [
     BrowserModule,
@@ -139,6 +141,7 @@ persist();
     GesamtListRestComponent,
     GesamtListDoneComponent,
     EditRaumComponent
+    , EditInventarComponent
   ],
   providers: [
     {

@@ -10,6 +10,13 @@ export enum DBDIRaumEditStatus {
   Started = 1,
   Closed = 2
 }
+
+
+export enum DBDIJobLockStatus {
+  Init = 0,
+  Unlocked = 1,
+  Locked = 2
+}
 /**
  * @PREFIX DBDI DataBasaDataInterface
  */
@@ -129,6 +136,20 @@ export interface DBDIInventurenGebaeude {
 export interface DBDIInventurenUser {
   jobid: number;
   uid: number;
+}
+
+export interface DBDIInventurenUserStatus {
+  jobid: number;
+  uid: number;
+  device_id: number;
+  status: number;
+  token: string;
+  last_client_revision_id?: number;
+  last_sync_at?: Date;
+  geladen_am?: Date;
+  geschlossen_am?: Date;
+  created_at?: Date;
+  modified_at?: Date;
 }
 
 export interface DBDILieferant {

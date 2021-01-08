@@ -1,10 +1,47 @@
 import { EventEmitter, Injectable, Output} from '@angular/core';
-import { DBDIInventar} from '../../dexie.interfaces';
+import {
+  DBDIHersteller,
+  DBDIInventar,
+  DBDIObjektKatalogGlobal,
+  DBDIObjektKatalogMandant
+} from '../../dexie.interfaces';
 import { DexieService } from '../../dexie.service';
 import { InventarData } from '../../inventory/service/data.service';
 import { Guid} from 'guid-typescript';
 import { BasedataService} from '../../basedata.service';
 import { DatabaseChangeType} from 'dexie-observable/api';
+import { AuthService} from '../../auth/auth.service';
+import { ArtikelService } from './artikel.service';
+import {HerstellerService} from './hersteller.service';
+
+export interface InventarFoundResult {
+  success: boolean;
+  inventar: null|DBDIInventar;
+  artikelRef: null|DBDIObjektKatalogMandant;
+  artikelData: null|DBDIObjektKatalogGlobal;
+  hersteller: null|DBDIHersteller;
+}
+
+export interface InventarBasisDaten {
+  ivid?: number;
+  code?: string;
+  mid?: number;
+  mcid?: number;
+  mcuuid?: string;
+  gcid?: number;
+  gcuuid?: string;
+  Bezeichnung?: string;
+  Gruppe?: string;
+  Kategorie?: string;
+  Typ?: string;
+  Hersteller?: string;
+  Groesse?: string;
+  Farbe?: string;
+  Zustand?: string;
+  hid?: number;
+  huuid?: string;
+  log?: boolean;
+}
 
 export const enum InventarChangeType {
   Create = DatabaseChangeType.Create,
@@ -57,7 +94,11 @@ export class InventarService {
   @Output() changed = new EventEmitter<InventarChanged>();
 
   constructor(private dexie: DexieService,
-              private baseData: BasedataService) { }
+              private authService: AuthService,
+              private baseData: BasedataService,
+              private herstellerService: HerstellerService,
+              private artikelService: ArtikelService
+  ) { }
 
   returnResultSuccess(data: InventarEditResultPresets): InventarEditResult {
     const result: any = {
@@ -70,6 +111,22 @@ export class InventarService {
       result.insertUUID = data.insertUUID;
     }
     return result;
+  }
+
+  getJobiId(): number {
+    return this.baseData.getCurrentJobid();
+  }
+
+  getMid(): number {
+    return this.baseData.getCurrentMid();
+  }
+
+  getUserId(): number {
+    return this.authService.getUser().id;
+  }
+
+  getFreshUuid(): string {
+    return Guid.create().toString();
   }
 
   returnResultError(data: InventarEditResultPresets): InventarEditResult {
@@ -86,10 +143,32 @@ export class InventarService {
     return 'hello';
   }
 
+  async getInventar(ivid: number): Promise<InventarFoundResult> {
+    const result: InventarFoundResult = {
+      success: false,
+      inventar: null,
+      artikelRef: null,
+      artikelData: null,
+      hersteller: null
+    };
+
+    result.inventar = await this.dexie.inventar.get(ivid);
+    if (result.inventar) {
+      result.artikelRef = await this.dexie.objektKatalogMandant.get(result.inventar.mcid);
+      if (result.artikelRef) {
+        result.success = true;
+        result.artikelData = await this.dexie.objektKatalogGlobal.get(result.artikelRef.gcid);
+        result.hersteller = await this.dexie.hersteller.get(result.artikelData.hid);
+      }
+    }
+
+    return result;
+  }
+
   async insertInventar(inventar: DBDIInventar, useJobid?: number): Promise<InventarEditResult> {
-    const jobid = useJobid || this.baseData.getCurrentJobid();
-    const uid = this.baseData.getCurrentUid();
-    const uuid = Guid.create().toString();
+    const jobid = useJobid || this.getJobiId();
+    const uid = this.getUserId();
+    const uuid = this.getFreshUuid();
     const item: DBDIInventar = {
       mcid: inventar.mcid,
       uuid,
@@ -120,6 +199,236 @@ export class InventarService {
       insertID: id,
       insertUUID: uuid
     });
+  }
+
+  async updateById(ivid: number, daten: InventarBasisDaten): Promise<InventarFoundResult> {
+    // return this.getInventar(ivid);
+    console.log('#205 updateById', { ivid, daten });
+
+    const updateData = daten;
+    const jobid = this.getJobiId();
+    const uid = this.getUserId();
+    const mid = this.getMid();
+    const devID = this.baseData.getCurrentDeviceId();
+    const oldData = await this.getInventar(ivid);
+    let bUpdateBarceLookup = false;
+
+    const globalKatalogDaten = {
+      Bezeichnung: daten.Bezeichnung,
+      Gruppe: daten.Gruppe,
+      Kategorie: daten.Kategorie,
+      Typ: daten.Typ,
+      Farbe: daten.Farbe,
+      Groesse: daten.Groesse,
+      hid: daten.hid || 0,
+      huuid: daten.huuid || null
+    };
+
+    if (daten.Hersteller) {
+      console.log('#226 checkAndGet Hersteller: ', daten.Hersteller);
+      const hstQuery = this.dexie.hersteller.where('Hersteller').equals(daten.Hersteller);
+      if (await hstQuery.count() > 0) {
+        console.log('#228 checkAndGet Hersteller existiert bereits');
+        await this.dexie.hersteller
+          .where('Hersteller').equals(daten.Hersteller)
+          .first()
+          .then( hstData => {
+            globalKatalogDaten.hid = hstData.hid;
+            globalKatalogDaten.huuid = hstData.uuid;
+          });
+      } else {
+        console.log('#238 checkAndGet Hersteller wird angelegt');
+        await this.herstellerService.createAndGetData(daten.Hersteller)
+          .then( (hst) => {
+          globalKatalogDaten.hid = hst.hid;
+          globalKatalogDaten.huuid = hst.uuid;
+        });
+      }
+    }
+
+    const okgFilledFields = this.getFilledFields(globalKatalogDaten);
+    const okgEmptyFieldnames = Object.keys(this.getEmptyFields(globalKatalogDaten));
+    const okgArtikelMatches = await this.dexie.objektKatalogGlobal
+      .filter( (rslt) => {
+        for (const ff of Object.keys(okgFilledFields)) {
+          const val = okgFilledFields[ff];
+          const valRslt = typeof rslt[ff] === 'string' ? rslt[ff].trim() : rslt[ff];
+          if (val !== valRslt) {
+            return false;
+          }
+        }
+        for (const ef of okgEmptyFieldnames) {
+          const valRslt = typeof rslt[ef] === 'string' ? rslt[ef].trim() : rslt[ef];
+          if (null !== valRslt && '' !== valRslt) {
+            return false;
+          }
+        }
+        return true;
+      }).toArray();
+
+    console.log('#267 okgArtikelMatches', { okgFilledFields, okgEmptyFieldnames, okgArtikelMatches });
+    let okgArtikel: DBDIObjektKatalogGlobal = null;
+    let okmArtikelRef: DBDIObjektKatalogMandant = null;
+
+    switch (okgArtikelMatches.length) {
+      case 0:
+        console.log('#273 checkAndGet Artikel wird angelegt');
+        okgArtikel = await this.artikelService.insertArtikelData(globalKatalogDaten);
+        break;
+
+      case 1:
+        okgArtikel = okgArtikelMatches[0];
+        break;
+
+      default:
+        okgArtikel = okgArtikelMatches.sort( (a, b) => {
+          const rankA = a.created_jobid === jobid ? 1 : (a.modified_jobid === jobid ? 2 : 3);
+          const rankB = b.created_jobid === jobid ? 1 : (b.modified_jobid === jobid ? 2 : 3);
+          return rankA < rankB ? -1 : (rankA > rankB ? 1 : 0);
+        })[0];
+    }
+
+    if (okgArtikel) {
+      console.log('#290 checkAndGet Artikel existiert/angelegt');
+      okmArtikelRef = await this.dexie.objektKatalogMandant.where({
+        mid,
+        for_jobid: jobid,
+        gcid: okgArtikel.gcid
+      }).first();
+
+      if (!okmArtikelRef) {
+        console.log('#296 checkAndGet ArtikelRef nuss angeleget werden');
+        okmArtikelRef = await this.artikelService.insertArtikelRefByGcidGcuuid(okgArtikel.gcid, okgArtikel.uuid);
+      }
+
+      const updateInv: any = {};
+      if (okmArtikelRef.mcid !== daten.mcid) {
+        updateInv.mcid = okmArtikelRef.mcid;
+        updateInv.mcuuid = okmArtikelRef.uuid;
+      }
+      if (oldData.inventar.Zustand !== daten.Zustand) {
+        updateInv.Zustand = daten.Zustand;
+      }
+      if (oldData.inventar.code !== daten.code) {
+        updateInv.code = daten.code;
+        bUpdateBarceLookup = true;
+      }
+
+      if (Object.keys(updateInv).length > 0) {
+        console.log('#310 checkAndGet ArtikelRef-ID muss im Inventar aktualisiert werden');
+        updateInv.modified_at = new Date();
+        updateInv.modified_uid = uid;
+        updateInv.modified_jobid = jobid;
+        updateInv.modified_device_id = devID;
+        updateInv.log = true;
+
+        this.dexie.inventar.update(ivid, updateInv);
+
+        this.dexie.inventar.update(ivid, updateInv).then( () => {
+          if (bUpdateBarceLookup) {
+            this.updateBarcodeLookup(ivid, daten.code);
+          }
+        });
+      }
+    }
+
+    const result = await this.getInventar(ivid);
+    console.log('#322 return Inventar-Data', result);
+
+    return result;
+  }
+
+  async updateRefs(ivid: number, mcid: number, mcuuid?: string, daten?: any) {
+    const jobid = this.getJobiId();
+    const uid = this.getUserId();
+    const mid = this.getMid();
+    const devID = this.baseData.getCurrentDeviceId();
+    const updateInv: any = {};
+    const oldData = await this.getInventar(ivid);
+    let bUpdateBarceLookup = false;
+
+    if (!mcuuid) {
+      await this.dexie.objektKatalogMandant.get(mcid).then( (item) => {
+        mcuuid = item.uuid;
+      });
+    }
+
+    updateInv.mcid = mcid;
+    updateInv.mcuuid = mcuuid;
+
+    if (daten.Zustand && daten.Zustand !== oldData.inventar.Zustand) {
+      updateInv.Zustand = daten.Zustand;
+    }
+
+    if (daten.code && daten.code !== oldData.inventar.code) {
+      updateInv.code = daten.code;
+      bUpdateBarceLookup = true;
+    }
+
+    console.log('#310 checkAndGet ArtikelRef-ID muss im Inventar aktualisiert werden');
+    updateInv.modified_at = new Date();
+    updateInv.modified_uid = uid;
+    updateInv.modified_jobid = jobid;
+    updateInv.modified_device_id = devID;
+    updateInv.log = true;
+
+    this.dexie.inventar.update(ivid, updateInv).then( () => {
+      if (bUpdateBarceLookup) {
+        this.updateBarcodeLookup(ivid, daten.code);
+      }
+    });
+  }
+
+  async updateBarcodeLookup(ivid: number, code: string) {
+    const savedRaumData = await this.dexie.inventar.get(ivid);
+    const jobid = this.getJobiId();
+    if (savedRaumData.code !== code) {
+      const lkupKey = {
+        code: savedRaumData.code,
+        for_jobid: jobid
+      };
+      const bcItem = await this.dexie.barcodeLookup.get(lkupKey);
+      if (bcItem) {
+        await this.dexie.barcodeLookup.update([savedRaumData.code, jobid], {
+          code
+        });
+      } else {
+        this.dexie.barcodeLookup.put({
+          code,
+          for_jobid: jobid,
+          id: ivid,
+          key: 'ivid',
+          table: 'inventar',
+          updateHelper: 1,
+          uuid: savedRaumData.uuid
+        });
+      }
+    }
+  }
+
+  getFilledFields(obj: object): object {
+    const allFields = Object.keys(obj);
+    const filledFields = {};
+    for (const f of allFields) {
+      const val = (typeof obj[f] === 'string') ? obj[f].trim() : obj[f];
+      if (null === val || '' === val) {
+        continue;
+      }
+      filledFields[f] = val;
+    }
+    return filledFields;
+  }
+
+  getEmptyFields(obj: object): object {
+    const allFields = Object.keys(obj);
+    const emptyFields = {};
+    for (const f of allFields) {
+      const val = (typeof obj[f] === 'string') ? obj[f].trim() : obj[f];
+      if (null === val || '' === val) {
+        emptyFields[f] = val;
+      }
+    }
+    return emptyFields;
   }
 
   async assignRaum(ivid: number, rid: number, useJobid?: number): Promise<InventarEditResult> {

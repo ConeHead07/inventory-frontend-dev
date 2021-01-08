@@ -330,7 +330,7 @@ export class DataService {
         .delete()
         .then( (nr) => list.map( (item: DBDIRaeume) => {
           console.log({ called: 'loadClientList', item });
-          return this.dexie.raeume.put(item);
+          return this.dexie.raeume.put({ ...item, ...{log: false}});
         })
         )
         .finally( () => {
@@ -351,7 +351,7 @@ export class DataService {
         .then( (nr: number) => {
           return list.map( (item: DBDIRaeume) => {
             console.log({ called: 'loadClientList', item });
-            return this.dexie.raeume.put(item);
+            return this.dexie.raeume.put( {...item, ...{log: false}});
           });
         })
         .finally( () => {
@@ -636,7 +636,7 @@ export class DataService {
             if (((i + 1) % stepSize === 0 || (i + 1) === total) && cbTblStatus) {
               cbTblStatus(table, i + 1);
             }
-            return this.dexie.table(table).put(item).then(() => {
+            return this.dexie.table(table).put({ ...item, ...{log: false}}).then(() => {
               inserts += 1;
               if (inserts % 100 === 0) {
                 syncLogData( logData(inserts) );
@@ -807,11 +807,11 @@ export class DataService {
       .where({ mid }).toArray();
 
     const artikelData = await Promise.all(artikelRefs.map( async (ref) => {
-      console.log('#774 getArtikelListByClientId ', { ref });
       return await this.dexie.objektKatalogGlobal.get( ref.gcid );
     }));
+
     const artikelHst = await Promise.all(artikelData.map( async (ref) => {
-      if (!ref.hid) {
+      if (typeof ref === 'undefined' || !ref || !ref.hid) {
         return '';
       }
       const hst = await this.dexie.hersteller.get( ref.hid );

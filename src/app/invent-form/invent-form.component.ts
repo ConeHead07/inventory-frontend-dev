@@ -4,7 +4,11 @@ import {Location} from '@angular/common';
 import {DataService, InventarData} from '../inventory/service/data.service';
 import {DBDIMandanten} from '../inventory/models/client.model';
 import {DBDIGebaeude} from '../inventory/models/building.model';
-import {faCamera, faImage, faSearch, faEdit, faCheck, faDoorClosed, faDoorOpen } from '@fortawesome/free-solid-svg-icons';
+import {
+  faCamera, faImage, faSearch, faEdit,
+  faCheck, faDoorClosed, faDoorOpen, faBookReader,
+  faLock, faUnlockAlt
+} from '@fortawesome/free-solid-svg-icons';
 import {InventoryProgress, InventoryProgressService} from '../inventory-progress.service';
 
 import {ScanDetectData} from '../inventory/components/scannerdetection/scannerdetection.component';
@@ -25,7 +29,7 @@ import {RaumListDoneComponent} from './modals/raum-list-done/raum-list-done.comp
 
 import {
   DBDIArtikel,
-  DBDIInventar,
+  DBDIInventar, DBDIJobLockStatus,
   DBDIRaeume,
   DBDIRaumEditStatus,
   DBDIRaumGebaeude,
@@ -46,7 +50,8 @@ import {SoundsService} from '../sounds.service';
 import { ToastrService } from 'ngx-toastr';
 import {Subscription} from 'rxjs';
 import {EditRaumComponent} from './modals/edit-raum/edit-raum.component';
-import {VariablesService} from "../inventory/service/variables.service";
+import {VariablesService} from '../inventory/service/variables.service';
+import {EditInventarComponent} from './modals/edit-inventar/edit-inventar.component';
 
 interface ScannerConfiguration {
   minLength?: number; // 7
@@ -87,12 +92,6 @@ interface CurrentModal {
   isOpen: boolean;
 }
 
-/*
-if ( matchesObjektbuchArtikel ) {
-      const [, src, id, mid, gkid, hashStart ] = matchesObjektbuchArtikel;
-      console.log( 'search for scanned Article', { src, id, mid, gkid, hashStart });
- */
-
 interface BCPartsObjektbuch {
   src: string;
   id: string;
@@ -129,6 +128,9 @@ export class InventFormComponent implements OnInit, OnDestroy {
   faCheck = faCheck;
   faDoorOpen = faDoorOpen;
   faDoorClosed = faDoorClosed;
+  faBookReader = faBookReader;
+  faLock = faLock;
+  faUnlockAlt = faUnlockAlt;
 
   @ViewChild('input2', { static: true }) input2: ElementRef;
   @ViewChild('inputSimulateBarcode', { static: true }) inputSimulateBarcode: ElementRef;
@@ -172,6 +174,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
   private routingSubscription: Subscription;
   private raumStatusChangeSubscription: Subscription;
   private inventarDataChangeSubscription: Subscription;
+  private inventurLockStatusChangeSubscription: Subscription;
 
   public lastScanDetectTime?: Date;
   public lastScanDetectClass = '';
@@ -187,6 +190,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
   };
 
   raumEditStatus: DBDIRaumEditStatus;
+  jobLockStatus: DBDIJobLockStatus;
 
   raumProgress: InventoryProgress = {
     total: 0,
@@ -252,6 +256,15 @@ export class InventFormComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
+    this.inventoryProgress.getCurrentInventurLockStatus().then( (status) => {
+      this.jobLockStatus = status;
+    });
+
+    this.inventurLockStatusChangeSubscription = this.inventoryProgress.inventurLockStatusChanged
+      .subscribe((status) => {
+        this.jobLockStatus = status;
+    });
+
     this.raumStatusChangeSubscription = this.raumService.raumStatusChanged
       .subscribe( (stat: RaumIDAndStatus) => {
       if (stat.rid === this.roomID) {
@@ -259,9 +272,10 @@ export class InventFormComponent implements OnInit, OnDestroy {
       }
     });
 
-    this.inventarDataChangeSubscription = this.inventarDataService.changed
-      .subscribe( (change: InventarChanged) => {
-      this.refreshRaumProgress();
+    console.log('this.inventarDataService.changed', this.inventarDataService.changed);
+    this.inventarDataChangeSubscription = this.inventarDataService
+      .changed.subscribe( (change) => {
+        this.refreshRaumProgress();
     });
 
     this.routingSubscription = this.route.params.subscribe(params => {
@@ -329,6 +343,8 @@ export class InventFormComponent implements OnInit, OnDestroy {
   }
 
   clearFormInventar() {
+    this.waitingForNewInventarBarcode = false;
+    this.waitingForInventarData = false;
     this.formInventar.ivid = 0;
     this.formInventar.mcid = 0;
     this.formInventar.gcid = 0;
@@ -347,6 +363,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
   }
 
   async assignInventarToRaum(inventarData: InventarData) {
+    console.log('#350 assignInventarToRaum(inventarData)', { inventarData });
     this.loadInventarByData( inventarData );
     this.inventarDataService.assignRaum(inventarData.inventar.ivid, this.roomID)
       .then( (rslt) => {
@@ -455,6 +472,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
 
   loadInventarById(ivid: number) {
     this.dataService.getInventarData(ivid).then( result => {
+      console.log('#458 loadInventarById(ivid)', { ivid });
       this.loadInventarByData( result.inventarData );
     });
   }
@@ -463,11 +481,12 @@ export class InventFormComponent implements OnInit, OnDestroy {
     const inventar = inventarData.inventar;
     const artikelRef = inventarData.artikelRef;
     const artikelData = inventarData.artikelData;
+    console.log('#466 loadInventarByData(inventarData)', { inventarData });
 
     this.inventarData = inventarData;
     this.artikelID = inventar.mcid;
     this.formInventar.mcid = inventar.mcid;
-    this.formInventar.gcid = artikelRef.gcid;
+    this.formInventar.gcid = artikelRef ? artikelRef.gcid : 0;
     this.formInventar.mcuuid = artikelRef.uuid;
     this.formInventar.gcuuid = artikelData.uuid;
     this.formInventar.Bezeichnung = artikelData.Bezeichnung;
@@ -663,6 +682,20 @@ export class InventFormComponent implements OnInit, OnDestroy {
     });
   }
 
+  openEditInventar() {
+    const modalRef = this.modalService.open(EditInventarComponent);
+    this.modalWatch(modalRef, 'EditInventar');
+    console.log('#674 this.inventarData ' + this.inventarData.inventar.ivid);
+    modalRef.componentInstance.inventarId = this.inventarData.inventar.ivid;
+    modalRef.componentInstance.inventarChanged.subscribe( (inventar) => {
+      console.log('Aktualisierte Inventar-Daten', { inventar });
+      this.toastr.success('Inventardaten wurden aktualisiert!');
+    });
+    modalRef.componentInstance.scannerRequest.subscribe( (target: HTMLElement) => {
+      this.openScanner(target);
+    });
+  }
+
   openSelectCreateRaum() {
     const modalRef = this.modalService.open(SelectCreateRaumComponent);
     this.modalWatch(modalRef, 'SelectCreateRaum');
@@ -737,6 +770,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
     this.routingSubscription.unsubscribe();
     this.raumStatusChangeSubscription.unsubscribe();
     this.inventarDataChangeSubscription.unsubscribe();
+    this.inventurLockStatusChangeSubscription.unsubscribe();
   }
 
   toggleRaumEditStatus() {
@@ -746,6 +780,14 @@ export class InventFormComponent implements OnInit, OnDestroy {
     } else {
       this.raumService.setRaumStatusStarted(this.roomID, jobid);
     }
+  }
+
+  setJobLockStatusClosed() {
+    this.inventoryProgress.setCurrentInventurLockStatusClosed();
+  }
+
+  setJobLockStatusOpened() {
+    this.inventoryProgress.setCurrentInventurLockStatusOpened();
   }
 
   setRaumEditStatusClosed() {
@@ -845,7 +887,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
   async handleScanData(event: ScanDetectData) {
     console.log('#738 handleScanData', { waitingForNewInventarBarcode: this.waitingForNewInventarBarcode, event });
     const bcResult = await this.bcLookup.fullLookup(event.barcode, this.jobid);
-    console.log('#740 handleScanData', { waitingForNewInventarBarcode: this.waitingForNewInventarBarcode });
+    console.log('#740 handleScanData', { waitingForNewInventarBarcode: this.waitingForNewInventarBarcode, bcResult });
     const barcode = event.barcode;
     let expectedBarcodeType = this.waitingForNewInventarBarcode ? LookupResultType.Inventar : null;
     this.displayScannedBarcode(event.barcode);
@@ -973,6 +1015,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
 
       case LookupResultTable.Inventar:
         console.log('#821 handleScanData LookupResultTable.Inventar');
+        console.log('#990 handleScanData(...)', arguments);
         this.assignInventarToRaum( {
           inventar: bcResult.inventar,
           artikelRef: bcResult.artikelRef,

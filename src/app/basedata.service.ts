@@ -1,5 +1,5 @@
 import {EventEmitter, Injectable, Output} from '@angular/core';
-import {DBDIGebaeude, DBDIInventuren, DBDIRaeume } from './dexie.interfaces';
+import {DBDIGebaeude, DBDIInventuren, DBDIJobLockStatus, DBDIRaeume} from './dexie.interfaces';
 import {User} from './auth/user.model';
 
 @Injectable({
@@ -12,6 +12,7 @@ export class BasedataService {
   @Output() gebaeudeChanged = new EventEmitter<DBDIGebaeude>();
   @Output() raumChanged = new EventEmitter<DBDIRaeume>();
   @Output() deviceChanged = new EventEmitter<number>();
+  @Output() inventurStatusChanged = new EventEmitter<DBDIJobLockStatus>();
 
   private currentInventur: DBDIInventuren;
   private currentGebaeude: DBDIGebaeude;
@@ -19,6 +20,7 @@ export class BasedataService {
   private currentUser: User;
   private previousUser: User;
   private currentDevice: number;
+  private currentInventurStatus: DBDIJobLockStatus;
 
   constructor() {
     this.currentInventur = JSON.parse( localStorage.getItem( 'currentInventur' ) );
@@ -27,6 +29,7 @@ export class BasedataService {
     this.currentGebaeude = JSON.parse( localStorage.getItem( 'currentGebaeude' ) );
     this.currentRaum = JSON.parse( localStorage.getItem( 'currentRaum' ) );
     this.currentDevice = JSON.parse( localStorage.getItem( 'currentDevice' ) );
+    this.currentInventurStatus = JSON.parse( localStorage.getItem( 'currentInventurStatus' ) );
   }
 
   setCurrentInventur(inventur: DBDIInventuren) {
