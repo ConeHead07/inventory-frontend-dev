@@ -11,7 +11,6 @@ import { faSquare as farSquare, faCheckSquare as farCheckSquare } from '@fortawe
 import { faStackOverflow, faGithub, faMedium } from '@fortawesome/free-brands-svg-icons';
 
 import { AppComponent } from './app.component';
-import { HeaderComponent } from './header/header.component';
 import { NgbModule } from '@ng-bootstrap/ng-bootstrap';
 import { AuthComponent } from './auth/auth.component';
 import { Routes, RouterModule } from '@angular/router';
@@ -75,7 +74,6 @@ persist();
 @NgModule({
   declarations: [
     AppComponent,
-    HeaderComponent,
     AuthComponent,
     SelectInventoryComponent,
     NgbheaderComponent,

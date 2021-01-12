@@ -2,6 +2,7 @@ import {EventEmitter, Injectable, Output} from '@angular/core';
 import {DBDIGebaeude, DBDIInventuren, DBDIJobLockStatus, DBDIRaeume} from './dexie.interfaces';
 import {User} from './auth/user.model';
 
+type stringCallback = () => string;
 @Injectable({
   providedIn: 'root'
 })
@@ -13,6 +14,7 @@ export class BasedataService {
   @Output() raumChanged = new EventEmitter<DBDIRaeume>();
   @Output() deviceChanged = new EventEmitter<number>();
   @Output() inventurStatusChanged = new EventEmitter<DBDIJobLockStatus>();
+  @Output() apiBaseUrlChanged = new EventEmitter<string>();
 
   private currentInventur: DBDIInventuren;
   private currentGebaeude: DBDIGebaeude;
@@ -21,6 +23,7 @@ export class BasedataService {
   private previousUser: User;
   private currentDevice: number;
   private currentInventurStatus: DBDIJobLockStatus;
+  private currentApiBaseUrl: string;
 
   constructor() {
     this.currentInventur = JSON.parse( localStorage.getItem( 'currentInventur' ) );
@@ -30,12 +33,19 @@ export class BasedataService {
     this.currentRaum = JSON.parse( localStorage.getItem( 'currentRaum' ) );
     this.currentDevice = JSON.parse( localStorage.getItem( 'currentDevice' ) );
     this.currentInventurStatus = JSON.parse( localStorage.getItem( 'currentInventurStatus' ) );
+    this.currentApiBaseUrl = JSON.parse( localStorage.getItem( 'currentApiBaseUrl' ) );
   }
 
   setCurrentInventur(inventur: DBDIInventuren) {
     this.currentInventur = inventur;
     localStorage.setItem('currentInventur', JSON.stringify( inventur ) );
     this.inventurChanged.emit( this.currentInventur );
+  }
+
+  setCurrentInventurStatus(inventurStatus: DBDIJobLockStatus) {
+    this.currentInventurStatus = inventurStatus;
+    localStorage.setItem('currentInventurStatus', JSON.stringify( inventurStatus ) );
+    this.inventurStatusChanged.emit( this.currentInventurStatus );
   }
 
   setCurrentGebaeude(gebaeude: DBDIGebaeude) {
@@ -65,6 +75,12 @@ export class BasedataService {
   setPreviousUser(user: User) {
     this.previousUser = user;
     localStorage.setItem('previousUser', JSON.stringify( user ) );
+  }
+
+  setCurrentApiBaseUrl(apiBaseUrl: string) {
+    this.currentApiBaseUrl = apiBaseUrl;
+    localStorage.setItem('currentApiBaseUrl', JSON.stringify( apiBaseUrl ) );
+    this.apiBaseUrlChanged.emit( this.currentApiBaseUrl );
   }
 
   getCurrentDevice(): number {
@@ -107,6 +123,10 @@ export class BasedataService {
     return this.currentInventur;
   }
 
+  getCurrentInventurStatus(): DBDIJobLockStatus {
+    return this.currentInventurStatus;
+  }
+
   getCurrentJobid(): number {
     try {
       return this.currentInventur.jobid;
@@ -145,5 +165,16 @@ export class BasedataService {
     } catch (e) {
       return 0;
     }
+  }
+
+  getCurrentApiBaseUrl(): string {
+    return this.currentApiBaseUrl;
+  }
+
+  getCurrentApiBaseUrlOrSetDefault(setter: stringCallback): string {
+    if (!this.currentApiBaseUrl) {
+      this.setCurrentApiBaseUrl(setter());
+    }
+    return this.currentApiBaseUrl;
   }
 }

@@ -4,5 +4,8 @@
     </span> ||
   Backend: <span [ngStyle]="{'color':currentState?.hasServerAccess?'green':'red'}">
       {{ currentState?.hasServerAccess ? 'ON' : 'OFF' }}!
+    </span> ||
+  Connected: <span [ngStyle]="{'color':currentState?.hasValidSession?'green':'red'}">
+      {{ currentState?.hasValidSession ? 'ON' : 'OFF' }}!
     </span>
 </div>

@@ -1,0 +1,14 @@
+{
+  "projects": {
+    "default": "mertens-inventory"
+  },
+  "targets": {
+    "mertens-inventory": {
+      "hosting": {
+        "frontend": [
+          "mertens-inventory"
+        ]
+      }
+    }
+  }
+}

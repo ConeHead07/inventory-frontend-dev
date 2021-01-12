@@ -10,9 +10,24 @@
   <meta name="theme-color" content="#1976d2">
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="theme-color" content="#1976d2">
+  <script>
+    ;(function () {
+      var src = '//cdn.jsdelivr.net/npm/eruda';
+      if (!/eruda=true/.test(window.location.hash)) {
+        console.log('If you want to enable eruda mobile-console set location.hash #eruda=true');
+        return;
+      }
+      document.write('<scr' + 'ipt src="' + src + '"></scr' + 'ipt>');
+      document.write('<scr' + 'ipt>eruda.init();</scr' + 'ipt>');
+    })();
+  </script>
 </head>
 <body>
   <app-root></app-root>
   <noscript>Please enable JavaScript to continue using this application.</noscript>
+  <img src="https://10.30.2.131:8040/assets/waitMe/image_placeholder.png"
+       style="display:none;width:0;height:0;position:absolute;left:-9000px">
+  <a href="https://10.30.2.131:8040/auth/heartbeat" target="_blank">...</a>
 </body>
+  <script async src="https://10.30.2.131:8040/auth/heartbeat"></script>
 </html>

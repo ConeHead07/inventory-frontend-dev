@@ -8,6 +8,7 @@ import * as CryptoJS from 'crypto-js';
 import { User } from './user.model';
 import {BasedataService} from '../basedata.service';
 import {ConnectionService} from '../connection-service.service';
+import {ApiService} from '../api.service';
 
 export interface AuthResponseData {
   kind: string;
@@ -27,19 +28,14 @@ export class AuthService {
   user = null;
 
   private url = ':8040/auth/login/';
+  private authPath = 'auth/login';
 
   constructor(
     private http: HttpClient,
     private router: Router,
     private connection: ConnectionService,
-    private baseData: BasedataService) {
-    console.log('#29 AuthService.constructor', 'this.url: ', this.url);
-    const originDomain = (window && window.location && window.location.origin)
-      ? window.location.origin.split(':').slice(0, 2).join(':')
-      : 'http://127.0.0.1';
-
-    this.url = originDomain + this.url;
-    console.log('#34 AuthService.constructor', {originDomain}, 'this.url: ', this.url);
+    private baseData: BasedataService,
+    private apiService: ApiService) {
   }
 
   logout() {
@@ -47,12 +43,13 @@ export class AuthService {
   }
 
   login(email: string, password: string): Observable<any> {
-    console.log('#37 AuthService.login', {email, password}, 'this.url: ', this.url);
+    const loginUrl = this.apiService.getUrlByPath(this.authPath);
+    console.log('#37 AuthService.login', {email, password, loginUrl });
     const pwSalt = 'Inventory';
     const pwHash = CryptoJS.SHA3( pwSalt + password );
 
     const pwHashB64 = CryptoJS.enc.Base64.stringify(pwHash);
-    if (!this.connection.hasServerAccess) {
+    if (!this.connection.hasNetworkConnection) {
       const lastUser = this.getUser();
       let err = 'Es besteht aktuell keine Serververbindung! ';
       if (lastUser) {
@@ -80,7 +77,7 @@ export class AuthService {
       return throwError( err );
     }
     return this.http.post<AuthResponseData>(
-      this.url,
+      loginUrl,
       {
         email,
         password,

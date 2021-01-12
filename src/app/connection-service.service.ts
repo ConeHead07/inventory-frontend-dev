@@ -3,6 +3,7 @@ import {fromEvent, Observable, Subscription, timer} from 'rxjs';
 import {debounceTime, delay, retryWhen, startWith, switchMap, tap} from 'rxjs/operators';
 import * as _ from 'lodash';
 import { HttpClient } from '@angular/common/http';
+import {ApiService} from './api.service';
 
 /**
  * Instance of this interface is used to report current connection status.
@@ -16,6 +17,8 @@ export interface ConnectionState {
    * "True" if browser has Internet access. Determined by heartbeat system which periodically makes request to heartbeat Url.
    */
   hasServerAccess: boolean;
+
+  hasValidSession: boolean;
 }
 
 /**
@@ -44,6 +47,8 @@ export interface ConnectionServiceOptions {
    */
   requestMethod?: 'get' | 'post' | 'head' | 'options';
 
+  responseType?: string;
+
 }
 
 /**
@@ -57,21 +62,24 @@ export const ConnectionServiceOptionsToken: InjectionToken<ConnectionServiceOpti
 export class ConnectionService implements OnDestroy {
   private static DEFAULT_OPTIONS: ConnectionServiceOptions = {
     enableHeartbeat: true,
-    heartbeatUrl: '/assets/ping.json',
+    heartbeatUrl: '/auth/heartbeat',
     heartbeatInterval: 120000,
     heartbeatRetryInterval: 60000,
-    requestMethod: 'head'
+    requestMethod: 'get',
+    responseType: 'text'
   };
 
   private stateChangeEventEmitter = new EventEmitter<ConnectionState>();
 
   private currentState: ConnectionState = {
     hasServerAccess: false,
+    hasValidSession: false,
     hasNetworkConnection: window.navigator.onLine
   };
   private offlineSubscription: Subscription;
   private onlineSubscription: Subscription;
   private httpSubscription: Subscription;
+  private sessionStateSubscription: Subscription;
   private serviceOptions: ConnectionServiceOptions;
 
   /**
@@ -85,11 +93,13 @@ export class ConnectionService implements OnDestroy {
   constructor(private http: HttpClient,
               @Inject(ConnectionServiceOptionsToken)
               @Optional()
-                options: ConnectionServiceOptions) {
+                options: ConnectionServiceOptions,
+              private apiService: ApiService) {
     this.serviceOptions = _.defaults({}, options, ConnectionService.DEFAULT_OPTIONS);
 
     this.checkNetworkState();
     this.checkInternetState();
+    // this.checkAuthenticationState();
   }
 
   private checkInternetState() {
@@ -97,11 +107,13 @@ export class ConnectionService implements OnDestroy {
     if (!_.isNil(this.httpSubscription)) {
       this.httpSubscription.unsubscribe();
     }
+    const method = this.serviceOptions.requestMethod;
+    const heartBeatPath = this.serviceOptions.heartbeatUrl;
 
     if (this.serviceOptions.enableHeartbeat) {
       this.httpSubscription = timer(0, this.serviceOptions.heartbeatInterval)
         .pipe(
-          switchMap(() => this.http[this.serviceOptions.requestMethod](this.serviceOptions.heartbeatUrl, {responseType: 'text'})),
+          switchMap(() => this.apiService[method]<ArrayBuffer>(heartBeatPath, {responseType: 'text'})),
           retryWhen(errors =>
             errors.pipe(
               // log error message
@@ -120,8 +132,13 @@ export class ConnectionService implements OnDestroy {
         )
         .subscribe(result => {
           const lastAccess = this.currentState.hasServerAccess;
+          const lastSession = this.currentState.hasValidSession;
           this.currentState.hasServerAccess = true;
-          if (lastAccess !== true) {
+          if (result && typeof result === 'string' && result.match(/"connected"\s*:\s*true/)) {
+            this.currentState.hasValidSession = true;
+          }
+          if (lastAccess !== true
+          || !lastSession && this.currentState.hasValidSession) {
             this.emitEvent();
           }
         });
@@ -138,6 +155,7 @@ export class ConnectionService implements OnDestroy {
     this.onlineSubscription = fromEvent(window, 'online').subscribe(() => {
       this.currentState.hasNetworkConnection = true;
       this.checkInternetState();
+      this.checkAuthenticationState();
       this.emitEvent();
     });
 
@@ -146,6 +164,53 @@ export class ConnectionService implements OnDestroy {
       this.checkInternetState();
       this.emitEvent();
     });
+  }
+
+  private checkAuthenticationState() {
+    const authPingUrl = this.apiService.getConnectedPingUrl();
+    console.log('ConnectionService.checkAuthenticationState #164', authPingUrl);
+
+    if (!_.isNil(this.sessionStateSubscription)) {
+      this.sessionStateSubscription.unsubscribe();
+    }
+
+    if (this.serviceOptions.enableHeartbeat) {
+      this.sessionStateSubscription = timer(0, this.serviceOptions.heartbeatInterval)
+        .pipe(
+          switchMap(() => this.http[this.serviceOptions.requestMethod](authPingUrl, {responseType: 'text'})),
+          retryWhen(errors =>
+            errors.pipe(
+              // log error message
+              tap(val => {
+                console.log('ConnectionService.checkAuthenticationState #178', authPingUrl);
+                console.error('Http error:', val);
+                const lastSessionState = this.currentState.hasValidSession;
+                this.currentState.hasValidSession = false;
+                if (lastSessionState !== false) {
+                  this.emitEvent();
+                }
+              }),
+              // restart after 5 seconds
+              delay(this.serviceOptions.heartbeatRetryInterval)
+            )
+          )
+        )
+        .subscribe(result => {
+          console.log('ConnectionService.checkAuthenticationState #186 subscribe result', { resultType: typeof result, result });
+          const jsonResult = typeof result === 'string' ? JSON.parse(result) : result;
+          const lastSessionState = this.currentState.hasValidSession;
+          this.currentState.hasValidSession = 'connected' in jsonResult && jsonResult.connected === true;
+          if (lastSessionState !== true) {
+            this.emitEvent();
+          }
+        });
+    } else {
+      const lastSessionState = this.currentState.hasValidSession;
+      this.currentState.hasValidSession = false;
+      if (lastSessionState !== false) {
+        this.emitEvent();
+      }
+    }
   }
 
   private emitEvent() {

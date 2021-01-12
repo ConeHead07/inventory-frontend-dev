@@ -186,6 +186,16 @@ export class InventarService {
 
     const id = await this.dexie.inventar.add( { ...item, ...log});
     item.ivid = id;
+    if (id) {
+      this.dexie.barcodeLookup.add({
+        code: inventar.code,
+        table: 'inventar',
+        key: 'ivid',
+        id,
+        uuid,
+        for_jobid: inventar.jobid || jobid
+      });
+    }
     this.changed.emit({
       type: InventarChangeType.Create,
       table: this.dexie.inventar.name,
