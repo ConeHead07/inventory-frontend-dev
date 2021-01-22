@@ -159,7 +159,7 @@ export class RaumService {
   }
 
   public async updateById(rid: number, raum: DBDIRaeume|RaumBasisDaten): Promise<DBUpdateRaumResult> {
-    console.log('#143 raum.service.ts updateById:', { rid, raum });
+    console.log('#162 raum.service.ts updateById:', { rid, raum });
     const jobid = this.baseDataService.getCurrentJobid();
     const savedRaumData = await this.dexie.raeume.get(rid);
     // uuid: "5bd9a47f-4b0b-11eb-8949-0242ac140002"
@@ -169,26 +169,44 @@ export class RaumService {
         code: savedRaumData.code,
         for_jobid: jobid
       };
+      console.log('#172 raum.service.ts Raum-Code has changed', { lkupKey });
       const bcItem = await this.dexie.barcodeLookup.get(lkupKey);
+      console.log('#174 raum.service.ts check if bcItem exists', { bcItem });
       if (bcItem) {
-        await this.dexie.barcodeLookup.update([savedRaumData.code, jobid], {
-          code: raum.code
-        });
-      } else {
-        this.dexie.barcodeLookup.put({
-          code: raum.code,
-          for_jobid: jobid,
-          id: rid,
-          key: 'rid',
-          table: 'raeume',
-          updateHelper: 1,
-          uuid: savedRaumData.uuid
+        await this.dexie.barcodeLookup.delete([savedRaumData.code, jobid]).catch( (reason) => {
+          console.error('#177 Alter BC-Lookup fuer Raum konnte nicht geloescht werden!', { reason });
         });
       }
+
+      console.log('#184 raum.service.ts create new bcItem', {
+        code: raum.code,
+        for_jobid: jobid,
+        id: rid,
+        key: 'rid',
+        table: 'raeume',
+        updateHelper: 1,
+        uuid: savedRaumData.uuid
+      });
+      this.dexie.barcodeLookup.put({
+        code: raum.code,
+        for_jobid: jobid,
+        id: rid,
+        key: 'rid',
+        table: 'raeume',
+        updateHelper: 1,
+        uuid: savedRaumData.uuid
+      });
     }
 
+    console.log('#205 raum.service.ts update raum', { rid, raum });
     const numChanges = await this.dexie.raeume.update(rid, raum);
     const savedData = await this.dexie.raeume.get(rid);
+    console.log('#208 raum.service.ts get updated raumItem', { rid, savedData, 'return': {
+        success: numChanges > 0,
+        id: rid,
+        item: savedData,
+        data: raum
+      }});
     return {
       success: numChanges > 0,
       id: rid,

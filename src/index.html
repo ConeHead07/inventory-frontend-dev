@@ -25,9 +25,30 @@
 <body>
   <app-root></app-root>
   <noscript>Please enable JavaScript to continue using this application.</noscript>
-  <img src="https://10.30.2.131:8040/assets/waitMe/image_placeholder.png"
-       style="display:none;width:0;height:0;position:absolute;left:-9000px">
-  <a href="https://10.30.2.131:8040/auth/heartbeat" target="_blank">...</a>
+
+  <script>
+    ;(function () {
+        var src = '//cdn.jsdelivr.net/npm/eruda';
+        if (!/\.web\.app$/.test(window.location.hostname) && !/\.firebase\.app$/.test(window.location.hostname)) {
+          console.log('App does not run on firebase-Server');
+          return;
+        }
+        /*
+        <!-- The core Firebase JS SDK is always required and must be listed first -->
+        */
+        document.write('<scr' + 'ipt src="/__/firebase/8.2.2/firebase-app.js"></scr' + 'ipt>');
+
+        /*
+        <!-- TODO: Add SDKs for Firebase products that you want to use
+        https://firebase.google.com/docs/web/setup#available-libraries -->
+         */
+        document.write('<scr' + 'ipt src="/__/firebase/8.2.2/firebase-analytics.js"></scr' + 'ipt>');
+
+        /*
+        <!-- Initialize Firebase -->
+        */
+        document.write('<scr' + 'ipt src="/__/firebase/init.js"></scr' + 'ipt>');
+      })();
+    </script>
 </body>
-  <script async src="https://10.30.2.131:8040/auth/heartbeat"></script>
 </html>

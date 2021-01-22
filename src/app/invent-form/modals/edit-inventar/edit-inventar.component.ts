@@ -147,6 +147,7 @@ export class EditInventarComponent implements OnInit {
     private dataService: DataService ) { }
 
     async loadHersteller(): Promise<number> {
+      console.log('EditInventarComponent #150 loadHersteller');
       return this.herstellerService.getAllHerstellerWithIds()
         .then( list => {
           while (states.length > 0) {
@@ -164,6 +165,7 @@ export class EditInventarComponent implements OnInit {
     }
 
     async loadGruppenKategorien(): Promise<number> {
+      console.log('EditInventarComponent #168');
       return this.artikelService.getGroupedArtikelGruppenKategorien()
         .then( (list) => {
           gruppenKategorien.length = 0;
@@ -174,6 +176,7 @@ export class EditInventarComponent implements OnInit {
     }
 
     async loadGruppen(): Promise<number> {
+      console.log('EditInventarComponent #179');
       return this.artikelService.getGroupedArtikelGruppen()
         .then( list => {
           artikelGruppen.length = 0;
@@ -184,6 +187,7 @@ export class EditInventarComponent implements OnInit {
     }
 
     async loadKategorien(): Promise<number> {
+      console.log('EditInventarComponent #190');
       return this.artikelService.getGroupedArtikelKategorien()
         .then( list => {
           artikelKategorien.length = 0;
@@ -194,6 +198,7 @@ export class EditInventarComponent implements OnInit {
     }
 
     async loadArtikeltypen(): Promise<number> {
+      console.log('EditInventarComponent #201');
       return this.artikelService.getGroupedArtikelProperties('Typ')
         .then( list => {
           artikelTypen.length = 0;
@@ -204,6 +209,7 @@ export class EditInventarComponent implements OnInit {
     }
 
     async loadFarben(): Promise<number> {
+      console.log('EditInventarComponent #212');
       return this.artikelService.getGroupedArtikelFarben()
         .then( list => {
           artikelFarben.length = 0;
@@ -214,6 +220,7 @@ export class EditInventarComponent implements OnInit {
     }
 
     async loadGroessen(): Promise<number> {
+      console.log('EditInventarComponent #223');
       return this.artikelService.getGroupedArtikelGroessen()
         .then( list => {
           artikelGroessen.length = 0;
@@ -224,6 +231,7 @@ export class EditInventarComponent implements OnInit {
     }
 
   ngOnInit() {
+    console.log('EditInventarComponent #234 ngOnInit');
     this.mid = this.baseData.getCurrentMid();
     Promise.all([
       this.loadHersteller(),
@@ -276,6 +284,7 @@ export class EditInventarComponent implements OnInit {
   }
 
   openScanner(target) {
+    console.log('EditInventarComponent #287 openScanner');
     this.scannerRequest.emit(target);
   }
 
@@ -285,8 +294,10 @@ export class EditInventarComponent implements OnInit {
   }
 
   set inventarId(id: number) {
+    console.log('EditInventarComponent #297 set inventarId(id)', { id });
     this.id = id;
     this.inventarService.getInventar(id).then( result => {
+      console.log('EditInventarComponent #300 getInventar', { result });
       this.inventarDaten = result;
       if (result && result.success) {
         this.inventarInput.ivid = id;
@@ -295,7 +306,11 @@ export class EditInventarComponent implements OnInit {
         this.inventarInput.Gruppe = result.artikelData.Gruppe;
         this.inventarInput.Kategorie = result.artikelData.Kategorie;
         this.inventarInput.Typ = result.artikelData.Typ;
-        this.inventarInput.Hersteller = result.hersteller.Hersteller;
+        if (result.hersteller && result.hersteller.Hersteller) {
+          this.inventarInput.Hersteller = result.hersteller.Hersteller;
+        } else {
+          this.inventarInput.Hersteller = '';
+        }
         this.inventarInput.Groesse = result.artikelData.Groesse;
         this.inventarInput.Farbe = result.artikelData.Farbe;
         this.inventarInput.mcid = result.inventar.mcid;
@@ -334,6 +349,7 @@ export class EditInventarComponent implements OnInit {
   }
 
   async delegateListArticleMatches(delay?: number) {
+    console.log('EditInventarComponent #347');
     const funcName = 'listArticleMatches';
     const delayMS = isNaN(delay) ? 2000 : delay;
     if (funcName in this.delayedTrigger) {
@@ -346,6 +362,7 @@ export class EditInventarComponent implements OnInit {
   }
 
   async rebuildTypeaheadKategorien(gruppe?: string) {
+    console.log('EditInventarComponent #360');
     const grpKategorien = gruppenKategorien.find( itm => itm.gruppe === gruppe);
     if (gruppe && grpKategorien && grpKategorien.kategorien.length) {
       artikelKategorien.length = 0;
@@ -369,6 +386,7 @@ export class EditInventarComponent implements OnInit {
   }
 
   async rebuildTypeaheadTypen() {
+    console.log('EditInventarComponent #384');
     const where = this.getWhereInputsOf(['hid']);
     this.artikelService.getGroupedArtikelTypen(where).then( list => {
       artikelTypen.length = 0;
@@ -377,6 +395,7 @@ export class EditInventarComponent implements OnInit {
   }
 
   async rebuildTypeaheadFarben() {
+    console.log('EditInventarComponent #393');
     const where = this.getWhereInputsOf(['hid']);
     this.artikelService.getGroupedArtikelFarben(where).then( list => {
       artikelFarben.length = 0;
@@ -385,6 +404,7 @@ export class EditInventarComponent implements OnInit {
   }
 
   async checkHersteller(): Promise<boolean> {
+    console.log('EditInventarComponent #402');
     console.log('called checkHersteller');
     const input = this.inventarInput.Hersteller;
     const term = (typeof input === 'string') ? input.trim() : '';
@@ -438,6 +458,7 @@ export class EditInventarComponent implements OnInit {
   }
 
   async checkIfArtikelExistsMandant(): Promise<boolean> {
+    console.log('EditInventarComponent #465');
     console.log('check if bezeichnung exists');
     this.numBezeichnungExists = -1;
 
@@ -462,6 +483,7 @@ export class EditInventarComponent implements OnInit {
   }
 
   async save(): Promise<boolean> {
+    console.log('EditInventarComponent #481');
     this.formError = '';
     console.log('save inventar');
     if (await this.formValidate()) {
@@ -470,7 +492,11 @@ export class EditInventarComponent implements OnInit {
       if (result.success) {
         this.inventarChanged.emit(result);
 
-        this.inventarInput.hid = result.hersteller.hid;
+        if (result.hersteller && result.hersteller.hid) {
+          this.inventarInput.hid = result.hersteller.hid;
+        } else {
+          this.inventarInput.hid = null;
+        }
         this.inventarInput.huuid = result.hersteller.uuid;
         this.inventarInput.mcid = result.artikelRef.mcid;
         this.inventarInput.mcuuid = result.artikelRef.uuid;
@@ -489,6 +515,7 @@ export class EditInventarComponent implements OnInit {
   }
 
   async applyItemAsArtikel(item: any) {
+    console.log('EditInventarComponent #509');
     this.applyItemAsInput(item);
     console.log('#361 applyItemAsArtikel', { item });
     if (!item.mcid || !item.mcuuid) {
@@ -513,6 +540,7 @@ export class EditInventarComponent implements OnInit {
   }
 
   applyItemAsInput(item: any) {
+    console.log('EditInventarComponent #534');
     console.log('#367 applyItemAsInput', { item });
     this.inventarInput.Hersteller = item.Hersteller;
     this.inventarInput.hid = item.hid;
@@ -528,6 +556,7 @@ export class EditInventarComponent implements OnInit {
   formatter = (state: string) => state;
 
   search = (text$: Observable<string>) => {
+    console.log('EditInventarComponent #550');
     const debouncedText$ = text$.pipe(debounceTime(200), distinctUntilChanged());
     const clicksWithClosedPopup$ = this.click$.pipe(filter(() => !this.instance.isPopupOpen()));
     const inputFocus$ = this.focus$;
@@ -539,6 +568,7 @@ export class EditInventarComponent implements OnInit {
   }
 
   searchGruppen = (text$: Observable<string>) => {
+    console.log('EditInventarComponent #562');
     const debouncedText$ = text$.pipe(debounceTime(200), distinctUntilChanged());
     const clicksWithClosedPopup$ = this.clickGrp$.pipe(filter(() => !this.instanceGrp.isPopupOpen()));
     const inputFocus$ = this.focusGrp$;
@@ -561,6 +591,7 @@ export class EditInventarComponent implements OnInit {
   }
 
   searchTypen = (text$: Observable<string>) => {
+    console.log('EditInventarComponent #585');
     const debouncedText$ = text$.pipe(debounceTime(200), distinctUntilChanged());
     const clicksWithClosedPopup$ = this.clickTyp$.pipe(filter(() => !this.instanceTyp.isPopupOpen()));
     const inputFocus$ = this.focusTyp$;
@@ -572,6 +603,7 @@ export class EditInventarComponent implements OnInit {
   }
 
   searchGroessen = (text$: Observable<string>) => {
+    console.log('EditInventarComponent #597');
     const debouncedText$ = text$.pipe(debounceTime(200), distinctUntilChanged());
     const clicksWithClosedPopup$ = this.clickGrs$.pipe(filter(() => !this.instanceGrs.isPopupOpen()));
     const inputFocus$ = this.focusGrs$;
@@ -583,6 +615,7 @@ export class EditInventarComponent implements OnInit {
   }
 
   searchFarben = (text$: Observable<string>) => {
+    console.log('EditInventarComponent #609', { text$ });
     const debouncedText$ = text$.pipe(debounceTime(200), distinctUntilChanged());
     const clicksWithClosedPopup$ = this.clickFa$.pipe(filter(() => !this.instanceFa.isPopupOpen()));
     const inputFocus$ = this.focusFa$;
@@ -591,9 +624,11 @@ export class EditInventarComponent implements OnInit {
       map(term => (term === '' ? artikelFarben
         : artikelFarben.filter(item => new RegExp(term, 'mi').test(item))).slice(0, 10))
     );
+    console.log('EditInventarComponent #618');
   }
 
   onInput(event?: Event) {
+    console.log('EditInventarComponent #621');
     this.inputChanging.emit(event);
   }
 
@@ -650,6 +685,7 @@ export class EditInventarComponent implements OnInit {
   }
 
   onPageChange(page: number) {
+    console.log('EditInventarComponent #678');
     this.collectionSize = this.listExistingArticleMatches.length;
     this.pageSize = 8;
     const start = (page - 1) * this.pageSize;

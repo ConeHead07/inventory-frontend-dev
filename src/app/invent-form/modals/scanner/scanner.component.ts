@@ -9,6 +9,7 @@ import {faTrashAlt, faCheck} from '@fortawesome/free-solid-svg-icons';
 import {ImagesService} from '../../data-services/images.service';
 import {ZXingScannerComponent} from '@zxing/ngx-scanner';
 import {BasedataService} from '../../../basedata.service';
+import {VariablesService} from "../../../inventory/service/variables.service";
 
 export interface ScannerBarcodeData {
   barcode?: string;
@@ -91,12 +92,17 @@ export class ScannerComponent implements OnInit {
     private dataService: DataService,
     private bcLookup: BarcodeService,
     private imageService: ImagesService,
-    private baseData: BasedataService
+    private baseData: BasedataService,
+    private variables: VariablesService
   ) {}
 
 
   ngOnInit() {
     this.jobid = this.baseData.getCurrentJobid();
+
+    this.variables.get('manualBarcodeInput', false).then( (status) => {
+      this.allowBarcodeInput = status;
+    });
   }
 
   clearResult(): void {
@@ -288,7 +294,7 @@ export class ScannerComponent implements OnInit {
 
   onCamerasFound(devices: MediaDeviceInfo[]): void {
     this.availableDevices = devices;
-    this.allowBarcodeInput = false;
+    // this.allowBarcodeInput = false;
     this.hasDevices = Boolean(devices && devices.length);
     if (this.hasDevices) {
       for (const dev of this.availableDevices) {
@@ -366,7 +372,7 @@ export class ScannerComponent implements OnInit {
   onDeviceSelectChange(selected: string) {
     const device = this.availableDevices.find(x => x.deviceId === selected);
     this.currentDevice = device || null;
-    this.allowBarcodeInput = !device;
+    // this.allowBarcodeInput = !device;
   }
 
   openFormatsDialog() {

@@ -87,7 +87,7 @@ export interface DBDIInventar extends DBDITableWithBarcode {
   hash?: string;
   code?: string;
   rid: number;
-  ruuid?: number;
+  ruuid?: string;
   rid_init?: number;
   rid_neu?: number;
   Bezeichnung?: string;

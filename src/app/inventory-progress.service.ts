@@ -1,5 +1,5 @@
 import {EventEmitter, Injectable, Output} from '@angular/core';
-import {DBDIInventar, DBDIJobLockStatus, DBDIRaeume} from './dexie.interfaces';
+import {DBDIInventar, DBDIInventurenUserStatus, DBDIJobLockStatus, DBDIRaeume} from './dexie.interfaces';
 import { DexieService } from './dexie.service';
 import {BasedataService} from './basedata.service';
 
@@ -37,11 +37,14 @@ export class InventoryProgressService {
     const uid = this.baseData.getCurrentUid();
     const deviceId = this.baseData.getCurrentDeviceId();
     const status = DBDIJobLockStatus.Locked;
+    console.log('InventoryProgressService #40 setCurrentInventurLockStatusClosed',
+      { jobid, uid, deviceId, status });
 
     const exists = await this.dexieService.inventurenUserStatus
       .where({jobid, uid, device_id: deviceId})
       .count();
 
+    console.log('InventoryProgressService #46 setCurrentInventurLockStatusClosed', { exists });
     if (exists) {
       return this.dexieService.inventurenUserStatus
         .update([jobid, uid, deviceId], {
@@ -50,30 +53,36 @@ export class InventoryProgressService {
           modified_at: new Date()
         })
         .then( () => {
-        this.inventurLockStatusChanged.emit( status );
-        return true;
+          console.log('InventoryProgressService #55 setCurrentInventurLockStatusClosed update emit Status Locked');
+          this.inventurLockStatusChanged.emit( status );
+          return true;
       })
         .catch( () => {
           return false;
         });
     } else {
+      console.log('InventoryProgressService #63 setCurrentInventurLockStatusClosed insert Status Locked');
+      const insertKey = [jobid, uid, deviceId];
+      const insertDaten: DBDIInventurenUserStatus = {
+        jobid,
+        uid,
+        device_id: deviceId,
+        token: '',
+        status: DBDIJobLockStatus.Locked,
+        geladen_am: new Date(),
+        geschlossen_am: new Date(),
+        created_at: new Date(),
+        modified_at: new Date()
+      };
       return this.dexieService.inventurenUserStatus
-        .put({
-          jobid,
-          uid,
-          device_id: deviceId,
-          token: '',
-          status: DBDIJobLockStatus.Locked,
-          geladen_am: new Date(),
-          geschlossen_am: new Date(),
-          created_at: new Date(),
-          modified_at: new Date()
-        }, [jobid, uid, deviceId])
+        .add(insertDaten)
         .then( () => {
+          console.log('InventoryProgressService #77 setCurrentInventurLockStatusClosed inserted emit Status Locked');
           this.inventurLockStatusChanged.emit( status );
           return true;
         })
-        .catch( () => {
+        .catch( (reason) => {
+          console.error('InventoryProgressService #83 Status Locked konnte nicht gesetzt werden', { reason, insertDaten });
           return false;
         });
     }
@@ -84,6 +93,8 @@ export class InventoryProgressService {
     const uid = this.baseData.getCurrentUid();
     const deviceId = this.baseData.getCurrentDeviceId();
     const status = DBDIJobLockStatus.Unlocked;
+    console.log('InventoryProgressService #88 setCurrentInventurLockStatusOpened',
+      { jobid, uid, deviceId, status });
 
     const exists = await this.dexieService.inventurenUserStatus
       .where({jobid, uid, device_id: deviceId})
@@ -104,8 +115,8 @@ export class InventoryProgressService {
           return false;
         });
     } else {
-      return this.dexieService.inventurenUserStatus
-        .put({
+      const insertKey: [number, number, number ] = [jobid, uid, deviceId];
+      const insertDaten: DBDIInventurenUserStatus = {
         jobid,
         uid,
         device_id: deviceId,
@@ -115,12 +126,16 @@ export class InventoryProgressService {
         geschlossen_am: null,
         created_at: new Date(),
         modified_at: new Date()
-      }, [jobid, uid, deviceId])
+      };
+      return this.dexieService.inventurenUserStatus
+        .put(insertDaten, insertKey)
         .then( () => {
           this.inventurLockStatusChanged.emit( status );
           return true;
         })
-        .catch( () => {
+        .catch( (reason) => {
+          console.error('InventoryProgressService #137 Status Opened konnte nicht gesetzt werden',
+            { reason, insertKey, insertDaten });
           return false;
         });
     }

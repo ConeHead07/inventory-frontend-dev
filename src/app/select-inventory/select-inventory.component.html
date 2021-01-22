@@ -127,7 +127,7 @@
 
   <div class="row">
     <div class="col col-sm-6 offset-sm-6">
-      <button [disabled]="!building" class="btn btn-primary w-100">Starten</button>
+      <button [disabled]="!building || loading" class="btn btn-primary w-100">Starten</button>
   </div>
     <div *ngIf="status" class="alert-info">{{status}}</div>
   </div>

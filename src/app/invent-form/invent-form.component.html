@@ -52,7 +52,7 @@
   <label for="raumCode" class="col-8"><strong>Raumdaten</strong></label>
 
   <div class="col-4 text-right">
-    <div ngbDropdown style="display: inline-block">
+    <div #invDrop="ngbDropdown" ngbDropdown style="display: inline-block">
       <button [ngClass]="{
         'btn-outline-success': jobLockStatus === 2,
         'btn-outline-info': jobLockStatus === 1,
@@ -62,7 +62,7 @@
               id="dropdownLockStatus"
               class="btn btn-sm dropdown-toggle"
               type="button" data-toggle="dropdown" aria-haspopup="true"
-              aria-expanded="false">
+              aria-expanded="false"> Inventur ({{ jobLockStatus }})
         <ng-container [ngSwitch]="jobLockStatus">
           <fa-icon *ngSwitchCase="2" [icon]="faLock"></fa-icon>
           <fa-icon *ngSwitchCase="1" [icon]="faUnlockAlt"></fa-icon>
@@ -91,14 +91,14 @@
               id="dropdownRaumStatus"
               class="btn btn-sm dropdown-toggle"
               type="button" data-toggle="dropdown" aria-haspopup="true"
-              aria-expanded="false">
+              aria-expanded="false"> Raum
         <ng-container [ngSwitch]="raumEditStatus">
           <fa-icon *ngSwitchCase="2" [icon]="faCheck"></fa-icon>
           <fa-icon *ngSwitchCase="1" [icon]="faDoorOpen"></fa-icon>
           <fa-icon *ngSwitchDefault [icon]="faDoorClosed"></fa-icon>
         </ng-container>
       </button>
-      <div class="dropdown-menu dropdown-menu-right" [style.right]="0" ngbDropdownMenu aria-labelledby="dropdownRaumStatus">
+      <div class="dropdown-menu dropdown-menu-right" [style.width]="'200px'" ngbDropdownMenu aria-labelledby="dropdownRaumStatus">
         <button ngbDropdownItem class="dropdown-item"
                 (click)="setRaumEditStatusClosed()"><fa-icon [attr.class]="'text-success'" [icon]="faCheck"></fa-icon>
           Fertig
@@ -167,11 +167,11 @@
         <div class="input-group-prepend">
           <span class="input-group-text">BCode</span>
         </div>
-        <input id="elmBarcode" #invBarcode readonly
-               required
-               [ngClass]="{'bg-danger': waitingForNewInventarBarcode }" type="text"
-               [attr.value]="formInventar.Barcode" class="form-control"
-               [placeholder]="!waitingForNewInventarBarcode ? 'Inventar-Barcode ...' : 'Warte auf Inventar-Barcode ...'" aria-label="Barcode">
+        <input id="elmBarcode" class="form-control" type="text" aria-label="Barcode"
+               required #invBarcode readonly
+               [ngClass]="{'bg-danger': waitingForNewInventarBarcode || waitingForInventarData }"
+               [attr.value]="formInventar.Barcode"
+               [placeholder]="!waitingForNewInventarBarcode ? 'Inventar-Barcode ...' : 'Warte auf Inventar-Barcode ...'">
         <div class="input-group-append">
           <button class="btn btn-outline-success" type="button" (click)="openScanner(invBarcode)">
             <fa-icon [icon]="faCamera"></fa-icon>
@@ -179,6 +179,9 @@
         </div>
       </div>
   </div>
+  <ngb-alert *ngIf="waitingForInventarData" type="danger">
+    Warte auf Artikelzuweisung für neuen Inventar-Barcode: {{ formInventar.Barcode }}
+  </ngb-alert>
   <div class="form-group row">
       <div class="col input-group mb-1">
         <div class="input-group-prepend">

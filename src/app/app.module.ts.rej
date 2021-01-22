@@ -1,0 +1,22 @@
+diff a/src/app/app.module.ts b/src/app/app.module.ts	(rejected hunks)
+@@ -55,13 +55,13 @@
+ 
+ const appRoutes: Routes = [
+   { path: '', component: AuthComponent },
+-  { path: 'auth', component: AuthComponent },
+-  { path: 'select-inventory', component: SelectInventoryComponent },
+-  { path: 'form-inventory/:clientid/:buildingid/:roomid', component: InventFormComponent },
+-  { path: 'form-inventory/:clientid/:buildingid', component: InventFormComponent },
+-  { path: 'form-inventory', component: InventFormComponent },
+-  { path: 'sync', component: DbsyncComponent },
+-  { path: 'settings', component: SettingsComponent }
++  { path: 'app/auth', component: AuthComponent },
++  { path: 'app/select-inventory', component: SelectInventoryComponent },
++  { path: 'app/form-inventory/:clientid/:buildingid/:roomid', component: InventFormComponent },
++  { path: 'app/form-inventory/:clientid/:buildingid', component: InventFormComponent },
++  { path: 'app/form-inventory', component: InventFormComponent },
++  { path: 'app/sync', component: DbsyncComponent },
++  { path: 'app/settings', component: SettingsComponent }
+ ];
+ 
+ async function persist() {

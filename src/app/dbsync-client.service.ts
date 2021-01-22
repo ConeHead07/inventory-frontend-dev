@@ -1,4 +1,4 @@
-import {EventEmitter, Injectable, Output} from '@angular/core';
+import {EventEmitter, Injectable, OnDestroy, Output} from '@angular/core';
 import {ApiService} from './api.service';
 import {BasedataService} from './basedata.service';
 import {DexieService} from './dexie.service';
@@ -6,6 +6,8 @@ import {DBDIBarcodeLookup, DBDIClientChangeLog} from './dexie.interfaces';
 import {ConnectionService} from './connection-service.service';
 import {VariablesService} from './inventory/service/variables.service';
 import {DbsyncLogService, TableSyncProgress} from './dbsync-log.service';
+import {DatabaseChangeType} from 'dexie-observable/api';
+import {Subscription} from "rxjs";
 
 export interface TableSyncProgressList {
   [key: string]: TableSyncProgress;
@@ -101,6 +103,16 @@ interface SyncServerResponseTest {
 interface SyncIncompleteInventuren {
   jobid: number;
   changes: DBDIClientChangeLog[];
+}
+
+interface CurrentJobSyncStatus {
+  jobid: number;
+  unsyncedClientLogs: number;
+  serverRevisionId: number;
+  clientRevisionId: number;
+  isRunning: boolean;
+  isUploading: boolean;
+  jobStatus: SyncJobStatus;
 }
 
 export enum SyncJobStatus {
@@ -207,7 +219,7 @@ export class SyncJobResult {
 @Injectable({
   providedIn: 'root'
 })
-export class DBSyncClientService {
+export class DBSyncClientService implements OnDestroy {
 
   private status: 0;
   private processes: SyncJobResult[] = [];
@@ -216,8 +228,12 @@ export class DBSyncClientService {
   public processFinished = new EventEmitter<SyncJobResult>();
   private syncIntervalTimer = null;
   private fullImportJobid = 0;
+  private currentJobSyncStatus: CurrentJobSyncStatus;
+  private subscriptionClientLogsChanged: Subscription;
 
   @Output() autoSyncChange = new EventEmitter<boolean>();
+  @Output() updateStatusChanges = new EventEmitter<any>();
+  @Output() currentJobChange = new EventEmitter<CurrentJobSyncStatus>();
 
   constructor(
     private dexieService: DexieService,
@@ -227,7 +243,26 @@ export class DBSyncClientService {
     private settings: VariablesService,
     private dbSyncLogService: DbsyncLogService) {
 
+    this.subscriptionClientLogsChanged = this.dexieService.clientSyncAmountChanged.subscribe( (amount) => {
+      console.log('DBSyncClientService #245 clientSyncAmountChanged: ', { amount });
+    });
     this.autoSyncStart();
+  }
+
+  ngOnDestroy() {
+    this.subscriptionClientLogsChanged.unsubscribe();
+  }
+
+  initCurrentJobSyncStatus() {
+    this.currentJobSyncStatus = {
+      jobid: 0,
+      unsyncedClientLogs: 0,
+      serverRevisionId: 0,
+      clientRevisionId: 0,
+      isUploading: false,
+      isRunning: false,
+      jobStatus: SyncJobStatus.Init
+    };
   }
 
   autoSyncIsRunning() {
@@ -380,7 +415,7 @@ export class DBSyncClientService {
   }
 
   async sendByJobId(useJobid: number, useLogs?: DBDIClientChangeLog[], useJobResult?: SyncJobResult): Promise<SyncJobResult> {
-    console.log('[called sendByJobId](' + useJobid + ', useLogs, useJobResult)');
+    console.log('[called sendByJobId](' + useJobid + ', useLogs(', { useLogs, useJobResult });
     this.clearFinishedProcesses();
     const jobid = useJobid;
     const syncJobResult = useJobResult || new SyncJobResult(jobid);
@@ -533,7 +568,7 @@ export class DBSyncClientService {
             await Promise.all(data.serverRechanges.map(async (chg) => {
               chg.table = chg.table[0].toLowerCase() + chg.table.substr(1);
               chg.mods.log = false;
-              await this.dexieService.table(chg.table).where({uuid: chg.uuid}).modify(chg.mods);
+              return this.dexieService.table(chg.table).where({uuid: chg.uuid}).modify(chg.mods);
             }));
           }
 
@@ -663,147 +698,8 @@ export class DBSyncClientService {
     return true;
   }
 
-  async sendByJobId_ALT(useJobid: number, useLogs?: DBDIClientChangeLog[], useJobResult?: SyncJobResult): Promise<SyncJobResult> {
-    console.log('[called sendByJobId](' + useJobid + ', useLogs, useJobResult)');
-    this.clearFinishedProcesses();
-    const jobid = useJobid;
-    const syncJobResult = useJobResult || new SyncJobResult(jobid);
-    const jobInProcess = this.processes.find( proc => proc.jobid === jobid);
-    if (jobInProcess && !jobInProcess.finished) {
-      syncJobResult.alreadyStartedProcess = jobInProcess;
-      return syncJobResult.finish(SyncJobStatus.AlreadyStarted);
-    }
-    syncJobResult.setStatus( SyncJobStatus.Pending );
-    this.processStarted.emit( syncJobResult );
-
-    if (!useLogs || !useLogs.length) {
-      syncJobResult.setStatus(SyncJobStatus.QueryChangeLogs );
-      useLogs = await this.getUnsyncedChangeLogsByJobId( useJobid );
-    }
-    if (!useLogs) {
-      return this.finishProcess(syncJobResult, SyncJobStatus.AbortedEmptyChangeLogs);
-    }
-    const logs = useLogs;
-    const devid = this.baseData.getCurrentDeviceId() || 0;
-
-    syncJobResult.sendClientDeviceId = devid;
-    syncJobResult.committedIds = logs.map<number>( (itm) => itm.id );
-
-    if (!this.networkService.hasServerAccess) {
-      return this.finishProcess(
-        syncJobResult,
-        SyncJobStatus.Offline,
-        'Synchronisatioon wurde abgeborochen wegen fehlernder Serververbindung!'
-      );
-    }
-
-    console.log('[called sendByJobId] call this.processes.push(syncJobResult)');
-    this.processingJobids.push( jobid );
-    this.processes.push(syncJobResult);
-    const lastDownloads = {
-      gebaeude: this.settings.get( `gebaeude-${jobid}-download-success`),
-      objektKatalogGlobal: this.settings.get( `objektKatalogGlobal-${jobid}-download-success`),
-      objektKatalogMandant: this.settings.get( `objektKatalogGlobal-${jobid}-download-success`),
-      objektbuchBarcodesLookupt: this.settings.get( `objektbuchBarcodesLookup-${jobid}-download-success`),
-      inventar: this.settings.get( `inventar-${jobid}-download-success`),
-      raeume: this.settings.get( `raeume-${jobid}-download-success`),
-      images: this.settings.get( `images-${jobid}-download-success`),
-      hersteller: this.settings.get( `hersteller-${jobid}-download-success`),
-    };
-
-    syncJobResult.committed = logs.length;
-    await this.apiService
-      .post<SyncServerResponse>(
-      `api/sync/importchanges/${jobid}`,
-      {
-        jobid,
-        devid,
-        lastDownloads,
-        changes: logs
-      })
-      .toPromise()
-      .then( (data) => {
-        if ('errorMsg' in data && data.errorMsg) {
-          syncJobResult.errorMsg = data.errorMsg;
-        }
-        console.log('#26 Response of sendByJobId', { data });
-        if ( ('setClientDeviceId' in data) && data.setClientDeviceId > 0) {
-          this.baseData.setCurrentDevice( data.setClientDeviceId );
-        }
-        syncJobResult.confirmed = data.syncedLogIds.length;
-        syncJobResult.confirmedIds = data.syncedLogIds;
-        syncJobResult.unsynced = syncJobResult.committed - syncJobResult.confirmed;
-        syncJobResult.serverChanges = data.serverChangeLogs;
-
-        if (data.syncMappedIds) {
-          for (let tableName of Object.keys(data.syncMappedIds)) {
-            tableName = tableName[0].toLowerCase() + tableName.substr(1);
-            if (data.syncMappedIds[tableName]) {
-              const table = this.dexieService.table(tableName);
-              const tblKey = table.schema.primKey.keyPath[0];
-              for (const oldId in data.syncMappedIds[tableName]) {
-                if (data.syncMappedIds[tableName].hasOwnProperty(oldId)) {
-                  const modKey: any = {};
-                  modKey[tblKey] = data.syncMappedIds[tableName][oldId];
-                  table.where(tblKey).equals(oldId).modify({ ...modKey, ...{log: false}});
-                }
-              }
-            }
-          }
-        }
-        const mapWithNoLog = (item: object) => {
-          return {...{item}, ...{log: false}};
-        };
-
-        if (syncJobResult.serverChanges) {
-          const tblChanges = syncJobResult.serverChanges;
-          for (let table of Object.keys(tblChanges) ) {
-            table = table[0].toLowerCase() + table.substr(1);
-            if (tblChanges.hasOwnProperty(table)) {
-              if ('inserts' in tblChanges[table] && tblChanges[table].inserts.length > 0) {
-                this.dexieService.table(table).bulkAdd(
-                  tblChanges[table].inserts.map( mapWithNoLog )
-                );
-              }
-              if ('updates' in tblChanges[table] && tblChanges[table].updates.length > 0) {
-                this.dexieService.table(table).bulkPut(
-                  tblChanges[table].updates.map( mapWithNoLog )
-                );
-              }
-            }
-          }
-        }
-
-        if ('errorMsg' in data && data.errorMsg) {
-          return syncJobResult.finish( SyncJobStatus.ServerAnsweredWithErrors, data.errorMsg );
-        } else {
-          return syncJobResult.setStatus( SyncJobStatus.ServerAnswered );
-        }
-      })
-      .catch( (reason) => {
-        syncJobResult.finish( SyncJobStatus.Aborted,  JSON.stringify( reason ));
-      });
-
-    if (syncJobResult.getStatus() !== SyncJobStatus.ServerAnswered) {
-      return this.finishProcess(syncJobResult, syncJobResult.getStatus(), syncJobResult.errorMsg);
-    }
-
-    syncJobResult.refreshed = await this.processResponseByJobId(syncJobResult.confirmedIds, syncJobResult.jobid);
-    this.updateCommitCounter(syncJobResult.committedIds, syncJobResult.jobid);
-
-    const diff = syncJobResult.committed - syncJobResult.refreshed;
-    if ( diff !== 0 ) {
-      syncJobResult.errorMsg += `Von ${diff} ChangeLog-Einträgen konte der Status nach der Synchronisierung nicht aktualisert werden!`;
-    }
-
-    if ('errorMsg' in syncJobResult && syncJobResult.errorMsg) {
-      return this.finishProcess(syncJobResult, SyncJobStatus.FinishedWithErrors, syncJobResult.errorMsg);
-    } else {
-      return this.finishProcess(syncJobResult, SyncJobStatus.Finished );
-    }
-  }
-
   public clearFinishedProcesses() {
+    console.log('DBSyncClientService #668 processList before clearFinishedProcesses', { ...this.processes.map(p => p) });
     this.processes = this.processes.filter( proc => {
       const finished = !proc.finished;
       if (finished) {
@@ -812,6 +708,7 @@ export class DBSyncClientService {
       return !finished;
     } );
     this.processingJobids = this.processes.map<number>( proc => proc.jobid );
+    console.log('DBSyncClientService #677 processList after clearFinishedProcesses', { ...this.processes.map(p => p) });
   }
 
   public getRunningProcesses(): SyncJobResult[] {
@@ -849,10 +746,101 @@ export class DBSyncClientService {
   }
 
   public async getUnsyncedChangeLogsByJobId(jobid: number): Promise<DBDIClientChangeLog[]> {
-    return await this.dexieService.clientChangeLog
+    const tablePrio = [ 'inventar', 'objektKatalogMandant', 'objektKatalogGlobal', 'hersteller' ];
+    const db = this.dexieService;
+
+    return db.clientChangeLog
       .where({ jobid })
       .filter(itm => !('sync_done' in itm) || itm.sync_done === 0)
-      .toArray();
+      .toArray()
+      .then( (list) => {
+        return this.sortAndFixChangeLogs(list);
+      });
+  }
+
+  public sortAndFixChangeLogs(list: DBDIClientChangeLog[]): Promise<DBDIClientChangeLog[]> {
+    console.log('DbSyncClientService #866 sortAndFixChangeLogs', { ...list });
+    const tablePrio = [ 'inventar', 'objektKatalogMandant', 'objektKatalogGlobal', 'hersteller' ];
+    const db = this.dexieService;
+
+    list.sort( (a, b) => {
+      if (a.timestamp !== b.timestamp) {
+        return a.timestamp < b.timestamp ? -1 : 1;
+      } else {
+        return (tablePrio.indexOf(a.table) > tablePrio.indexOf(b.table)) ? -1 : 1;
+      }
+    });
+
+    return Promise.all(list.map( async (itm) => {
+      if (itm.type === DatabaseChangeType.Update) {
+        if (Object.keys(itm.mods).length === 0 || (Object.keys(itm.mods).length === 1 && 'modified_at' in itm.mods)) {
+          console.log('DbSyncClientService #881 Removing empty Entry from Change-Log', { itm });
+          db.clientChangeLog.delete(itm.id);
+          return null;
+        }
+      }
+
+      if (itm.table === 'inventar') {
+        if (itm.type === DatabaseChangeType.Update) {
+          let isEmptyMod = false;
+          if (itm.mods.mcid && !itm.mods.mcuuid) {
+            console.log('Found Inventar-Update #872 without mcuuid-Field', {...itm});
+            const artikelRef = await db.objektKatalogMandant.get(itm.mods.mcid);
+            if (artikelRef) {
+              itm.mods.mcuuid = artikelRef.uuid;
+              console.log('Found Inventar-Update #875 added mcuuid-Field', {...itm});
+            } else {
+              console.error('Found Inventar-Update #875 but don t found ArtikelRefmcuuid-Field', {...itm});
+            }
+            delete itm.mods.mcid;
+          }
+          if (Object.keys(itm.mods).length === 1 && 'modified_at' in itm.mods) {
+            isEmptyMod = true;
+          }
+          if (Object.keys(itm.mods).length === 0) {
+            isEmptyMod = true;
+          }
+          if (isEmptyMod) {
+            console.log('DbSyncClientService #908 Removing empty Entry from Change-Log', { itm });
+            db.clientChangeLog.delete(itm.id);
+            itm = null;
+          }
+        } else if (itm.type === DatabaseChangeType.Create) {
+          const okg = await db.objektKatalogGlobal.where({uuid: itm.obj.mcuuid }).first();
+          if (okg) {
+            await db.objektKatalogMandant.where({gcid: okg.gcid }).first().then( (okm) => {
+              itm.obj.mcuuid = okm.uuid;
+              db.inventar.update(itm.obj.ivid, { mcuuid: okm.uuid });
+              db.clientChangeLog.update(itm.id, {
+                obj: {
+                  ...itm.obj,
+                  ...{mcuuid: okm.uuid }
+                }
+              });
+            });
+          }
+          if (itm.obj.mcid && itm.obj.mcuuid) {
+            console.log('Found Inventar-Update #872 without mcuuid-Field', {...itm});
+            delete itm.obj.mcid;
+          }
+          if (itm.obj.rid && !itm.obj.ruuid) {
+            console.log('Found Inventar-Update #872 without ruuid-Field', {...itm});
+            const raum = await db.raeume.get(itm.obj.rid);
+            if (raum) {
+              itm.obj.ruuid = raum.uuid;
+            }
+          }
+          if (!itm.obj.ruuid || !itm.obj.mcuuid) {
+            console.log('DbSyncClientService #938 Removing incomplete Inventar + Entry from Change-Log', { itm });
+            db.clientChangeLog.delete(itm.id);
+            db.inventar.delete(itm.key);
+            itm = null;
+          }
+        }
+      }
+
+      return itm;
+    }).filter( (itm) => !!itm));
   }
 
   public async numUnsyncedChangeLogsByJobId(jobid: number): Promise<number> {
@@ -871,12 +859,23 @@ export class DBSyncClientService {
     return rslt;
   }
 
+  public async getCurrentSyncStatus(): Promise<any> {
+    return Promise.all([
+      this.numUnsyncedChangeLogs(),
+      this.getRunningProcesses()
+    ]);
+  }
+
+  public async numUnsyncedChangeLogs(): Promise<number> {
+    return this.dexieService.clientChangeLog.where({sync_done: 0}).count();
+  }
+
   private async getIncompleteInventuren(): Promise<SyncIncompleteInventuren[]> {
     const numPending = await this.dexieService.clientChangeLog.where({ sync_done: 0 }).count();
     return this.dexieService.clientChangeLog
       .where({ sync_done: 0 })
       .toArray()
-      .then( list => {
+      .then( async list => {
         const currJobId = this.baseData.getCurrentJobid();
         const listGroupedByJobid: SyncIncompleteInventuren[] = [];
 
@@ -900,7 +899,10 @@ export class DBSyncClientService {
           listGroupedByJobid[ groupIdx ].changes.push( item );
         });
 
-        return listGroupedByJobid;
+        return Promise.all( Object.keys(listGroupedByJobid).map( (groupIdx) => {
+          listGroupedByJobid[groupIdx].changes = this.sortAndFixChangeLogs(listGroupedByJobid[groupIdx].changes);
+          return groupIdx;
+        })).then( () => listGroupedByJobid);
       });
   }
 }

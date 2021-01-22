@@ -1,11 +1,16 @@
 <div>
   Netzwerk: <span [ngStyle]="{'color':currentState?.hasNetworkConnection?'green':'red'}">
-      {{ currentState?.hasNetworkConnection ? 'ON' : 'OFF' }}!
+      {{ currentState?.hasNetworkConnection ? 'ON' : 'OFF' }}
     </span> ||
   Backend: <span [ngStyle]="{'color':currentState?.hasServerAccess?'green':'red'}">
-      {{ currentState?.hasServerAccess ? 'ON' : 'OFF' }}!
+      {{ currentState?.hasServerAccess ? 'ON' : 'OFF' }}
     </span> ||
   Connected: <span [ngStyle]="{'color':currentState?.hasValidSession?'green':'red'}">
-      {{ currentState?.hasValidSession ? 'ON' : 'OFF' }}!
+      {{ currentState?.hasValidSession ? 'ON' : 'OFF' }}
     </span>
+  <ng-container *ngIf="numUnsynced > -1">
+    Unsynced:  <span [ngStyle]="{'color':numUnsynced===0?'green':'red'}">
+      {{ numUnsynced }}
+  </span>
+  </ng-container>
 </div>

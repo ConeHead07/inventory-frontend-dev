@@ -152,13 +152,29 @@ export class InventarService {
       hersteller: null
     };
 
+    console.log('InventarService #155 getInventar(ivid: ', ivid , ')');
     result.inventar = await this.dexie.inventar.get(ivid);
+    console.log('InventarService #157 inventar.get(ivid: ', ivid , ')', { result });
+
     if (result.inventar) {
+      console.log('InventarService #160 objektKatalogMandant.get(mcid: ', result.inventar.mcid , ')');
       result.artikelRef = await this.dexie.objektKatalogMandant.get(result.inventar.mcid);
+      console.log('InventarService #162 objektKatalogMandant.get(mcid: ', result.inventar.mcid , ')',
+        { resultArtikelRef: result.artikelRef });
+
       if (result.artikelRef) {
         result.success = true;
+        console.log('InventarService #155 objektKatalogGlobal.get(gcid: ', result.artikelRef.gcid , ')');
         result.artikelData = await this.dexie.objektKatalogGlobal.get(result.artikelRef.gcid);
-        result.hersteller = await this.dexie.hersteller.get(result.artikelData.hid);
+        console.log('InventarService #155 objektKatalogGlobal.get(gcid: ', result.artikelRef.gcid , ')',
+          { resultArtikelData: result.artikelData});
+
+        if (result.artikelData.hid) {
+          console.log('InventarService #172 herteller.get(hid: ', result.artikelData.hid, ')');
+          result.hersteller = await this.dexie.hersteller.get(result.artikelData.hid);
+          console.log('InventarService #174 hersteller.get(hid: ', result.artikelData.hid, ')',
+            {resultHersteller: result.hersteller});
+        }
       }
     }
 
@@ -177,6 +193,7 @@ export class InventarService {
       code: inventar.code,
       rid: inventar.rid,
       rid_neu: inventar.rid,
+      for_jobid: inventar.jobid || jobid,
       jobid: inventar.jobid || jobid,
       created_at: inventar.created_at || new Date(),
       created_uid: inventar.created_uid || uid,
@@ -189,11 +206,11 @@ export class InventarService {
     if (id) {
       this.dexie.barcodeLookup.add({
         code: inventar.code,
+        for_jobid: inventar.jobid || jobid,
         table: 'inventar',
         key: 'ivid',
         id,
-        uuid,
-        for_jobid: inventar.jobid || jobid
+        uuid
       });
     }
     this.changed.emit({
@@ -332,11 +349,12 @@ export class InventarService {
         updateInv.modified_device_id = devID;
         updateInv.log = true;
 
-        this.dexie.inventar.update(ivid, updateInv);
-
-        this.dexie.inventar.update(ivid, updateInv).then( () => {
+        await this.dexie.inventar.update(ivid, updateInv).then( () => {
           if (bUpdateBarceLookup) {
-            this.updateBarcodeLookup(ivid, daten.code);
+            console.log('InventarService #353 call updateBarcodelookup(', { ivid, datenCode: daten.code });
+            this.updateBarcodeLookup(ivid, daten.code, oldData.inventar.code);
+          } else {
+            console.log('InventarService #356 Barcode has not changed');
           }
         });
       }
@@ -384,25 +402,33 @@ export class InventarService {
 
     this.dexie.inventar.update(ivid, updateInv).then( () => {
       if (bUpdateBarceLookup) {
-        this.updateBarcodeLookup(ivid, daten.code);
+        this.updateBarcodeLookup(ivid, daten.code, oldData.inventar.code);
       }
     });
   }
 
-  async updateBarcodeLookup(ivid: number, code: string) {
+  async updateBarcodeLookup(ivid: number, code: string, oldCode?: string) {
+    console.log('InventarService #410 called updateBarcodelookup(', { ivid, code }, ')');
+    let savedRaumDataCode = oldCode;
     const savedRaumData = await this.dexie.inventar.get(ivid);
+    if (!oldCode) {
+      savedRaumDataCode = savedRaumData.code;
+    }
     const jobid = this.getJobiId();
-    if (savedRaumData.code !== code) {
+    console.log('InventarService #413 check if code has changed(', { ivid, code, savedRaumDataCode }, ')');
+    if (savedRaumDataCode !== code) {
       const lkupKey = {
-        code: savedRaumData.code,
+        code: savedRaumDataCode,
         for_jobid: jobid
       };
       const bcItem = await this.dexie.barcodeLookup.get(lkupKey);
       if (bcItem) {
-        await this.dexie.barcodeLookup.update([savedRaumData.code, jobid], {
+        console.log('InventarService #420 make update on existing bcItem: ', { lkupKey });
+        await this.dexie.barcodeLookup.update([savedRaumDataCode, jobid], {
           code
         });
       } else {
+        console.log('InventarService #425 create new bcItem');
         this.dexie.barcodeLookup.put({
           code,
           for_jobid: jobid,

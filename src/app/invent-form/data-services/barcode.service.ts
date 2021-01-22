@@ -1,10 +1,9 @@
 import {Injectable} from '@angular/core';
-import { DexieService } from '../../dexie.service';
+import {DexieService} from '../../dexie.service';
 import {
   BarcodeLookupSimpleResult,
   DBDIBarcodeLookup,
   DBDIInventar,
-  DBDIObjektKatalogGlobal,
   DBDIObjektKatalogMandant,
   DBDIRaeume,
   DBDITableWithBarcode,
@@ -30,9 +29,18 @@ export class BarcodeService {
 
   async simpleLookup(barcode: string, jobid: number): Promise<BarcodeLookupSimpleResult> {
     if (barcode.startsWith('R') || barcode.startsWith('A')) {
-      return await this.bcAnalyzeLookup(barcode);
+      const structLookupResult = await this.bcAnalyzeLookup(barcode, jobid);
+      if (structLookupResult && structLookupResult.success) {
+        return structLookupResult;
+      }
     }
-    return await this.indexLookup(barcode, jobid);
+    const indexLookupResult = await this.indexLookup(barcode, jobid);
+
+    if (indexLookupResult) {
+      return indexLookupResult;
+    }
+
+    return await this.allTablesLookup(barcode, jobid);
     /*
     return Promise.all([
       this.indexLookup(barcode),
@@ -91,7 +99,49 @@ export class BarcodeService {
     return result;
   }
 
-  async bcAnalyzeLookup(barcode: string): Promise<BarcodeLookupSimpleResult> {
+  async allTablesLookup(barcode: string, jobid: number): Promise<BarcodeLookupSimpleResult> {
+    const result: BarcodeLookupSimpleResult = {
+      barcode,
+      foundRef: null,
+      success: false,
+      lookupResultTable: LookupResultTable.None,
+      data: null
+    };
+
+    result.data = await this.db.inventar.where({code: barcode, for_jobid: jobid}).first();
+    if (result.data) {
+      result.lookupResultTable = LookupResultTable.Inventar;
+      result.success = true;
+      result.foundRef = {
+        code: barcode, key: 'ivid', id: (result.data as DBDIInventar).ivid,
+        for_jobid: jobid, table: 'inventar', updateHelper: 0, uuid: result.inventar.uuid};
+      return result;
+    }
+
+    result.data = await this.db.raeume.where({code: barcode, for_jobid: jobid}).first();
+    if (result.data) {
+      result.lookupResultTable = LookupResultTable.Raeume;
+      result.success = true;
+      result.foundRef = {
+        code: barcode, key: 'rid', id: (result.data as DBDIRaeume).rid,
+        for_jobid: jobid, table: 'raeume', updateHelper: 0, uuid: result.data.uuid};
+      return result;
+    }
+
+    result.data = await this.db.objektKatalogMandant.where({code: barcode, for_jobid: jobid}).first();
+    if (result.data) {
+      result.lookupResultTable = LookupResultTable.ObjektKatalogMandant;
+      result.success = true;
+      result.foundRef = {
+        code: barcode, key: 'mcid', id: (result.data as DBDIObjektKatalogMandant).mcid,
+        for_jobid: jobid, table: 'objektKatalogMandant', updateHelper: 0, uuid: result.data.uuid};
+      return result;
+    }
+
+    return result;
+  }
+
+  async bcAnalyzeLookup(barcode: string, jobid: number): Promise<BarcodeLookupSimpleResult> {
 
     const matchesObjektbuchArtikel = barcode.match(/^(A)-(\d+)-/);
     const matchesObjektbuchRaum = !matchesObjektbuchArtikel ? barcode.match(/^(R)-(\d+)-/) : false;
@@ -122,7 +172,15 @@ export class BarcodeService {
 
     if (foundTable && foundTableId) {
       result.data = await this.db.table(foundTable).get(foundTableId);
-      if (result.data) {
+      let matchJobId = true;
+      if (!result.data) {
+        matchJobId = false;
+      } else if ('for_jobid' in result.data && result.data.for_jobid !== jobid) {
+        matchJobId = false;
+      } else if ('jobid' in result.data && result.data.jobid !== jobid) {
+        matchJobId = false;
+      }
+      if (result.data && matchJobId) {
         result.foundRef = {
           code: barcode,
           table: foundTable,

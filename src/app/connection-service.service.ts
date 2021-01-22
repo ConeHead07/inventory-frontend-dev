@@ -102,6 +102,15 @@ export class ConnectionService implements OnDestroy {
     // this.checkAuthenticationState();
   }
 
+  public setAuthState(isLoggedIn: boolean) {
+    this.currentState.hasValidSession = isLoggedIn;
+    this.emitEvent();
+  }
+
+  public refresh() {
+    this.checkInternetState();
+  }
+
   private checkInternetState() {
 
     if (!_.isNil(this.httpSubscription)) {
@@ -137,8 +146,8 @@ export class ConnectionService implements OnDestroy {
           if (result && typeof result === 'string' && result.match(/"connected"\s*:\s*true/)) {
             this.currentState.hasValidSession = true;
           }
-          if (lastAccess !== true
-          || !lastSession && this.currentState.hasValidSession) {
+          if (lastAccess !== this.currentState.hasServerAccess
+          || lastSession !== this.currentState.hasValidSession) {
             this.emitEvent();
           }
         });
@@ -152,65 +161,23 @@ export class ConnectionService implements OnDestroy {
   }
 
   private checkNetworkState() {
+    if (!_.isNil(this.onlineSubscription)) {
+      this.onlineSubscription.unsubscribe();
+    }
     this.onlineSubscription = fromEvent(window, 'online').subscribe(() => {
       this.currentState.hasNetworkConnection = true;
       this.checkInternetState();
-      this.checkAuthenticationState();
       this.emitEvent();
     });
 
+    if (!_.isNil(this.offlineSubscription)) {
+      this.offlineSubscription.unsubscribe();
+    }
     this.offlineSubscription = fromEvent(window, 'offline').subscribe(() => {
       this.currentState.hasNetworkConnection = false;
-      this.checkInternetState();
+      this.currentState.hasServerAccess = false;
       this.emitEvent();
     });
-  }
-
-  private checkAuthenticationState() {
-    const authPingUrl = this.apiService.getConnectedPingUrl();
-    console.log('ConnectionService.checkAuthenticationState #164', authPingUrl);
-
-    if (!_.isNil(this.sessionStateSubscription)) {
-      this.sessionStateSubscription.unsubscribe();
-    }
-
-    if (this.serviceOptions.enableHeartbeat) {
-      this.sessionStateSubscription = timer(0, this.serviceOptions.heartbeatInterval)
-        .pipe(
-          switchMap(() => this.http[this.serviceOptions.requestMethod](authPingUrl, {responseType: 'text'})),
-          retryWhen(errors =>
-            errors.pipe(
-              // log error message
-              tap(val => {
-                console.log('ConnectionService.checkAuthenticationState #178', authPingUrl);
-                console.error('Http error:', val);
-                const lastSessionState = this.currentState.hasValidSession;
-                this.currentState.hasValidSession = false;
-                if (lastSessionState !== false) {
-                  this.emitEvent();
-                }
-              }),
-              // restart after 5 seconds
-              delay(this.serviceOptions.heartbeatRetryInterval)
-            )
-          )
-        )
-        .subscribe(result => {
-          console.log('ConnectionService.checkAuthenticationState #186 subscribe result', { resultType: typeof result, result });
-          const jsonResult = typeof result === 'string' ? JSON.parse(result) : result;
-          const lastSessionState = this.currentState.hasValidSession;
-          this.currentState.hasValidSession = 'connected' in jsonResult && jsonResult.connected === true;
-          if (lastSessionState !== true) {
-            this.emitEvent();
-          }
-        });
-    } else {
-      const lastSessionState = this.currentState.hasValidSession;
-      this.currentState.hasValidSession = false;
-      if (lastSessionState !== false) {
-        this.emitEvent();
-      }
-    }
   }
 
   private emitEvent() {

@@ -1,4 +1,4 @@
-import {Injectable} from '@angular/core';
+import {EventEmitter, Injectable, Output} from '@angular/core';
 import Dexie from 'dexie';
 import 'dexie-observable';
 import 'dexie-syncable';
@@ -26,6 +26,8 @@ Dexie.addons.push( relationships );
   providedIn: 'root'
 })
 export class DexieService extends Dexie {
+
+  @Output() clientSyncAmountChanged = new EventEmitter<number>();
 
   clientChangeLog: Dexie.Table<DBDIClientChangeLog, number>;
   devices: Dexie.Table<DBDIDevices, number>;
@@ -85,7 +87,7 @@ export class DexieService extends Dexie {
       images:
         '++id,uuid,name,type,size,width,height,gcuuid,url,for_jobid,created_jobid,modified_jobid',
       inventar:
-        '++ivid,mcid,uuid,for_jobid,mcuuid,code,[rid+jobid],rid,rid_init,rid_neu,jobid,invid,iv_nr',
+        '++ivid,mcid,uuid,for_jobid,mcuuid,code,[rid+jobid],rid,rid_init,rid_neu,ruuid,jobid,invid,iv_nr',
       inventuren:
        '++jobid,mid,gid,Titel,Start,aktiviert,AbgeschlossenAm',
       inventurenGebaeude:
@@ -130,27 +132,57 @@ export class DexieService extends Dexie {
       'objektKatalogGlobal',
       'objektKatalogMandant',
       'objektKatalogImages',
-      'raeume',
-      'barcodeLookup'
+      'raeume'
     ];
 
+    let lastClientChangeLogTimestamp = 0;
+    const lastClientChangeLogDelay = 2000;
+    let lastClientChangeLogTimer = null;
+    const lastClientChangeLogTrigger = () => {
+      this.clientChangeLog.count().then( (num) => {
+        this.clientSyncAmountChanged.emit(num);
+      });
+    };
+    const checkEmitClientChange = () => {
+      const now = Date.now();
+      if (lastClientChangeLogTimer) {
+        if (now - lastClientChangeLogTimestamp < lastClientChangeLogDelay) {
+          return;
+        }
+        clearTimeout(lastClientChangeLogTimer);
+        lastClientChangeLogTimer = null;
+      }
+
+      lastClientChangeLogTimestamp = Date.now();
+      lastClientChangeLogTimer = setTimeout( lastClientChangeLogTrigger, lastClientChangeLogDelay);
+    };
+
     this.on( 'changes', (changes, partial) => {
-       // console.log('#145 dexie.service on changes: changes.length', changes.length, partial, { changes});
-       if (this.stopClientLogForServerLoad) {
-         // console.log('#145 dexie.service on changes: is disabled for Server-Load');
-         return;
-       }
-       changes.forEach( (change: IDatabaseChange) => {
+      // console.log('#145 dexie.service on changes: changes.length', changes.length, partial, { changes});
+      changes.forEach( (change: IDatabaseChange) => {
+        if (change.table === 'clientChangeLog') {
+          if (change.type === DatabaseChangeType.Update && !('sync_done' in change.mods)) {
+            return;
+          }
+          checkEmitClientChange();
+        }
+      });
 
-         if (validLogTables.indexOf(change.table) === -1 || change.table === this.clientChangeLog.name) {
-           // console.log('#151 dexie.service on changes: ChangeLog disabled for table ', change.table);
-           return;
-         }
-         console.log('#154 dexie.service on changes: Write ChangeLog for table ', change.table, change.key, 'partial', partial);
+      if (this.stopClientLogForServerLoad) {
+        // console.log('#145 dexie.service on changes: is disabled for Server-Load');
+        return;
+      }
+      changes.forEach( (change: IDatabaseChange) => {
 
-         this.addChangeLog( change );
-       });
-     });
+        if (validLogTables.indexOf(change.table) === -1 || change.table === this.clientChangeLog.name) {
+          // console.log('#151 dexie.service on changes: ChangeLog disabled for table ', change.table);
+          return;
+        }
+        console.log('#154 dexie.service on changes: Write ChangeLog for table ', change.table, change.key, 'partial', partial);
+
+        this.addChangeLog( change );
+      });
+    });
   }
 
   async addChangeLog(change: IDatabaseChange) {
@@ -169,7 +201,7 @@ export class DexieService extends Dexie {
       const obj: any = await this.table( change.table ).get( change.key );
       uuid = ('uuid' in obj) ? obj.uuid : '';
 
-      console.log('#161 addChangeLog Remove LogFlag from Entry ' + change.table + ' with id ' + change.key);
+      console.log('#161 addChangeLog Remove LogFlag from Entry ' + change.table + ' with id ' + change.key, { change });
       delete obj.log;
       await this.table( change.table ).put( obj, change.key);
     }
@@ -194,6 +226,37 @@ export class DexieService extends Dexie {
         }
         chlog.obj = change.obj;
         console.log('#141  addChangeLog on changes: An object was created: ', change.table, change.key, { chlog } );
+        switch (change.table) {
+          case 'objektKatalogGlobal':
+            if (!('huuid' in chlog.obj)) {
+              chlog.obj.huuid = this.getChangeLogProp<string>(change, 'huuid');
+            }
+            if (!('hid' in chlog.obj)) {
+              chlog.obj.hid = this.getChangeLogProp<number>(change, 'hid');
+            }
+            break;
+
+          case 'objektKatalogMandant':
+            if (!('gcuuid' in chlog.obj)) {
+              chlog.obj.gcuuid = this.getChangeLogProp<string>(change, 'gcuuid');
+            }
+            if (!('gcid' in chlog.obj)) {
+              chlog.obj.gcid = this.getChangeLogProp<number>(change, 'gcid');
+            }
+            break;
+
+          case 'inventar':
+            if (!('mcuuid' in chlog.obj)) {
+              chlog.obj.mcuuid = this.getChangeLogProp<string>(change, 'mcuuid');
+            }
+            if (!('mcid' in chlog.obj)) {
+              chlog.obj.mcid = this.getChangeLogProp<number>(change, 'mcid');
+            }
+            if (!('ruuid' in chlog.obj)) {
+              chlog.obj.ruuid = this.getChangeLogProp<string>(change, 'ruuid');
+            }
+            break;
+        }
         break;
 
       case DatabaseChangeType.Update:
@@ -201,6 +264,41 @@ export class DexieService extends Dexie {
         chlog.mods = updateChange.mods;
         if ('log' in chlog.mods) {
           delete chlog.mods.log;
+        }
+
+        switch (change.table) {
+          case 'objektKatalogGlobal':
+            if (!('huuid' in chlog.mods)) {
+              chlog.mods.huuid = this.getChangeLogProp<string>(change, 'huuid');
+            }
+            if (!('hid' in chlog.mods)) {
+              chlog.mods.hid = this.getChangeLogProp<number>(change, 'hid');
+            }
+            break;
+
+          case 'objektKatalogMandant':
+            if (!('gcuuid' in chlog.mods)) {
+              chlog.mods.gcuuid = this.getChangeLogProp<string>(change, 'gcuuid');
+            }
+            if (!('gcid' in chlog.mods)) {
+              chlog.mods.gcid = this.getChangeLogProp<number>(change, 'gcid');
+            }
+            break;
+
+          case 'inventar':
+            if (!('mcuuid' in chlog.mods)) {
+              chlog.mods.mcuuid = this.getChangeLogProp<string>(change, 'mcuuid');
+            }
+            if (!('mcid' in chlog.mods)) {
+              chlog.mods.mcid = this.getChangeLogProp<number>(change, 'mcid');
+            }
+            if (!('ruuid' in chlog.mods)) {
+              chlog.mods.ruuid = this.getChangeLogProp<string>(change, 'ruuid');
+            }
+            break;
+
+          default:
+            // Nothing
         }
         const colNames = Object.keys(chlog.mods);
 
@@ -228,6 +326,20 @@ export class DexieService extends Dexie {
       return ch.mods.uuid;
     }
     if ( ('oldObj' in ch) && ('uuid' in ch.oldObj)) {
+      return ch.oldObj.uuid;
+    }
+    return undefined;
+  }
+
+  getChangeLogProp<T>(change: IDatabaseChange, propName: string): T|null {
+    const ch = change as any;
+    if ( (propName in ch) && (propName in ch.obj)) {
+      return ch.obj.uuid;
+    }
+    if ( (propName in ch) && (propName in ch.mods)) {
+      return ch.mods.uuid;
+    }
+    if ( (propName in ch) && (propName in ch.oldObj)) {
       return ch.oldObj.uuid;
     }
     return undefined;

@@ -5,9 +5,16 @@ import {DataService, InventarData} from '../inventory/service/data.service';
 import {DBDIMandanten} from '../inventory/models/client.model';
 import {DBDIGebaeude} from '../inventory/models/building.model';
 import {
-  faCamera, faImage, faSearch, faEdit,
-  faCheck, faDoorClosed, faDoorOpen, faBookReader,
-  faLock, faUnlockAlt
+  faBookReader,
+  faCamera,
+  faCheck,
+  faDoorClosed,
+  faDoorOpen,
+  faEdit,
+  faImage,
+  faLock,
+  faSearch,
+  faUnlockAlt
 } from '@fortawesome/free-solid-svg-icons';
 import {InventoryProgress, InventoryProgressService} from '../inventory-progress.service';
 
@@ -29,7 +36,8 @@ import {RaumListDoneComponent} from './modals/raum-list-done/raum-list-done.comp
 
 import {
   DBDIArtikel,
-  DBDIInventar, DBDIJobLockStatus,
+  DBDIInventar,
+  DBDIJobLockStatus,
   DBDIRaeume,
   DBDIRaumEditStatus,
   DBDIRaumGebaeude,
@@ -40,14 +48,14 @@ import {
 import {SelectSearchRaumComponent} from './modals/select-search-raum/select-search-raum.component';
 import {BasedataService} from '../basedata.service';
 import {InventoryEditorService} from '../inventory-editor.service';
-import {InventarService, InventarChanged } from './data-services/inventar.service';
+import {InventarFoundResult, InventarService} from './data-services/inventar.service';
 import {ImagesService} from './data-services/images.service';
 import {BarcodeService} from './data-services/barcode.service';
 import {RaumIDAndStatus, RaumService} from './data-services/raum.service';
 import {GesamtListRestComponent} from './modals/gesamt-list-rest/gesamt-list-rest.component';
 import {GesamtListDoneComponent} from './modals/gesamt-list-done/gesamt-list-done.component';
 import {SoundsService} from '../sounds.service';
-import { ToastrService } from 'ngx-toastr';
+import {ToastrService} from 'ngx-toastr';
 import {Subscription} from 'rxjs';
 import {EditRaumComponent} from './modals/edit-raum/edit-raum.component';
 import {VariablesService} from '../inventory/service/variables.service';
@@ -175,6 +183,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
   private raumStatusChangeSubscription: Subscription;
   private inventarDataChangeSubscription: Subscription;
   private inventurLockStatusChangeSubscription: Subscription;
+  private unsyncedAmountChangeSubscription: Subscription;
 
   public lastScanDetectTime?: Date;
   public lastScanDetectClass = '';
@@ -189,8 +198,10 @@ export class InventFormComponent implements OnInit, OnDestroy {
     done: 0,
   };
 
+  numUnsynced = -1;
+
   raumEditStatus: DBDIRaumEditStatus;
-  jobLockStatus: DBDIJobLockStatus;
+  jobLockStatus: DBDIJobLockStatus = DBDIJobLockStatus.Init;
 
   raumProgress: InventoryProgress = {
     total: 0,
@@ -258,6 +269,11 @@ export class InventFormComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.inventoryProgress.getCurrentInventurLockStatus().then( (status) => {
       this.jobLockStatus = status;
+    });
+
+    this.unsyncedAmountChangeSubscription = this.dataService.clientSyncAmountChanged
+      .subscribe( (amount) => {
+        this.numUnsynced = amount;
     });
 
     this.inventurLockStatusChangeSubscription = this.inventoryProgress.inventurLockStatusChanged
@@ -390,6 +406,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
     this.inventarDataService.insertInventar(inventar, jobid)
       .then( (result) => {
         console.log('Inventar wurde hinzugefügt', result);
+        this.loadInventarById(result.insertID);
       })
       .catch( (err) => {
         console.error('Fehler beim Speichern neuer Inventar-Daten', { err });
@@ -442,7 +459,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
   loadArtikelByData(artikel: DBDIArtikel) {
     this.artikelID = artikel.mcid;
     this.formInventar.mcid = artikel.mcid;
-    this.formInventar.mcuuid = artikel.uuid;
+    this.formInventar.mcuuid = artikel.mcuuid;
     this.formInventar.gcid = artikel.gcid;
     this.formInventar.gcuuid = artikel.uuid;
     this.formInventar.Bezeichnung = artikel.Bezeichnung;
@@ -459,6 +476,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
     this.formInventar = {...tmp};
 
     if (this.waitingForInventarData) {
+      console.log('#471 call this.saveNewInventar() from this.loadArtikelByData(...)');
       this.saveNewInventar();
       this.playSuccess();
       this.waitingForInventarData = false;
@@ -524,13 +542,9 @@ export class InventFormComponent implements OnInit, OnDestroy {
 
   get gebaeudeId() { return this.buildingID; }
 
-  private openComponent(content: Component) {
-    const modalRef = this.modalService.open(content);
-    modalRef.componentInstance.name = 'World';
-  }
-
   openCreateArtikelImage() {
     const modalRef = this.modalService.open(CreateArtikelImageComponent);
+    this.modalWatch(modalRef, 'CreateArtikelImage');
     modalRef.componentInstance.name = this.formInventar.Bezeichnung + '/' + this.formInventar.Typ;
     modalRef.componentInstance.gcuuid = this.formInventar.gcuuid;
     modalRef.result.then( () => {
@@ -540,6 +554,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
 
   openEditArtikelImage() {
     const modalRef = this.modalService.open(CreateArtikelImageComponent);
+    this.modalWatch(modalRef, 'CreateArtikelImage');
     modalRef.componentInstance.name = this.formInventar.Bezeichnung + '/' + this.formInventar.Typ;
     modalRef.componentInstance.setGcuuid( this.formInventar.gcuuid );
     modalRef.result.then( () => {
@@ -549,6 +564,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
 
   openShowArtikelImage() {
     const modalRef = this.modalService.open(ShowArtikelImageComponent);
+    this.modalWatch(modalRef, 'ShowArtikelImage');
     modalRef.componentInstance.name = 'World';
     modalRef.componentInstance.setGcuuid( this.formInventar.gcuuid );
     modalRef.result.then( () => {
@@ -558,6 +574,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
 
   openScanner(inputElm?: HTMLElement) {
     const modalRef = this.modalService.open(ScannerComponent);
+    this.modalWatch(modalRef, 'Scanner');
     modalRef.componentInstance.name = 'World';
     const sub = modalRef.componentInstance.onScan.subscribe((data: ScannerBarcodeData) => {
       const scan: ScanDetectData = {
@@ -572,9 +589,18 @@ export class InventFormComponent implements OnInit, OnDestroy {
     });
   }
 
-  getModalRefByName(name): NgbModalRef {
+  getModalRefByName(name: string): NgbModalRef {
     const modal = this.currentModals.find( mod => mod.name === name);
     return (modal && modal.modalRef.componentInstance) ? modal.modalRef : null;
+  }
+
+  closeModalIfOpen(name: string): boolean {
+    const modal = this.currentModals.find( mod => mod.name === name);
+    if (modal && modal.modalRef.componentInstance) {
+      modal.modalRef.close();
+      return true;
+    }
+    return false;
   }
 
   modalWatch(modalRef: NgbModalRef, name: string) {
@@ -687,9 +713,10 @@ export class InventFormComponent implements OnInit, OnDestroy {
     this.modalWatch(modalRef, 'EditInventar');
     console.log('#674 this.inventarData ' + this.inventarData.inventar.ivid);
     modalRef.componentInstance.inventarId = this.inventarData.inventar.ivid;
-    modalRef.componentInstance.inventarChanged.subscribe( (inventar) => {
+    modalRef.componentInstance.inventarChanged.subscribe( (inventar: InventarFoundResult) => {
       console.log('Aktualisierte Inventar-Daten', { inventar });
       this.toastr.success('Inventardaten wurden aktualisiert!');
+      this.loadInventarById(inventar.inventar.ivid);
     });
     modalRef.componentInstance.scannerRequest.subscribe( (target: HTMLElement) => {
       this.openScanner(target);
@@ -831,57 +858,6 @@ export class InventFormComponent implements OnInit, OnDestroy {
     this.openRaumListRest();
   }
 
-  async barcodeLookup( barcode: string): Promise<BCLookupResult> {
-    const bclResult: BCLookupResult = {
-      barcode,
-      expectedType: LookupResultType.NoMatch,
-      bcParts: null,
-      result: { type: LookupResultType.NoMatch }
-    };
-
-    // Test auf Objektbuch - Artikel
-    const matchesObjektbuchArtikel = barcode.match(/^(A)-(\d+)-(\d+)-(\d+)-([0-9a-zA-Z]+)$/);
-    if ( matchesObjektbuchArtikel ) {
-      const [, src, id, mid, gcid, hashStart ] = matchesObjektbuchArtikel;
-      bclResult.expectedType = LookupResultType.ObjektBuchArtikel;
-      bclResult.bcParts = { src, id, mid, gcid, hashStart } as BCPartsObjektbuchArtikel;
-
-      const data = await this.dataService.getArtikelRefAndData( parseInt(id, 10) );
-      if (data) {
-        bclResult.result = {
-          type: LookupResultType.ObjektBuchArtikel,
-          artikelRef: data.artikelRef,
-          artikelData: data.artikelData
-        };
-      }
-      return bclResult;
-    }
-
-    // Test auf Objektbuch - Raum
-    const matchesObjektbuchRaum = barcode.match(/^(R)-(\d+)-(\d+)-(\d+)-([0-9a-zA-Z]+)$/);
-    if ( matchesObjektbuchRaum ) {
-      const [ , src, id, mid, gid, hashStart ] = matchesObjektbuchRaum;
-      bclResult.expectedType = LookupResultType.ObjektBuchRaum;
-      bclResult.bcParts = { src, id, mid, gid, hashStart } as BCPartsObjektbuchRaum;
-
-      const data = await this.dataService.getRaumAndGebaeude( parseInt(id, 10) );
-      if (data) {
-        bclResult.result = {
-          type: LookupResultType.ObjektBuchRaum,
-          raum: data.raum,
-          gebaeude: data.gebaeude
-        };
-      }
-      return bclResult;
-    }
-
-    console.log('Start Barcode-Lookup');
-    bclResult.result = await this.dataService.bcLookup(barcode, this.kunde.mid);
-
-    return bclResult;
-
-  }
-
   onBarcodeInput(): void {}
 
   async handleScanData(event: ScanDetectData) {
@@ -909,6 +885,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
 
     const RaumCreateModal = this.getModalRefByName('SelectCreateRaum');
     const RaumEditModal = this.getModalRefByName('EditRaum');
+    const InventarEditModal = this.getModalRefByName('EditInventar');
 
     if (RaumCreateModal && RaumCreateModal.componentInstance) {
       if (bcResult.lookupResultTable === LookupResultTable.None) {
@@ -924,13 +901,10 @@ export class InventFormComponent implements OnInit, OnDestroy {
           '<br>' + barcode,
           'Ungültiger Barcode für Raum-Neu-Erfassung:'
         );
-        if (0) {
-          alert('Ungültiger Barcode für Raum-Neu-Erfassung! ' +
-            'Gebe einen gülten Barcode ein oder schließe den Dialog "Neuen Raum anlegen"!');
-        }
         return false;
       }
     }
+
     if (RaumEditModal && RaumEditModal.componentInstance) {
       if (bcResult.lookupResultTable === LookupResultTable.None) {
         const modalComp: EditRaumComponent = RaumEditModal.componentInstance;
@@ -941,14 +915,28 @@ export class InventFormComponent implements OnInit, OnDestroy {
       } else {
         this.playError();
         this.toastr.error(
-          'Gebe einen gülten Barcode ein oder schließe den Dialog "Neuen aktualisieren"!' +
+          'Gebe einen gülten Barcode ein oder schließe den Dialog "Raum aktualisieren"!' +
           '<br>' + barcode,
-          'Ungültiger Barcode für Raum-Aktualisierung:'
+          'Ungültiger Barcode für Raum-Aktualisierung'
         );
-        if (0) {
-          alert('Ungültiger Barcode für Raum-Neu-Erfassung! ' +
-            'Gebe einen gülten Barcode ein oder schließe den Dialog "Neuen Raum anlegen"!');
-        }
+        return false;
+      }
+    }
+
+    if (InventarEditModal && InventarEditModal.componentInstance) {
+      if (bcResult.lookupResultTable === LookupResultTable.None) {
+        const modalComp: EditInventarComponent = InventarEditModal.componentInstance;
+        // alert('transfer Code to Input EditRaumComponent.raumInput.code!');
+        modalComp.inventarInput.code = bcResult.barcode;
+        this.playSuccess();
+        return true;
+      } else {
+        this.playError();
+        this.toastr.error(
+          'Gebe einen gülten Barcode ein oder schließe den Dialog "Barcode aktualisieren"!' +
+          '<br>' + barcode,
+          'Ungültiger Barcode für Inventar-Aktualisierung'
+        );
         return false;
       }
     }
@@ -960,16 +948,35 @@ export class InventFormComponent implements OnInit, OnDestroy {
         this.formInventar.Barcode = bcResult.barcode;
         this.waitingForNewInventarBarcode = false;
         console.log('#783 handleScanData', { waitingForNewInventarBarcode: this.waitingForNewInventarBarcode });
+        console.log('#471 call this.saveNewInventar() from this.handleScanData');
         this.saveNewInventar();
         this.playSuccess();
         return true;
       } else {
         this.playError();
         console.log('#789 handleScanData', { waitingForNewInventarBarcode: this.waitingForNewInventarBarcode });
-        if (confirm('Ungültiger Barcode für die Inventar-Neu-Anlage!' +
-          'Bitte bestätige den Abbruch, wenn die vorherige Aktion abgebrochen werden soll.')) {
-          this.waitingForNewInventarBarcode = false;
+        if (confirm('Barcode ist bereits vergeben!\n' +
+          'Drücken Sie [Abbrechen], um die Neuaufnahme abzubrechen!\n' +
+          'Drücken Sie [OK], wenn Sie einen neuen Barcode vergeben wollen.')) {
           return;
+        } else {
+          this.waitingForNewInventarBarcode = false;
+        }
+      }
+    }
+
+    console.log('#777 handleScanData', { waitingForNewInventarBarcode: this.waitingForNewInventarBarcode });
+    if (this.waitingForInventarData) {
+      console.log('#779 handleScanData', { waitingForInventarData: this.waitingForInventarData });
+      if (bcResult.lookupResultTable !== LookupResultTable.ObjektKatalogMandant) {
+        this.playSuccess();
+        console.log('#789 handleScanData', { waitingForNewInventarBarcode: this.waitingForNewInventarBarcode });
+        if (confirm('Fehler: Erwarte Artikel-Barcode!\n' +
+          'Drücken Sie [Abbrechen], um die Neuaufnahme abzubrechen!\n' +
+          'Drücken Sie [OK], wenn Sie einen Artikel zuweisen möchten.')) {
+          return;
+        } else {
+          this.waitingForInventarData = false;
         }
       }
     }
@@ -980,13 +987,16 @@ export class InventFormComponent implements OnInit, OnDestroy {
         this.formInventar.Barcode = bcResult.barcode;
         this.waitingForInventarData = true;
 
-        this.playError().then( () => {
-          this.openSelectSearchArtikel();
+        this.playSuccess().then( () => {
+          // this.openSelectSearchArtikel();
         });
 
-        this.toastr.error(
-          'Barcode wurde nicht erkannt<br>' + barcode,
-          'Barcode-Fehler'
+        // ToDo: Reaktion auf neuen Barcode ändern in Neufnahme
+        // User soll daraufhin einen Artikel zuweisen können
+        this.toastr.warning(
+          'Barcode: ' + barcode + '<br>' +
+          'Für eine Neuaufnahme weisen sie bitte einen Artikel zu!',
+          'Unbekannter Barcode'
         );
         break;
 
@@ -1016,6 +1026,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
       case LookupResultTable.Inventar:
         console.log('#821 handleScanData LookupResultTable.Inventar');
         console.log('#990 handleScanData(...)', arguments);
+        this.modalService.dismissAll();
         this.assignInventarToRaum( {
           inventar: bcResult.inventar,
           artikelRef: bcResult.artikelRef,
@@ -1028,6 +1039,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
         console.log('#831 handleScanData LookupResultTable.Mandant', { bcResult });
         this.loadArtikelByData({
           ...bcResult.artikelRef,
+          ...{mcuuid: bcResult.artikelRef.uuid },
           ...bcResult.artikelData
         });
         this.playSuccess();

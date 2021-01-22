@@ -1,4 +1,4 @@
-import {Injectable} from '@angular/core';
+import {EventEmitter, Injectable, OnDestroy, Output} from '@angular/core';
 import {ApiService} from '../../api.service';
 import {
   DBDIArtikel, DBDIArtikelMitHersteller, DBDIDevices,
@@ -26,6 +26,7 @@ import Dexie, {IndexableType } from 'dexie';
 import {DBSyncClientService, SyncJobResult} from '../../dbsync-client.service';
 import {BarcodeService} from '../../invent-form/data-services/barcode.service';
 import {DbsyncLogService} from '../../dbsync-log.service';
+import {Subscription} from "rxjs";
 
 export interface LoadApiDataResult {
   success: boolean;
@@ -158,11 +159,13 @@ const log = {
 @Injectable({
   providedIn: 'root'
 })
-export class DataService {
+export class DataService implements OnDestroy {
 
   currentState: ConnectionState;
   lastLoadFailed = false;
   lastFailed;
+  @Output() clientSyncAmountChanged = new EventEmitter<number>();
+  private subscriptionClientLogsChanged: Subscription;
 
   constructor(
     private api: ApiService,
@@ -176,7 +179,16 @@ export class DataService {
     this.connectionService.monitor().subscribe((currentState: ConnectionState) => {
       log.info(43, 'network status has changed', { currentState });
       this.currentState = currentState;
+
+      this.subscriptionClientLogsChanged = this.dexie.clientSyncAmountChanged.subscribe( (amount) => {
+        console.log('DataService #245 clientSyncAmountChanged: ', { amount });
+        this.clientSyncAmountChanged.emit(amount);
+      });
     });
+  }
+
+  ngOnDestroy() {
+    this.subscriptionClientLogsChanged.unsubscribe();
   }
 
   getSelectedRoom() {
@@ -360,6 +372,23 @@ export class DataService {
       });
   }
 
+  public async hasAllInventurData(jobid: number): Promise<boolean> {
+    // tslint:disable-next-line:variable-name
+    const for_jobid = jobid;
+
+    return (!!await this.dexie.inventar.where({for_jobid}).first()
+       && !!await this.dexie.raeume.where({for_jobid}).first()
+       && !!await this.dexie.objektKatalogMandant.where({for_jobid}).first()
+       && !!await this.dexie.objektbuchBarcodesLookup.where({for_jobid}).first()
+       && !!await this.dexie.barcodeLookup.where({for_jobid}).first());
+  }
+
+  public async hasValidInventurRevId(jobid: number): Promise<boolean> {
+    const varName = 'jobid-' + jobid + '-revision-id';
+    const lastRevId = +(await this.settingsService.get(varName, 0));
+    return (!isNaN(lastRevId) && lastRevId > 0);
+  }
+
   async loadInventurDataByInventurId(jobid: number, reset: boolean = false): Promise<LoadApiDataResult[]> {
     console.log('#324 called loadInventurDataByInventurId(', jobid, reset, ')');
     this.setLoadingStarted( jobid );
@@ -385,7 +414,12 @@ export class DataService {
     const inventurAlreadyStartedRevId = +(await this.settingsService.get('jobid-' + jobid + '-revision-id', 0));
     console.log('#388 loadInventurDataByInventurId, inventurAlreadyStartedRevId: ', inventurAlreadyStartedRevId);
 
-    if (!isNaN(inventurAlreadyStartedRevId) && inventurAlreadyStartedRevId > 0 && !reset) {
+    const hasAllInventurData = await this.hasAllInventurData(jobid);
+
+    if (!reset
+      && !isNaN(inventurAlreadyStartedRevId) && inventurAlreadyStartedRevId > 0
+      && hasAllInventurData
+    ) {
       console.log('#338 loadInventurDataByInventurId');
       const numUnsyncedClientChanges = await this.DbSyncService.numUnsyncedChangeLogsByJobId(jobid);
       console.log('#340 loadInventurDataByInventurId', {numUnsyncedClientChanges});
@@ -411,6 +445,8 @@ export class DataService {
         }];
       }
     }
+
+    // await this.DbSyncService
 
     this.dbSyncLogService.start(jobid, inventurAlreadyStartedRevId);
     this.dexie.stopChangeLogForImport( true );

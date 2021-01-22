@@ -117,6 +117,8 @@ export class AuthService {
     }
     this.setUserData( this.user );
     this.setClientDeviceId( clientDeviceId );
+    this.connection.setAuthState(true);
+    this.connection.refresh();
   }
 
   private setUserData(userData: User): void {

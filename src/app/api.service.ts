@@ -29,8 +29,8 @@ export class ApiService {
   }
 
   getDefaultApiUrl(): string {
-    const url = (window.location.origin.indexOf('mertens-inventory.firebaseapp.com') !== -1)
-      ? 'https://10.30.2.131:8040/'
+    const url = (window.location.origin.indexOf('mertens-inventory') !== -1)
+      ? 'https://mertens-inventory.bluebirdapp.de/'
       : 'https://' + window.location.hostname + ':8040/';
     console.log('ApiService.getDefaultApiUrl() return ', { url });
     return url;
@@ -59,7 +59,7 @@ export class ApiService {
     if ( url.substr(0, 10).match(/^[a-zA-Z]:\/\//)) {
       return url;
     }
-    return this.apiBaseUrl + url;
+    return this.getUrlByPath(url);
   }
 
   get<T>(path: string, options?: object): Observable<T> {

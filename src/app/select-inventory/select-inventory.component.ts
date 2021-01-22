@@ -67,6 +67,7 @@ export class SelectInventoryComponent implements OnInit, OnDestroy {
   inventory?: DBDIInventuren;
   client: DBDIMandanten;
   building: DBDIGebaeude;
+  loading = false;
 
   clients: DBDIMandanten[];
   buildings: DBDIGebaeude[];
@@ -116,6 +117,7 @@ export class SelectInventoryComponent implements OnInit, OnDestroy {
 
 
   ngOnInit() {
+    this.loading = false;
     this.lastInventory = this.baseData.getCurrentInventur();
     this.lastBuilding = this.baseData.getCurrentGebaeude();
     this.lastRaum = this.baseData.getCurrentRaum();
@@ -391,6 +393,7 @@ export class SelectInventoryComponent implements OnInit, OnDestroy {
   }
 
   async onSubmit() {
+    this.loading = true;
     console.log( this.selectForm );
     if (!this.client || !this.inventory || !this.building) {
       this.status = 'Bitte vervollständige die Auswahl!';
@@ -403,10 +406,13 @@ export class SelectInventoryComponent implements OnInit, OnDestroy {
     if (
       this.lastInventory && this.lastInventory.jobid === this.jobid
       && this.lastBuilding && this.lastBuilding.gid === this.building.gid
+      && await this.dataService.hasValidInventurRevId(this.inventory.jobid)
+      && await this.dataService.hasAllInventurData(this.inventory.jobid)
     ) {
+      console.log('SelectInventoryComponent #410 onSubmit gotoLastInventory');
       this.gotoLastInventory();
     } else {
-
+      console.log('SelectInventoryComponent #414 onSubmit dataService.loadInventurDataByInventurId', this.inventory.jobid);
       this.status = 'Bitte warten .... Inventarisierungsdaten werden vom Server geladen.';
       await this.dataService.loadInventurDataByInventurId( this.inventory.jobid );
       this.status = 'Daten wurden geladen';
