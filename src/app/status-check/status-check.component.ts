@@ -1,8 +1,9 @@
 import {Component, OnDestroy, OnInit} from '@angular/core';
 import {ConnectionState, ConnectionService} from './../connection-service.service';
-import {Subscription} from "rxjs";
-import {DataService} from "../inventory/service/data.service";
-import {DBSyncClientService} from "../dbsync-client.service";
+import {Subscription} from 'rxjs';
+import {DataService} from '../inventory/service/data.service';
+import {DBSyncClientService} from '../dbsync-client.service';
+import {environment} from '../../environments/environment';
 
 @Component({
   selector: 'app-status-check',
@@ -15,6 +16,7 @@ export class StatusCheckComponent implements OnInit, OnDestroy {
   connectionSubscription: Subscription;
   unsyncedAmountChangeSubscription: Subscription;
   numUnsynced: number;
+  currentApplicationVersion = environment.appVersion;
 
   constructor(
     private connectionService: ConnectionService,
