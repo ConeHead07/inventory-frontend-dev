@@ -59,18 +59,10 @@ export class AuthComponent implements OnInit, OnDestroy {
 
     let authObs: Observable<AuthResponseData>;
 
-    let url = '';
     const email = this.form.email;
     const password = this.form.password;
-    const originDomain = (window && window.location && window.location.origin)
-      ? window.location.origin.split(':').slice(0, 2).join(':')
-      : 'http://127.0.0.1';
-
-    url = originDomain + ':8040/auth/login/';
-    console.log('onLoginSubmit #44', { url });
 
     authObs = this.authService.login(email, password);
-    console.log('onLoginSubmit #47', { url });
 
     this.isLoading = true;
     authObs.subscribe(
@@ -87,7 +79,6 @@ export class AuthComponent implements OnInit, OnDestroy {
         this.isLoading = false;
       }
     );
-    console.log('onLoginSubmit #63', { url });
   }
 
 }

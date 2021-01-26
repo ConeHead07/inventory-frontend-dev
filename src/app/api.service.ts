@@ -8,43 +8,34 @@ import {BasedataService} from './basedata.service';
 })
 export class ApiService {
 
-  private apiBaseUrl = ':8040/';
+  private apiBaseUrl = '';
 
   constructor(private http: HttpClient, private baseData: BasedataService) {
-    console.log('ApiService.constructor #14');
-    if (false) {
-      const originDomain = (window && window.location && window.location.origin)
-        ? window.location.origin.split(':').slice(0, 2).join(':')
-        : 'http://127.0.0.1';
-
-      this.apiBaseUrl = originDomain + this.apiBaseUrl;
-
-      const realApiBaseUrl = this.apiBaseUrl;
-      const debugApiBaseUrl = this.baseData.getCurrentApiBaseUrlOrSetDefault( this.getDefaultApiUrl );
-      console.log({debugApiBaseUrl, realApiBaseUrl});
-      return;
-    }
-
     this.apiBaseUrl = this.baseData.getCurrentApiBaseUrlOrSetDefault( this.getDefaultApiUrl );
   }
 
   getDefaultApiUrl(): string {
     const hostName = window.location.hostname;
+    let defaultUrl = '';
 
     switch (hostName) {
       case 'inventory.local':
       case '127.0.0.1':
       case 'localhost':
-        return 'https://' + hostName + ':8040/';
+        defaultUrl = 'https://' + hostName + ':8040/';
+        break;
 
       case 'https://mertens-inventory-client.bluebirdapp.de/':
-        return 'https://mertens-inventory.bluebirdapp.de/';
+        defaultUrl = 'https://mertens-inventory.bluebirdapp.de/';
+        break;
 
       case 'mertens-inventory.firebaseapp.com':
       case 'mertens-inventory.web.app':
       default:
-        return 'https://inventory.mertens.services';
+        defaultUrl = 'https://inventory.mertens.services';
     }
+    console.log('ApiService #37 getDefaultApiUrl()', { hostName, defaultUrl });
+    return defaultUrl;
   }
 
   getBaseUrl(): string {

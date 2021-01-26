@@ -27,7 +27,6 @@ export class AuthService {
 
   user = null;
 
-  private url = ':8040/auth/login/';
   private authPath = 'auth/login';
 
   constructor(
