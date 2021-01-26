@@ -29,11 +29,22 @@ export class ApiService {
   }
 
   getDefaultApiUrl(): string {
-    const url = (window.location.origin.indexOf('mertens-inventory') !== -1)
-      ? 'https://mertens-inventory.bluebirdapp.de/'
-      : 'https://' + window.location.hostname + ':8040/';
-    console.log('ApiService.getDefaultApiUrl() return ', { url });
-    return url;
+    const hostName = window.location.hostname;
+
+    switch (hostName) {
+      case 'inventory.local':
+      case '127.0.0.1':
+      case 'localhost':
+        return 'https://' + hostName + ':8040/';
+
+      case 'https://mertens-inventory-client.bluebirdapp.de/':
+        return 'https://mertens-inventory.bluebirdapp.de/';
+
+      case 'mertens-inventory.firebaseapp.com':
+      case 'mertens-inventory.web.app':
+      default:
+        return 'https://inventory.mertens.services';
+    }
   }
 
   getBaseUrl(): string {
