@@ -32,7 +32,7 @@ export class ApiService {
       case 'mertens-inventory.firebaseapp.com':
       case 'mertens-inventory.web.app':
       default:
-        defaultUrl = 'https://inventory.mertens.services';
+        defaultUrl = 'https://inventory.mertens.services/';
     }
     console.log('ApiService #37 getDefaultApiUrl()', { hostName, defaultUrl });
     return defaultUrl;
