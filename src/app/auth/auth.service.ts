@@ -27,7 +27,7 @@ export class AuthService {
 
   user = null;
 
-  private authPath = 'auth/login';
+  private authPath = '/auth/login';
 
   constructor(
     private http: HttpClient,
