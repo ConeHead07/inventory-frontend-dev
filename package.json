@@ -1,6 +1,6 @@
 {
   "name": "frontend",
-  "version": "0.8.12",
+  "version": "0.8.13",
   "scripts": {
     "ng": "ng",
     "start": "ng serve --aot --host 0.0.0.0 --disable-host-check",
@@ -45,10 +45,10 @@
     "compressorjs": "^1.0.6",
     "cropperjs": "^1.5.6",
     "crypto-js": "3.3.0",
-    "dexie": "^2.0.4",
-    "dexie-observable": "^1.0.0-beta.6",
+    "dexie": "2.0.4",
+    "dexie-observable": "1.0.0-beta.7",
     "dexie-relationships": "^1.2.11",
-    "dexie-syncable": "^1.0.0-beta.6",
+    "dexie-syncable": "1.0.0-beta.6",
     "es6-shim": "^0.35.5",
     "express": "^4.17.1",
     "express-cors": "0.0.3",
