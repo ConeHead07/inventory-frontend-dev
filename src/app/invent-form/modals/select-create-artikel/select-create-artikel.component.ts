@@ -6,7 +6,7 @@ import {
   ArtikelService,
   ArtikelBasisDaten,
   ArtikelPropertiesForQueryCount,
-  ArtikelHerstellerImg
+  ArtikelHerstellerImg, DBInsertArtikelResult
 } from '../../data-services/artikel.service';
 
 import {Observable, Subject, merge} from 'rxjs';
@@ -41,7 +41,6 @@ interface ExistCountSimilarArticle {
 
 interface HerstellerExistsStatus {
   term?: string;
-  hid?: number;
   uuid?: string;
   data?: DBDIHersteller;
   isQuerying: boolean;
@@ -63,13 +62,15 @@ export class SelectCreateArtikelComponent implements OnInit {
   public artikelDaten: ArtikelBasisDaten = {
     mid: 0,
     mcid: 0,
+    mcuuid: '',
     gcid: 0,
+    gcuuid: '',
     Bezeichnung: '',
     Gruppe: '',
     Kategorie: '',
     Typ: '',
     Hersteller: '',
-    hid: 0,
+    huuid: '',
     Groesse: '',
     Farbe: ''
   };
@@ -115,7 +116,6 @@ export class SelectCreateArtikelComponent implements OnInit {
 
   herstellerExistsStatus: HerstellerExistsStatus = {
     term: '',
-    hid: 0,
     uuid: '',
     data: null,
     isQuerying: false
@@ -131,7 +131,7 @@ export class SelectCreateArtikelComponent implements OnInit {
 
   @Output() artikelSelected = new EventEmitter<ArtikelOption>();
   @Output() artikelSearching = new EventEmitter<number>();
-  @Output() artikelCreated = new EventEmitter<DBDIArtikel>();
+  @Output() artikelCreated = new EventEmitter<DBInsertArtikelResult>();
   @Output() herstellerChanged = new EventEmitter<string>();
   @Output() gruppeChanged = new EventEmitter<string>();
   @Output() inputChanging = new EventEmitter();
@@ -148,7 +148,7 @@ export class SelectCreateArtikelComponent implements OnInit {
   }
 
   ngOnInit() {
-    this.herstellerService.getAllHerstellerWithIds().then( list => {
+    this.herstellerService.getAllHerstellerWithUuids().then(list => {
       while (states.length > 0) {
         states.pop();
         stateNames.pop();
@@ -230,7 +230,7 @@ export class SelectCreateArtikelComponent implements OnInit {
   }
 
   async rebuildTypeaheadGruppen() {
-    const where = this.getWhereInputsOf(['hid']);
+    const where = this.getWhereInputsOf(['huuid']);
     this.artikelService.getGroupedArtikelGruppen(where).then( list => {
       artikelGruppen.length = 0;
       list.forEach( (it) => artikelGruppen.push( it ) );
@@ -261,7 +261,7 @@ export class SelectCreateArtikelComponent implements OnInit {
   }
 
   async rebuildTypeaheadTypen() {
-    const where = this.getWhereInputsOf(['hid']);
+    const where = this.getWhereInputsOf(['huuid']);
     this.artikelService.getGroupedArtikelTypen(where).then( list => {
       artikelTypen.length = 0;
       list.forEach( (it) => artikelTypen.push( it ) );
@@ -269,7 +269,7 @@ export class SelectCreateArtikelComponent implements OnInit {
   }
 
   async rebuildTypeaheadGroessen() {
-    const where = this.getWhereInputsOf(['hid']);
+    const where = this.getWhereInputsOf(['huuid']);
     this.artikelService.getGroupedArtikelGroessen(where).then( list => {
       artikelGroessen.length = 0;
       list.forEach( (it) => artikelGroessen.push( it ) );
@@ -277,7 +277,7 @@ export class SelectCreateArtikelComponent implements OnInit {
   }
 
   async rebuildTypeaheadFarben() {
-    const where = this.getWhereInputsOf(['hid']);
+    const where = this.getWhereInputsOf(['huuid']);
     this.artikelService.getGroupedArtikelFarben(where).then( list => {
       artikelFarben.length = 0;
       list.forEach( (it) => artikelFarben.push( it ) );
@@ -316,7 +316,6 @@ export class SelectCreateArtikelComponent implements OnInit {
     if (term !== this.herstellerExistsStatus.term) {
       this.herstellerExistsStatus.term = term;
       this.herstellerExistsStatus.data = null;
-      this.herstellerExistsStatus.hid = null;
       this.herstellerExistsStatus.uuid = null;
     }
 
@@ -326,7 +325,6 @@ export class SelectCreateArtikelComponent implements OnInit {
         this.herstellerExistsStatus.data = data;
         this.herstellerExistsStatus.isQuerying = false;
         if (data !== null && data !== undefined) {
-          this.herstellerExistsStatus.hid = data.hid;
           this.herstellerExistsStatus.uuid = ('uuid' in data) ? data.uuid : null;
           console.log('#167 Hersteller exists: ', this.herstellerExistsStatus);
           return true;
@@ -346,7 +344,7 @@ export class SelectCreateArtikelComponent implements OnInit {
     const oCheckData: ArtikelPropertiesForQueryCount = {};
 
     await this.checkHersteller();
-    const hid = this.herstellerExistsStatus.hid;
+    const huuid = this.herstellerExistsStatus.uuid;
 
     for (const k of ['Bezeichnung', 'Typ', 'Kategorie', 'Gruppe', 'Groesse', 'Farbe']) {
       if (d[k]) {
@@ -354,16 +352,16 @@ export class SelectCreateArtikelComponent implements OnInit {
       }
     }
 
-    this.listExistingArticleMatches = await this.artikelService.listArticleByProperties(mid, hid, oCheckData);
+    this.listExistingArticleMatches = await this.artikelService.listArticleByProperties(mid, huuid, oCheckData);
     this.page = 1;
     this.onPageChange(this.page);
     console.log('finished listArticleMatches with results.count: ', this.listExistingArticleMatches.length,
-      ' for', { mid, hid, oCheckData } );
+      ' for', { mid, huuid, oCheckData } );
   }
 
   async applyItemAsArtikel(item: any) {
     console.log('#361 applyItemAsArtikel', { item });
-    if (!item.mcid || !item.mcuuid) {
+    if (!item.mcuuid) {
       let artikelRef = await this.dataService.getArtikelRefByGcuuidMid(item.gcuuid, this.clientId);
       if (!artikelRef) {
         artikelRef = await this.artikelService.insertArtikelRef(item);
@@ -372,8 +370,7 @@ export class SelectCreateArtikelComponent implements OnInit {
       item.mcuuid = artikelRef.uuid;
     }
     this.artikelSelected.emit({
-      id: item.mcid,
-      mcid: item.mcid,
+      uuid: item.mcuuid,
       mcuuid: item.mcuuid,
       name: item.Bezeichnung
     } as ArtikelOption);
@@ -383,7 +380,7 @@ export class SelectCreateArtikelComponent implements OnInit {
   applyItemAsInput(item: any) {
     console.log('#367 applyItemAsInput', { item });
     this.artikelDaten.Hersteller = item.Hersteller;
-    this.artikelDaten.hid = item.hid;
+    this.artikelDaten.huuid = item.huuid;
     this.artikelDaten.Bezeichnung = item.Bezeichnung;
     this.artikelDaten.Gruppe = item.Gruppe;
     this.artikelDaten.Kategorie = item.Kategorie;
@@ -471,10 +468,9 @@ export class SelectCreateArtikelComponent implements OnInit {
 
   onSelectHersteller(selected) {
     const foundHst = states.find( (st) => st.Hersteller === selected.item);
-    console.log('selected:', selected, 'selected.item: ', selected.item,
-      'foundHst:', foundHst);
-    this.artikelDaten.hid = (foundHst) ? foundHst.hid : null;
-    console.log('this.artikelDaten.Hersteller: ', this.artikelDaten.Hersteller, { selected });
+    this.artikelDaten.huuid = (foundHst) ? foundHst.uuid : null;
+    console.log('SelectCreateArtikel onSelectHersteller this.artikelDaten.Hersteller: ', this.artikelDaten.Hersteller,
+      { selected, foundHst });
     this.herstellerChanged.emit(selected.item);
   }
   onChangeHersteller(event: Event) {
@@ -534,7 +530,6 @@ export class SelectCreateArtikelComponent implements OnInit {
   }
 
   formValidate(): boolean {
-    console.log('called formValidate');
     this.formIsValid =
       this.artikelDaten.Bezeichnung.length > 0
       && this.numBezeichnungExists === 0;
@@ -544,28 +539,23 @@ export class SelectCreateArtikelComponent implements OnInit {
   }
 
   showSearchForm(event) {
-    console.log('called showSearchForm');
     this.artikelSearching.emit(1);
     this.activeModal.close();
   }
 
   get gebaeudeId() {
-    console.log('called get gebaeudeId() ', this.gid);
     return this.gid;
   }
 
   set gebaeudeId(gid: number) {
-    console.log( 'called set gebaeudeId', 'param', gid, 'old-gid', this.gid);
     this.gid = gid;
   }
 
   get clientId() {
-    console.log('called get clientId() ', this.mid);
     return this.mid;
   }
 
   set clientId(mid: number) {
-    console.log( 'called set clientId', 'param', mid, 'old-mid', this.mid);
     this.mid = mid;
   }
 
@@ -587,42 +577,38 @@ export class SelectCreateArtikelComponent implements OnInit {
   }
 
   async checkIfArtikelExistsMandant(): Promise<boolean> {
-    console.log('check if bezeichnung exists');
     this.numBezeichnungExists = -1;
 
-    let globalArtikelIds: number[] = [];
+    let globalArtikelUuids: string[] = [];
 
     await this.artikelService
       .artikelGlobalByBezeichnung( this.artikelDaten.Bezeichnung )
       .then( items => {
-        globalArtikelIds = items.map<number>( item => item.gcid );
+        globalArtikelUuids = items.map<string>( item => item.uuid );
       });
 
-    if (globalArtikelIds.length === 0) {
+    if (globalArtikelUuids.length === 0) {
       return false;
     }
 
     return 0 < await this.artikelService
-      .artikelMcidByGcids( this.mid, globalArtikelIds )
+      .artikelMcuuidByGcuuids( this.mid, globalArtikelUuids )
       .then( items => {
         return items.length;
-        // mandantArtikelIds = items.map<number>( itm => itm.mcid );
       });
   }
 
   async save(): Promise<boolean> {
     this.formError = '';
-    console.log('save Artikel ');
     if (this.formValidate()) {
       this.artikelDaten.mid = this.mid;
-      console.log('save Artikeldaten ', this.artikelDaten);
-      const result = await this.artikelService.insert( this.artikelDaten );
-      console.log('save Artikeldaten result ', result);
+      const result: DBInsertArtikelResult = await this.artikelService.insert( this.artikelDaten );
       if (!result.success) {
         this.formError = 'Daten konnten nicht gespeichert werden!<br>' + result.errorMsg;
+        console.error('save Artikeldaten result ', { artikelDaten: this.artikelDaten, result});
         return false;
       } else {
-        this.artikelCreated.emit( result.newItem );
+        this.artikelCreated.emit( result );
         this.activeModal.close();
         return true;
       }

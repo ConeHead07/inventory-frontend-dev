@@ -32,7 +32,7 @@ export class SelectCreateRaumComponent implements OnInit {
 
   private gid: number;
 
-  @Output() raumSearching = new EventEmitter<number>();
+  @Output() raumSearching = new EventEmitter();
   @Output() raumCreated = new EventEmitter<DBDIRaeume>();
   @Output() scannerRequest = new EventEmitter<HTMLElement>();
 
@@ -71,7 +71,7 @@ export class SelectCreateRaumComponent implements OnInit {
 
   showSearchForm(event) {
     console.log('called showSearchForm');
-    this.raumSearching.emit(1);
+    this.raumSearching.emit();
     this.activeModal.close();
   }
 

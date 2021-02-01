@@ -151,7 +151,7 @@
     <input  id="raumBez" readonly type="text" [value]="formInventar.Raumbezeichnung"
             placeholder="Raumbezeichnung" class="form-control">
     <div class="input-group-append">
-      <button class="btn btn-outline-success" [disabled]="!formInventar.rid" type="button" (click)="openEditRaum()">
+      <button class="btn btn-outline-success" [disabled]="!formInventar.ruuid" type="button" (click)="openEditRaum()">
         <fa-icon [icon]="faEdit"></fa-icon>
       </button>
     </div>
@@ -181,6 +181,9 @@
   </div>
   <ngb-alert *ngIf="waitingForInventarData" type="danger">
     Warte auf Artikelzuweisung für neuen Inventar-Barcode: {{ formInventar.Barcode }}
+  </ngb-alert>
+  <ngb-alert *ngIf="waitingForNewInventarBarcode" type="danger">
+    Warte auf neuen Inventar-Barcode für {{ formInventar.Bezeichnung }}
   </ngb-alert>
   <div class="form-group row">
       <div class="col input-group mb-1">

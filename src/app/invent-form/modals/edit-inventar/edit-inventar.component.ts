@@ -72,7 +72,7 @@ export class EditInventarComponent implements OnInit {
   inventarDaten: InventarFoundResult = null;
   public inventarInput: InventarBasisDaten = {
     code: '',
-    ivid: 0,
+    uuid: '',
     Bezeichnung: '',
     Gruppe: '',
     Kategorie: '',
@@ -80,6 +80,7 @@ export class EditInventarComponent implements OnInit {
     Hersteller: '',
     Groesse: '',
     Farbe: '',
+    huuid: '',
   };
 
   @ViewChild('instance', {static: true}) instance: NgbTypeahead;
@@ -133,7 +134,7 @@ export class EditInventarComponent implements OnInit {
   public validationErrors: string[] = [];
   public formIsValid = true;
   public formError = '';
-  private id = 0;
+  private uuid = '';
 
   private gid: number;
   private mid: number;
@@ -148,7 +149,7 @@ export class EditInventarComponent implements OnInit {
 
     async loadHersteller(): Promise<number> {
       console.log('EditInventarComponent #150 loadHersteller');
-      return this.herstellerService.getAllHerstellerWithIds()
+      return this.herstellerService.getAllHerstellerWithUuids()
         .then( list => {
           while (states.length > 0) {
             states.pop();
@@ -288,19 +289,19 @@ export class EditInventarComponent implements OnInit {
     this.scannerRequest.emit(target);
   }
 
-  get inventarId() {
-    console.log('called get raumId() ', this.id);
-    return this.id;
+  get inventarUuid() {
+    console.log('called get raumId() ', this.uuid);
+    return this.uuid;
   }
 
-  set inventarId(id: number) {
-    console.log('EditInventarComponent #297 set inventarId(id)', { id });
-    this.id = id;
-    this.inventarService.getInventar(id).then( result => {
+  set inventarUuid(uuid: string) {
+    console.log('EditInventarComponent #297 set inventarId(id)', { id: uuid });
+    this.uuid = uuid;
+    this.inventarService.getInventar(uuid).then(result => {
       console.log('EditInventarComponent #300 getInventar', { result });
       this.inventarDaten = result;
       if (result && result.success) {
-        this.inventarInput.ivid = id;
+        this.inventarInput.uuid = uuid;
         this.inventarInput.code = result.inventar.code;
         this.inventarInput.Bezeichnung = result.artikelData.Bezeichnung;
         this.inventarInput.Gruppe = result.artikelData.Gruppe;
@@ -462,12 +463,12 @@ export class EditInventarComponent implements OnInit {
     console.log('check if bezeichnung exists');
     this.numBezeichnungExists = -1;
 
-    let globalArtikelIds: number[] = [];
+    let globalArtikelIds: string[] = [];
 
     await this.artikelService
       .artikelGlobalByBezeichnung( this.inventarInput.Bezeichnung )
       .then( items => {
-        globalArtikelIds = items.map<number>( item => item.gcid );
+        globalArtikelIds = items.map<string>( item => item.uuid );
       });
 
     if (globalArtikelIds.length === 0) {
@@ -475,10 +476,9 @@ export class EditInventarComponent implements OnInit {
     }
 
     return 0 < await this.artikelService
-      .artikelMcidByGcids( this.mid, globalArtikelIds )
+      .artikelMcuuidByGcuuids( this.mid, globalArtikelIds )
       .then( items => {
         return items.length;
-        // mandantArtikelIds = items.map<number>( itm => itm.mcid );
       });
   }
 
@@ -487,8 +487,8 @@ export class EditInventarComponent implements OnInit {
     this.formError = '';
     console.log('save inventar');
     if (await this.formValidate()) {
-      const ivid = this.id;
-      const result = await this.inventarService.updateById(ivid, this.inventarInput);
+      const ivid = this.uuid;
+      const result = await this.inventarService.updateByUuid(ivid, this.inventarInput);
       if (result.success) {
         this.inventarChanged.emit(result);
 
@@ -518,7 +518,7 @@ export class EditInventarComponent implements OnInit {
     console.log('EditInventarComponent #509');
     this.applyItemAsInput(item);
     console.log('#361 applyItemAsArtikel', { item });
-    if (!item.mcid || !item.mcuuid) {
+    if (!item.mcuuid) {
       let artikelRef = await this.dataService.getArtikelRefByGcuuidMid(item.gcuuid, this.mid);
       if (!artikelRef) {
         artikelRef = await this.artikelService.insertArtikelRef(item);
@@ -527,13 +527,13 @@ export class EditInventarComponent implements OnInit {
       item.mcuuid = artikelRef.uuid;
     }
 
-    if (this.inventarDaten.inventar.mcid !== item.mcid) {
-      await this.inventarService.updateRefs(this.id, item.mcid, item.mcuuid, {
+    if (this.inventarDaten.inventar.mcuuid !== item.mcuuid) {
+      await this.inventarService.updateRefs(this.uuid, item.mcuuid, {
         Zustand: this.inventarInput.Zustand,
         code: this.inventarInput.code
       });
     }
-    const result = await this.inventarService.getInventar(this.id);
+    const result = await this.inventarService.getInventar(this.uuid);
 
     this.inventarChanged.emit(result);
     return;
@@ -640,7 +640,7 @@ export class EditInventarComponent implements OnInit {
     const foundHst = states.find( (st) => st.Hersteller === selected.item);
     console.log('selected:', selected, 'selected.item: ', selected.item,
       'foundHst:', foundHst);
-    this.inventarInput.hid = (foundHst) ? foundHst.hid : null;
+    this.inventarInput.huuid = (foundHst) ? foundHst.uuid : null;
     console.log('this.artikelDaten.Hersteller: ', this.inventarInput.Hersteller, { selected });
     this.herstellerChanged.emit(selected.item);
   }

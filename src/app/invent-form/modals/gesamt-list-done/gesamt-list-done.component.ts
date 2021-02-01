@@ -38,7 +38,7 @@ export class GesamtListDoneComponent implements OnInit {
   faFull = faBatteryFull;
   faSignOutAlt = faSignOutAlt;
 
-  @Output() raumSelected = new EventEmitter<number>();
+  @Output() raumSelected = new EventEmitter<string>();
 
   constructor(
     public activeModal: NgbActiveModal,
@@ -54,8 +54,8 @@ export class GesamtListDoneComponent implements OnInit {
     this.loadGebaeudeStat();
   }
 
-  onSelectRaum(rid) {
-    this.raumSelected.emit( rid );
+  onSelectRaum(uuid: string) {
+    this.raumSelected.emit( uuid );
     this.activeModal.close();
   }
 

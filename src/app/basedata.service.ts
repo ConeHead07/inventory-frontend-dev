@@ -159,11 +159,11 @@ export class BasedataService {
     return this.currentRaum;
   }
 
-  getCurrentRid(): number {
+  getCurrentRuuid(): string {
     try {
-      return this.currentRaum.rid;
+      return this.currentRaum.uuid;
     } catch (e) {
-      return 0;
+      return '';
     }
   }
 

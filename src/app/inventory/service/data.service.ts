@@ -489,7 +489,7 @@ export class DataService implements OnDestroy {
               .each( (itm) => {
                 this.dexie.objektKatalogMandant.where({gcuuid: itm.uuid}).count().then( (num) => {
                   if (num === 0) {
-                    this.dexie.objektKatalogGlobal.delete(itm.gcid);
+                    this.dexie.objektKatalogGlobal.delete(itm.uuid);
                   }
                 });
               })
@@ -707,7 +707,6 @@ export class DataService implements OnDestroy {
   }
 
   async getClient(clientID: number): Promise<DBDIMandanten> | null {
-    console.log('#500  data.service');
     const clients = await this.getClientList();
     const fclients = clients.filter( client => client.mid === clientID);
     console.log( { clientID, clients, fclients });
@@ -715,7 +714,6 @@ export class DataService implements OnDestroy {
   }
 
   async getBuilding(bldgID: number, clientID: number): Promise<DBDIGebaeude> | null {
-    console.log('#508  data.service');
     const bldgs = await this.getBuildingList(clientID);
     const fbldgs = bldgs.filter( bldg => bldg.gid === bldgID);
     console.log( { bldgID, clientID, bldgs, fbldgs });
@@ -723,70 +721,59 @@ export class DataService implements OnDestroy {
   }
 
   async getClientList(): Promise<DBDIMandanten[]>  {
-    console.log('#516  data.service');
     return await this.dexie.mandanten.toArray();
   }
 
   getFullArtikelData(link: DBDIObjektKatalogMandant, globalData: DBDIObjektKatalogGlobal): DBDIArtikel {
-    console.log('#521  data.service');
     return {...globalData, ...link, ...{mcuuid: link.uuid }} as DBDIArtikel;
   }
 
   getFullRaumData(raum: DBDIRaeume, gebaeude: DBDIGebaeude): DBDIRaumGebaeude {
-    console.log('#526  data.service');
     const raumGebaeudeData: DBDIRaumGebaeude = {...raum, ...gebaeude};
     return raumGebaeudeData;
   }
 
   getArtikelRefByGcuuidMid(gcuuid: string, mid: number): Promise<DBDIObjektKatalogMandant> {
-    console.log('#532  data.service getArtikelRefByGcuuidMid');
     return this.dexie.objektKatalogMandant.where( { gcuuid, mid } ).first();
   }
 
-  public async getArtikelRef(mcid: number): Promise<DBDIObjektKatalogMandant> {
-    console.log('#537  data.service getArtikelRef');
-    return this.dexie.objektKatalogMandant.get( mcid );
+  public async getArtikelRef(uuid: string): Promise<DBDIObjektKatalogMandant> {
+    return this.dexie.objektKatalogMandant.get( uuid );
   }
 
-  public async getArtikelData(gcid: number): Promise<DBDIObjektKatalogGlobal> {
-    console.log('#542  data.service');
-    return this.dexie.objektKatalogGlobal.get( gcid );
+  public async getArtikelData(gcuuid: string): Promise<DBDIObjektKatalogGlobal> {
+    return this.dexie.objektKatalogGlobal.get( gcuuid );
   }
 
-  public async getArtikel(id: number): Promise<DBDIArtikel> {
-    console.log('#547  data.service');
-    const artikelLink = await this.dexie.objektKatalogMandant.get( { mcid: id } );
-    const artikelData = await this.dexie.objektKatalogGlobal.get( { gcid: artikelLink.gcid } );
-    console.log('getArtikel by id', { id, artikelLink, artikelData});
+  public async getArtikel(uuid: string): Promise<DBDIArtikel> {
+    const artikelLink = await this.dexie.objektKatalogMandant.get( { uuid } );
+    const artikelData = await this.dexie.objektKatalogGlobal.get( { uuid: artikelLink.gcuuid } );
     return this.getFullArtikelData(artikelLink, artikelData);
   }
 
-  public async getArtikelRefAndData(id: number): Promise<ArtikelRefAndData> {
-    console.log('#555  data.service');
-    const artikelRef = await this.dexie.objektKatalogMandant.get( { mcid: id } );
-    const artikelData = await this.dexie.objektKatalogGlobal.get( { gcid: artikelRef.gcid } );
+  public async getArtikelRefAndData(uuid: string): Promise<ArtikelRefAndData> {
+    const artikelRef = await this.dexie.objektKatalogMandant.get( { uuid } );
+    const artikelData = await this.dexie.objektKatalogGlobal.get( { uuid: artikelRef.gcuuid } );
     return {
       artikelRef,
       artikelData
     };
   }
 
-  public async getInventarRef(ivid: number): Promise<DBDIInventar> {
-    console.log('#565  data.service');
-    return this.dexie.inventar.get(ivid);
+  public async getInventarRef(uuid: string): Promise<DBDIInventar> {
+    return this.dexie.inventar.get(uuid);
   }
 
-  public async getInventarData(ivid: number): Promise<InventarDataResult> {
-    console.log('#570  data.service');
-    const inventarRef = await this.dexie.inventar.get( ivid );
+  public async getInventarData(uuid: string): Promise<InventarDataResult> {
+    const inventarRef = await this.dexie.inventar.get( uuid );
     if (!inventarRef) {
       return { success: false, errorCode: InventarDataResultError.InventarNotFound };
     }
-    const artikelRef = await this.dexie.objektKatalogMandant.get( inventarRef.mcid );
+    const artikelRef = await this.dexie.objektKatalogMandant.get( inventarRef.mcuuid );
     if (!artikelRef) {
       return { success: false, errorCode: InventarDataResultError.ArtikelRefNotFound };
     }
-    const artikelData = await this.dexie.objektKatalogGlobal.get (artikelRef.gcid );
+    const artikelData = await this.dexie.objektKatalogGlobal.get (artikelRef.gcuuid );
 
     if (!artikelData) {
       return { success: false, errorCode: InventarDataResultError.ArtikelDataNotFound };
@@ -802,11 +789,8 @@ export class DataService implements OnDestroy {
     };
   }
 
-  public async getRaumAndGebaeude(id: number): Promise<RaumAndGebaude> {
-    console.log('#596  data.service');
-    console.log('getRaum by id', id);
-
-    const raum = await this.dexie.raeume.get( id );
+  public async getRaumAndGebaeude(ruuid: string): Promise<RaumAndGebaude> {
+    const raum = await this.dexie.raeume.get( ruuid );
     if (raum) {
       const gebaeude = await this.dexie.gebaeude.get( raum.gid );
       return {
@@ -817,12 +801,9 @@ export class DataService implements OnDestroy {
     return null;
   }
 
-  public getRaum(id: number) {
-    console.log('#611  data.service');
-    console.log('getRaum by id', id);
-
+  public getRaum(uuid: string) {
     let raum: DBDIRaeume;
-    return this.dexie.raeume.get( {rid: id})
+    return this.dexie.raeume.get( {uuid})
       .then( (data: DBDIRaeume) => {
         raum = data;
         const gid = raum.gid;
@@ -832,25 +813,22 @@ export class DataService implements OnDestroy {
   }
 
   public getRaeumeByGebaeudeId(gid: number, jobid: number): Promise<DBDIRaeume[]> {
-    console.log('#625 data.service Search in rooms by gid', gid);
     return this.dexie.raeume.where({ gid, for_jobid: jobid }).toArray();
   }
 
   public async getArtikelListByClientId(mid: number): Promise<DBDIArtikelMitHersteller[]> {
-    console.log('#630 data.service Search in Global Katalog by mid', mid);
-
     const artikelRefs = await this.dexie.objektKatalogMandant
       .where({ mid }).toArray();
 
     const artikelData = await Promise.all(artikelRefs.map( async (ref) => {
-      return await this.dexie.objektKatalogGlobal.get( ref.gcid );
+      return await this.dexie.objektKatalogGlobal.get( ref.gcuuid );
     }));
 
     const artikelHst = await Promise.all(artikelData.map( async (ref) => {
-      if (typeof ref === 'undefined' || !ref || !ref.hid) {
+      if (typeof ref === 'undefined' || !ref || !ref.huuid) {
         return '';
       }
-      const hst = await this.dexie.hersteller.get( ref.hid );
+      const hst = await this.dexie.hersteller.get( ref.huuid );
       if (hst) {
         return hst.Hersteller;
       }
@@ -867,46 +845,17 @@ export class DataService implements OnDestroy {
     );
   }
 
-  public async bcLookup(barcode: string, mid: number): Promise<IUnionLookupAssignedObject> {
-    console.log('#641 barcodeLookup', {barcode, mid});
-
-    const lookupInventar = await this.getInventarByBarcode(barcode, mid);
-
-    if (lookupInventar.type === LookupResultType.Inventar) {
-      return lookupInventar;
-    }
-
-    // Otherwise return the Result of Raum-Lookup
-    const lookupRaum = await this.getRaumByBarcode(barcode, mid);
-    if (lookupRaum.type === LookupResultType.Raum) {
-      return lookupRaum;
-    }
-
-    const lookupArtikel = await this.getArtikelByBarcode(barcode, mid);
-    if ('type' in lookupArtikel && lookupArtikel.type === LookupResultType.ObjektBuchArtikel) {
-      return lookupArtikel as LookupAssignedObjektbuchArtikel;
-    }
-
-    console.error('Barcode-Lookup erzielte kein Match für: ', { barcode, mid });
-    return { type: LookupResultType.NoMatch };
-  }
-
   async getInventarByBarcode(barcode: string, useMid?: number): Promise<LookupAssignedInventar|LookupNoMatches> {
-    console.log('#665  data.service');
     const db = this.dexie;
 
-    console.log('#380 barcodeLookup in inventar', { barcode, useMid });
     const inventarMatches = await db.inventar
       .where( { code: barcode } )
       .toArray();
-    console.log('#383 barcodeLookup in inventar', { inventarMatches });
 
     for (const inventar of inventarMatches) {
-      const artikelRef = await db.objektKatalogMandant.get(inventar.mcid);
-      console.log('#387 barcodeLookup in inventar', { artikelRef });
+      const artikelRef = await db.objektKatalogMandant.get(inventar.mcuuid);
       if (!useMid || artikelRef.mid === useMid) {
-        const artikelData = await db.objektKatalogGlobal.get(artikelRef.gcid);
-        console.log('#389 barcodeLookup in inventar', { artikelData });
+        const artikelData = await db.objektKatalogGlobal.get(artikelRef.gcuuid);
 
         return {
           type: LookupResultType.Inventar,
@@ -916,7 +865,6 @@ export class DataService implements OnDestroy {
         };
       }
     }
-    console.log('#398 barcodeLookup in inventar', 'No-Match');
 
     return {
       type: LookupResultType.NoMatch
@@ -924,10 +872,8 @@ export class DataService implements OnDestroy {
   }
 
   async getRaumByBarcode(barcode: string, useMid?: number): Promise<LookupAssignedRoom|LookupNoMatches> {
-    console.log('#697  data.service');
     const db = this.dexie;
 
-    console.log('#412 barcodeLookup in raeume', { barcode, useMid});
     const raumMatch = await db.raeume.where( { code: barcode } ).first();
 
     if (raumMatch) {
@@ -940,20 +886,16 @@ export class DataService implements OnDestroy {
       };
     }
 
-    console.log('#232 barcodeLookup NOT FOUND', { barcode, useMid});
     return { type: LookupResultType.NoMatch };
   }
 
   async getArtikelByBarcode(barcode: string, useMid?: number):
     Promise<LookupResult|LookupAssignedObjektbuchArtikel|LookupAssignedObjektbuchArtikel[]> {
-    console.log('#719  data.service');
     const db = this.dexie;
 
-    console.log('#517 barcodeLookup in Objektbuch', { barcode, useMid});
     const listArtikelData = await db.objektKatalogGlobal.where( { code: barcode } ).toArray();
 
     if (listArtikelData.length === 0) {
-      console.log('#521 barcodeLookup in Objektbuch NOT FOUND', {barcode, useMid});
       return {type: LookupResultType.NoMatch};
     }
 
@@ -984,23 +926,18 @@ export class DataService implements OnDestroy {
   }
 
   async getBuildingList(clientID: number): Promise<DBDIGebaeude[]> {
-    console.log('#757  data.service');
     const list = await this.dexie.gebaeude.where({mid: clientID}).toArray();
-    console.log('#336 async getBuildingList', list);
     return list;
   }
 
   async getBuildingListByJobid(jobid: number, clientID: number): Promise<DBDIGebaeude[]> {
-    console.log('#764  data.service');
     const listGebaeudeRef = await this.dexie.inventurenGebaeude.where({jobid}).toArray();
     const listGid = listGebaeudeRef.map( (jg) => jg.gid);
     const list = await this.dexie.gebaeude.where( 'gid').anyOf(listGid).filter( (g) => g.mid === clientID).toArray();
-    console.log('#703 async getBuildingList by jobid', { jobid, clientID, listGebaeudeRef, listGid, list });
     return list;
   }
 
   joinsToStrictFormat(joins: JoinFlexFormatted, parent?: JoinFlexFormatted): JoinStrictFormatted {
-    console.log('#773  data.service');
     const db = this.dexie;
     const f = { ...joins };
     if (typeof f.table === 'string' ) {
@@ -1041,7 +978,6 @@ export class DataService implements OnDestroy {
   }
 
   joinieTables(join: JoinStrictFormatted): Dexie.Table<any, any>[] {
-    console.log('#814  data.service');
     let tables: Dexie.Table<any, any>[] = [ join.table ];
     if (join.joins) {
       join.joins.forEach( (jn) => tables = tables.concat( this.joinieTables( jn )) );
@@ -1050,7 +986,6 @@ export class DataService implements OnDestroy {
   }
 
   async joinie(flexJoins: JoinFlexFormatted): Promise<any[]|Dexie.Collection<any, any>> {
-    console.log('#823  data.service');
     const joins: JoinStrictFormatted = this.joinsToStrictFormat(flexJoins);
 
     const db = this.dexie;

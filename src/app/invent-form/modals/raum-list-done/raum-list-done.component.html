@@ -23,8 +23,8 @@
     </tr>
     </thead>
     <tbody>
-    <tr *ngFor="let item of inventarListDone">
-      <th scope="row">{{ item.mcid }}</th>
+    <tr *ngFor="let item of inventarListDone; let rowNr = index">
+      <th scope="row">{{ rowNr + 1 }}</th>
       <td>{{ item.Bezeichnung }}</td>
       <td>{{ item.Typ }}</td>
       <td>{{ item.Menge }}</td>

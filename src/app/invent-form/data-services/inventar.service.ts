@@ -24,6 +24,7 @@ export interface InventarFoundResult {
 
 export interface InventarBasisDaten {
   ivid?: number;
+  uuid?: string;
   code?: string;
   mid?: number;
   mcid?: number;
@@ -100,7 +101,7 @@ export class InventarService {
               private artikelService: ArtikelService
   ) { }
 
-  returnResultSuccess(data: InventarEditResultPresets): InventarEditResult {
+  returnResultSuccess<T extends InventarEditResult>(data: InventarEditResultPresets): T {
     const result: any = {
       type: data.type,
       success: true,
@@ -143,7 +144,7 @@ export class InventarService {
     return 'hello';
   }
 
-  async getInventar(ivid: number): Promise<InventarFoundResult> {
+  async getInventar(uuid: string): Promise<InventarFoundResult> {
     const result: InventarFoundResult = {
       success: false,
       inventar: null,
@@ -152,27 +153,27 @@ export class InventarService {
       hersteller: null
     };
 
-    console.log('InventarService #155 getInventar(ivid: ', ivid , ')');
-    result.inventar = await this.dexie.inventar.get(ivid);
-    console.log('InventarService #157 inventar.get(ivid: ', ivid , ')', { result });
+    console.log('InventarService #155 getInventar(ivid: ', uuid , ')');
+    result.inventar = await this.dexie.inventar.get(uuid);
+    console.log('InventarService #157 inventar.get(ivid: ', uuid , ')', { result });
 
     if (result.inventar) {
-      console.log('InventarService #160 objektKatalogMandant.get(mcid: ', result.inventar.mcid , ')');
-      result.artikelRef = await this.dexie.objektKatalogMandant.get(result.inventar.mcid);
-      console.log('InventarService #162 objektKatalogMandant.get(mcid: ', result.inventar.mcid , ')',
+      console.log('InventarService #160 objektKatalogMandant.get(uuid: ', result.inventar.mcuuid , ')');
+      result.artikelRef = await this.dexie.objektKatalogMandant.get(result.inventar.mcuuid);
+      console.log('InventarService #162 objektKatalogMandant.get(uuid: ', result.inventar.mcuuid , ')',
         { resultArtikelRef: result.artikelRef });
 
       if (result.artikelRef) {
         result.success = true;
-        console.log('InventarService #155 objektKatalogGlobal.get(gcid: ', result.artikelRef.gcid , ')');
-        result.artikelData = await this.dexie.objektKatalogGlobal.get(result.artikelRef.gcid);
-        console.log('InventarService #155 objektKatalogGlobal.get(gcid: ', result.artikelRef.gcid , ')',
+        console.log('InventarService #155 objektKatalogGlobal.get(uuid: ', result.artikelRef.gcuuid , ')');
+        result.artikelData = await this.dexie.objektKatalogGlobal.get(result.artikelRef.gcuuid);
+        console.log('InventarService #155 objektKatalogGlobal.get(uuid: ', result.artikelRef.gcuuid , ')',
           { resultArtikelData: result.artikelData});
 
-        if (result.artikelData.hid) {
-          console.log('InventarService #172 herteller.get(hid: ', result.artikelData.hid, ')');
-          result.hersteller = await this.dexie.hersteller.get(result.artikelData.hid);
-          console.log('InventarService #174 hersteller.get(hid: ', result.artikelData.hid, ')',
+        if (result.artikelData.huuid) {
+          console.log('InventarService #172 herteller.get(huuid: ', result.artikelData.huuid, ')');
+          result.hersteller = await this.dexie.hersteller.get(result.artikelData.huuid);
+          console.log('InventarService #174 hersteller.get(huuid: ', result.artikelData.huuid, ')',
             {resultHersteller: result.hersteller});
         }
       }
@@ -181,18 +182,19 @@ export class InventarService {
     return result;
   }
 
-  async insertInventar(inventar: DBDIInventar, useJobid?: number): Promise<InventarEditResult> {
+  async insertInventar(inventar: DBDIInventar, useJobid?: number): Promise<InventarInsertResult> {
     const jobid = useJobid || this.getJobiId();
     const uid = this.getUserId();
     const uuid = this.getFreshUuid();
+    console.log('InventarService #189 insertInventar: ', { inventar });
     const item: DBDIInventar = {
       mcid: inventar.mcid,
       uuid,
       mcuuid: inventar.mcuuid,
       hash: '',
       code: inventar.code,
-      rid: inventar.rid,
-      rid_neu: inventar.rid,
+      ruuid: inventar.ruuid,
+      ruuid_neu: inventar.ruuid,
       for_jobid: inventar.jobid || jobid,
       jobid: inventar.jobid || jobid,
       created_at: inventar.created_at || new Date(),
@@ -201,43 +203,46 @@ export class InventarService {
     };
     const log = { log: true };
 
-    const id = await this.dexie.inventar.add( { ...item, ...log});
-    item.ivid = id;
-    if (id) {
+    const insertUuid = await this.dexie.inventar.add( { ...item, ...log});
+    console.log('InventarService #207 insertInventar: ', { insertUuid, data: {...item, ...log} });
+    const saved = await this.dexie.inventar.get(insertUuid);
+    console.log('InventarService #207 insertInventar: ', { insertUuid, saved, data: {...item, ...log} });
+    if (insertUuid && saved) {
       this.dexie.barcodeLookup.add({
-        code: inventar.code,
-        for_jobid: inventar.jobid || jobid,
+        code: saved.code,
+        for_jobid: jobid,
         table: 'inventar',
-        key: 'ivid',
-        id,
-        uuid
+        key: 'uuid',
+        uuid: insertUuid,
+        updateHelper: 11
       });
+      const lkupItem = await this.dexie.barcodeLookup.get({code: saved.code, for_jobid: jobid});
+      console.log('InventarService #220 insertInventar: ', { insertUuid, saved, lkupItem, data: {...item, ...log} });
     }
     this.changed.emit({
       type: InventarChangeType.Create,
       table: this.dexie.inventar.name,
-      key: id,
+      key: insertUuid,
       uuid,
       obj: item
     });
 
-    return this.returnResultSuccess({
+    return this.returnResultSuccess<InventarInsertResult>({
       type: InventarChangeType.Create,
-      insertID: id,
       insertUUID: uuid
     });
   }
 
-  async updateById(ivid: number, daten: InventarBasisDaten): Promise<InventarFoundResult> {
+  async updateByUuid(uuid: string, daten: InventarBasisDaten): Promise<InventarFoundResult> {
     // return this.getInventar(ivid);
-    console.log('#205 updateById', { ivid, daten });
+    console.log('#205 updateById', { ivid: uuid, daten });
 
     const updateData = daten;
     const jobid = this.getJobiId();
     const uid = this.getUserId();
     const mid = this.getMid();
     const devID = this.baseData.getCurrentDeviceId();
-    const oldData = await this.getInventar(ivid);
+    const oldData = await this.getInventar(uuid);
     let bUpdateBarceLookup = false;
 
     const globalKatalogDaten = {
@@ -325,12 +330,11 @@ export class InventarService {
 
       if (!okmArtikelRef) {
         console.log('#296 checkAndGet ArtikelRef nuss angeleget werden');
-        okmArtikelRef = await this.artikelService.insertArtikelRefByGcidGcuuid(okgArtikel.gcid, okgArtikel.uuid);
+        okmArtikelRef = await this.artikelService.insertArtikelRefByGcidGcuuid(okgArtikel.uuid);
       }
 
       const updateInv: any = {};
-      if (okmArtikelRef.mcid !== daten.mcid) {
-        updateInv.mcid = okmArtikelRef.mcid;
+      if (okmArtikelRef.uuid !== daten.mcuuid) {
         updateInv.mcuuid = okmArtikelRef.uuid;
       }
       if (oldData.inventar.Zustand !== daten.Zustand) {
@@ -349,10 +353,10 @@ export class InventarService {
         updateInv.modified_device_id = devID;
         updateInv.log = true;
 
-        await this.dexie.inventar.update(ivid, updateInv).then( () => {
+        await this.dexie.inventar.update(uuid, updateInv).then( () => {
           if (bUpdateBarceLookup) {
-            console.log('InventarService #353 call updateBarcodelookup(', { ivid, datenCode: daten.code });
-            this.updateBarcodeLookup(ivid, daten.code, oldData.inventar.code);
+            console.log('InventarService #353 call updateBarcodelookup(', { ivid: uuid, datenCode: daten.code });
+            this.updateBarcodeLookup(uuid, daten.code, oldData.inventar.code);
           } else {
             console.log('InventarService #356 Barcode has not changed');
           }
@@ -360,28 +364,21 @@ export class InventarService {
       }
     }
 
-    const result = await this.getInventar(ivid);
+    const result = await this.getInventar(uuid);
     console.log('#322 return Inventar-Data', result);
 
     return result;
   }
 
-  async updateRefs(ivid: number, mcid: number, mcuuid?: string, daten?: any) {
+  async updateRefs(uuid: string, mcuuid: string, daten?: any) {
     const jobid = this.getJobiId();
     const uid = this.getUserId();
     const mid = this.getMid();
     const devID = this.baseData.getCurrentDeviceId();
     const updateInv: any = {};
-    const oldData = await this.getInventar(ivid);
+    const oldData = await this.getInventar(uuid);
     let bUpdateBarceLookup = false;
 
-    if (!mcuuid) {
-      await this.dexie.objektKatalogMandant.get(mcid).then( (item) => {
-        mcuuid = item.uuid;
-      });
-    }
-
-    updateInv.mcid = mcid;
     updateInv.mcuuid = mcuuid;
 
     if (daten.Zustand && daten.Zustand !== oldData.inventar.Zustand) {
@@ -400,22 +397,22 @@ export class InventarService {
     updateInv.modified_device_id = devID;
     updateInv.log = true;
 
-    this.dexie.inventar.update(ivid, updateInv).then( () => {
+    this.dexie.inventar.update(uuid, updateInv).then( () => {
       if (bUpdateBarceLookup) {
-        this.updateBarcodeLookup(ivid, daten.code, oldData.inventar.code);
+        this.updateBarcodeLookup(uuid, daten.code, oldData.inventar.code);
       }
     });
   }
 
-  async updateBarcodeLookup(ivid: number, code: string, oldCode?: string) {
-    console.log('InventarService #410 called updateBarcodelookup(', { ivid, code }, ')');
+  async updateBarcodeLookup(uuid: string, code: string, oldCode?: string) {
+    console.log('InventarService #410 called updateBarcodelookup(', { ivid: uuid, code }, ')');
     let savedRaumDataCode = oldCode;
-    const savedRaumData = await this.dexie.inventar.get(ivid);
+    const savedRaumData = await this.dexie.inventar.get(uuid);
     if (!oldCode) {
       savedRaumDataCode = savedRaumData.code;
     }
     const jobid = this.getJobiId();
-    console.log('InventarService #413 check if code has changed(', { ivid, code, savedRaumDataCode }, ')');
+    console.log('InventarService #413 check if code has changed(', { ivid: uuid, code, savedRaumDataCode }, ')');
     if (savedRaumDataCode !== code) {
       const lkupKey = {
         code: savedRaumDataCode,
@@ -432,7 +429,6 @@ export class InventarService {
         this.dexie.barcodeLookup.put({
           code,
           for_jobid: jobid,
-          id: ivid,
           key: 'ivid',
           table: 'inventar',
           updateHelper: 1,
@@ -467,7 +463,7 @@ export class InventarService {
     return emptyFields;
   }
 
-  async assignRaum(ivid: number, rid: number, useJobid?: number): Promise<InventarEditResult> {
+  async assignRaum(uuid: string, ruuid: string, useJobid?: number): Promise<InventarEditResult> {
     const db = this.dexie;
     const inventar = db.inventar;
     const raeume = db.raeume;
@@ -477,16 +473,16 @@ export class InventarService {
     const log = { log: true };
 
     console.log('InventoryEditorService.assignInventarToRaum', {
-      ivid,
-      rid,
+      uuid,
+      ruuid,
       jobid,
       uid,
       devid
     });
 
     return Promise.all([
-      inventar.get(ivid),
-      raeume.get(rid)
+      inventar.get(uuid),
+      raeume.get(ruuid)
     ])
       .then(result => {
         const inv = result[0];
@@ -508,7 +504,6 @@ export class InventarService {
             errorCode: InventarEditErrorCode.RaumNotFound });
         }
         const changes = {
-          rid,
           ruuid: raum.uuid,
           jobid,
           modified_at: new Date(),
@@ -517,7 +512,7 @@ export class InventarService {
           modified_device_id: devid
         };
 
-        return inventar.update(inv.ivid, { ...changes, ...log}).then( () => {
+        return inventar.update(inv.uuid, { ...changes, ...log}).then( () => {
           this.changed.emit({
             type: InventarChangeType.Update,
             table: inventar.name,
@@ -526,61 +521,62 @@ export class InventarService {
             obj: { ...inv, ...changes },
             mods: changes
           });
-          return this.returnResultSuccess({
+
+          return this.returnResultSuccess<InventarEditResult>({
             type: InventarChangeType.Update
           });
         } );
       });
   }
 
-  async getInventarListRestByRaumId(rid: number, jobid: number): Promise<InventarData[]> {
+  async getInventarListRestByRaumUuid(ruuid: string, jobid: number): Promise<InventarData[]> {
 
     const inventarDataList: InventarData[] = [];
     const inventarList = await this.dexie.inventar
-      .where({ rid })
+      .where({ ruuid })
       .and( (item) => item.jobid !== jobid)
-      .sortBy( 'mcid' );
+      .sortBy( 'created_at' );
 
     const artikelRefs = await this.dexie.objektKatalogMandant
-      .where( 'mcid').anyOf( inventarList.map<number>( itm => itm.mcid ) )
+      .where( 'uuid').anyOf( inventarList.map<string>( itm => itm.mcuuid ) )
       .toArray();
 
     const artikelData = await this.dexie.objektKatalogGlobal
-      .where( 'gcid').anyOf( artikelRefs.map<number>( itm => itm.gcid) )
+      .where( 'uuid').anyOf( artikelRefs.map<string>( itm => itm.gcuuid) )
       .toArray();
 
     for (const inventar of inventarList) {
       const d: InventarData = { inventar, artikelRef: null, artikelData: null };
-      d.artikelRef = artikelRefs.find( itm => itm.mcid === inventar.mcid);
+      d.artikelRef = artikelRefs.find( itm => itm.uuid === inventar.mcuuid);
       if (d.artikelRef) {
-        d.artikelData = artikelData.find( itm => itm.gcid === d.artikelRef.gcid );
+        d.artikelData = artikelData.find( itm => itm.uuid === d.artikelRef.gcuuid );
       }
       inventarDataList.push(d);
     }
     return inventarDataList;
   }
 
-  async getInventarListDoneByRaumId(rid: number, jobid: number): Promise<InventarData[]> {
+  async getInventarListDoneByRaumUuid(ruuid: string, jobid: number): Promise<InventarData[]> {
 
     const inventarDataList: InventarData[] = [];
     const inventarList = await this.dexie.inventar
-      .where({ rid })
+      .where({ ruuid })
       .and( (item) => item.jobid === jobid)
-      .sortBy( 'mcid' );
+      .sortBy( 'modified_at' );
 
     const artikelRefs = await this.dexie.objektKatalogMandant
-      .where( 'mcid').anyOf( inventarList.map<number>( itm => itm.mcid ) )
+      .where( 'uuid').anyOf( inventarList.map<string>( itm => itm.mcuuid ) )
       .toArray();
 
     const artikelData = await this.dexie.objektKatalogGlobal
-      .where( 'gcid').anyOf( artikelRefs.map<number>( itm => itm.gcid) )
+      .where( 'uuid').anyOf( artikelRefs.map<string>( itm => itm.gcuuid) )
       .toArray();
 
     for (const inventar of inventarList) {
       const d: InventarData = { inventar, artikelRef: null, artikelData: null };
-      d.artikelRef = artikelRefs.find( itm => itm.mcid === inventar.mcid);
+      d.artikelRef = artikelRefs.find( itm => itm.uuid === inventar.mcuuid);
       if (d.artikelRef) {
-        d.artikelData = artikelData.find( itm => itm.gcid === d.artikelRef.gcid );
+        d.artikelData = artikelData.find( itm => itm.uuid === d.artikelRef.gcuuid );
       }
       inventarDataList.push(d);
     }

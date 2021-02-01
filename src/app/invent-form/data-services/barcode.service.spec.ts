@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import {} from 'jasmine';
 
 import { BarcodeService } from './barcode.service';
 

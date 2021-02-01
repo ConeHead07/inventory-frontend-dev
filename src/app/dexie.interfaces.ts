@@ -40,6 +40,22 @@ export interface DBDIClientChangeLog {
   sync_done: number;
 }
 
+export interface DBDIServerSyncErrors {
+  id?: number;
+  jobid: number;
+  clientChangeLogId: number;
+  table: string;
+  type?: number;
+  uuid: string;
+  error_code: string;
+  error_msg: string;
+  error_data?: any;
+  error_ref_table?: string;
+  error_ref_by?: string;
+  error_ref_uuid?: string;
+  timestamp?: Date;
+}
+
 export interface DBDIDevices {
   id?: number;
   name: string;
@@ -80,16 +96,17 @@ export interface DBDIHersteller {
 
 export interface DBDIInventar extends DBDITableWithBarcode {
   ivid?: number;
-  mcid: number;
+  mcid?: number;
   uuid?: string;
   for_jobid?: number;
   mcuuid?: string;
   hash?: string;
   code?: string;
-  rid: number;
+  rid?: number;
   ruuid?: string;
   rid_init?: number;
   rid_neu?: number;
+  ruuid_neu?: string;
   Bezeichnung?: string;
   Typ?: string;
   Kategorie?: string;
@@ -276,7 +293,9 @@ export interface DBDIImages {
   width: number;
   height: number;
   type: string;
-  gcuuid: string;
+  gcuuid?: string;
+  mcuuid?: string;
+  mcid?: number;
   url?: string;
   data_binary?: string;
   data_url?: string;
@@ -340,7 +359,7 @@ export interface DBDIBarcodeLookup {
   code: string;
   table: string;
   key: string;
-  id?: number;
+  id?: string|number;
   uuid: string;
   for_jobid?: number;
   updateHelper?: number;

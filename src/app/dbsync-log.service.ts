@@ -26,6 +26,7 @@ export interface TotalSyncProgress {
   modified: number;
   deleted: number;
   tables: TableSyncTotal[];
+  tableSyncDetails?: {[key: string]: TableSyncProgress };
   chunks: number;
   start: Date;
 }
@@ -83,6 +84,7 @@ export class DbsyncLogService {
       modified: 0,
       deleted: 0,
       tables: [],
+      tableSyncDetails: {},
       start: new Date()
     };
     this.jobList.push(newJob);
@@ -124,6 +126,7 @@ export class DbsyncLogService {
       job.puts += data.puts;
       job.modified += data.modified;
       job.deleted += data.deleted;
+      job.tableSyncDetails[ data.table ] = data;
 
       const tbl = job.tables.find( t => t.table === data.table);
       if (!tbl) {

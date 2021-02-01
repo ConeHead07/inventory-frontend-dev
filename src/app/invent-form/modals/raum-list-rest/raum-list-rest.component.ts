@@ -7,7 +7,7 @@ import {BasedataService} from '../../../basedata.service';
 import { faSignOutAlt } from '@fortawesome/free-solid-svg-icons';
 
 interface RaumInventarRest {
-  mcid?: number;
+  mcuuid: string;
   Bezeichnung?: string;
   Typ?: string;
   Menge?: number;
@@ -45,7 +45,7 @@ export class RaumListRestComponent implements OnInit {
 
   set raum(raum: DBDIRaeume) {
     this.raumDaten = raum;
-    this.loadInventarByRid(raum.rid).then( () => {
+    this.loadInventarByRuuid(raum.uuid).then( () => {
       this.setPage(1);
     });
   }
@@ -60,24 +60,24 @@ export class RaumListRestComponent implements OnInit {
       .slice( Math.max(0, this.pageNr - 1) * this.pageSize, this.pageSize );
   }
 
-  async loadInventarByRid(rid: number, useJobid?: number): Promise<boolean> {
+  async loadInventarByRuuid(ruuid: string, useJobid?: number): Promise<boolean> {
     const jobid = useJobid || this.baseData.getCurrentJobid();
     const groupedList: RaumInventarRest[] = [];
     console.log('#54 getHello:', this.inventarService.getHello());
-    return this.inventarService.getInventarListRestByRaumId( rid, jobid )
+    return this.inventarService.getInventarListRestByRaumUuid( ruuid, jobid )
       .then( list => {
         this.inventarDetailList = list;
         this.inventarListGrouped = this.inventarDetailList
           .sort(
-          (a, b) => a.inventar.mcid > b.inventar.mcid ? -1
-            : (a.inventar.mcid < b.inventar.mcid ? 1 : 0)
+          (a, b) => a.inventar.mcuuid > b.inventar.mcuuid ? -1
+            : (a.inventar.mcuuid < b.inventar.mcuuid ? 1 : 0)
           )
           .reduce<RaumInventarRest[]>( (gList, item) => {
             const l = gList.length;
             const i = l - 1;
-            if (!l || gList[i].mcid !== item.inventar.mcid) {
+            if (!l || gList[i].mcuuid !== item.inventar.mcuuid) {
               gList[l] = {
-                mcid: item.inventar.mcid,
+                mcuuid: item.inventar.mcuuid,
                 Bezeichnung: item.inventar.Bezeichnung || item.artikelData.Bezeichnung,
                 Typ: item.inventar.Typ || item.artikelData.Typ,
                 Menge: 1

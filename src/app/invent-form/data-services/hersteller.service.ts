@@ -6,8 +6,7 @@ import { Guid} from 'guid-typescript';
 
 export interface HerstellerWithId {
   Hersteller: string;
-  hid: number;
-  uuid?: string;
+  uuid: string;
 }
 
 @Injectable({
@@ -22,28 +21,35 @@ export class HerstellerService {
     return await this.dexie.hersteller.orderBy('Hersteller').toArray();
   }
 
-  async getAllHerstellerWithIds(): Promise<HerstellerWithId[]> {
+  async getAllHerstellerWithUuids(): Promise<HerstellerWithId[]> {
     const result: HerstellerWithId[] = [];
     return this.dexie.hersteller.orderBy('Hersteller')
       .each( hst => {
         result.push({
           Hersteller: hst.Hersteller,
-          hid: hst.hid,
           uuid: hst.uuid
         });
       })
       .then( () => result );
   }
 
+  async getByNameOrCreate(name: string): Promise<DBDIHersteller> {
+    const hstExisting = await this.getByName(name);
+    if (hstExisting) {
+      return hstExisting;
+    }
+    return this.createAndGetData(name);
+  }
+
   async getByName(name: string): Promise<DBDIHersteller> {
     console.log('called HerstellerService.getByName(name)');
-    const exakt = await this.dexie.hersteller.filter( item => item.Hersteller === name).first();
+    const exakt = await this.dexie.hersteller.where( { Hersteller: name}).first();
     if (exakt !== undefined) {
       console.log('Found Hersteller with strict compare-search');
       return exakt;
     }
     const fuzzy = await this.dexie.hersteller.filter( item => item.Hersteller.trim().toLowerCase() === name.trim().toLowerCase()).first();
-    if (fuzzy !== undefined) {
+    if (fuzzy === undefined) {
       console.log('Not Found Hersteller with strict compare-search, found with caseinsensitive');
     } else {
       console.error('Hersteller not found!');
@@ -51,12 +57,12 @@ export class HerstellerService {
     return fuzzy;
   }
 
-  async create(name: string): Promise<number> {
+  async create(name: string): Promise<string> {
     const jobid = this.baseData.getCurrentJobid();
     const uid = this.baseData.getCurrentUid();
     const uuid = Guid.create().toString();
 
-    return await this.dexie.hersteller.add({
+    await this.dexie.hersteller.add({
       Hersteller: name,
       uuid,
       for_jobid: jobid,
@@ -64,10 +70,11 @@ export class HerstellerService {
       created_uid: uid,
       created_jobid: jobid
     });
+    return uuid;
   }
 
   async createAndGetData(name: string): Promise<DBDIHersteller> {
-    const hid = await this.create(name);
-    return this.dexie.hersteller.get(hid);
+    const uuid = await this.create(name);
+    return this.dexie.hersteller.get({ uuid });
   }
 }

@@ -1,4 +1,4 @@
-<div class="modal-header p-0" style="padding:0.1rem">
+onSelectRaum<div class="modal-header p-0" style="padding:0.1rem">
   <div class="btn-group row no-gutters w-100">
     <button class="btn btn-primary col-10 text-left pl-3" (click)="showGesamtDoneForm()">
       <fa-icon [icon]="faSignOutAlt" class="mr-3"></fa-icon> Zeige bereits aufgenommene Räume
@@ -26,10 +26,10 @@
     </tr>
     </thead>
     <tbody>
-    <tr *ngFor="let item of raeumeListDone">
-      <th scope="row">{{ item.rid }}</th>
+    <tr *ngFor="let item of raeumeListDone; let rowNr = index">
+      <th scope="row">{{ rowNr + 1 }}</th>
       <th>{{ item.Etage }}</th>
-      <td><span class="btn btn-link" (click)="onSelectRaum(item.rid)">{{ item.Raum }}</span></td>
+      <td><span class="btn btn-link" (click)="onSelectRaum(item.uuid)">{{ item.Raum }}</span></td>
       <td>{{ item.editStatus === 0 ? 'Nein' : 'Ja' }}</td>
       <td>{{ item.total }}</td>
       <td>{{ item.done }}</td>

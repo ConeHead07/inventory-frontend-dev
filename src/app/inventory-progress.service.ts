@@ -158,20 +158,20 @@ export class InventoryProgressService {
       done: 0,
     };
 
-    const ridListTmp = await raeume.where( {gid}).toArray();
-    const ridList = ridListTmp.filter( (rg) => rg.gid === gid && rg.for_jobid === jobid).map( (rg) => rg.rid);
+    const ruuidListTmp = await raeume.where( {gid}).toArray();
+    const ruuidList = ruuidListTmp.filter( (rg) => rg.gid === gid && rg.for_jobid === jobid).map( (rg) => rg.uuid);
 
-    const chunkSize = Math.ceil( ridList.length / 8 );
+    const chunkSize = Math.ceil( ruuidList.length / 8 );
     const chunks = [];
-    for (let i = 0; i < ridList.length; i += chunkSize) {
-      chunks.push( ridList.slice(i, i + chunkSize) );
+    for (let i = 0; i < ruuidList.length; i += chunkSize) {
+      chunks.push( ruuidList.slice(i, i + chunkSize) );
     }
 
     return await Promise.all([
       inventar.where( { jobid } ).count(),
       Promise.all(
-          chunks.map( async (ridChunkList) => inventar
-              .where( 'rid' ).anyOf( ridChunkList )
+          chunks.map( async (ruuidChunkList) => inventar
+              .where( 'ruuid' ).anyOf( ruuidChunkList )
               .and((inv) => inv.for_jobid === jobid)
               .count()
           )
@@ -184,52 +184,52 @@ export class InventoryProgressService {
     });
   }
 
-  async getCurrentRaumProgress(useRid?: number): Promise<InventoryProgress> {
-    const rid = useRid || this.baseData.getCurrentRid();
+  async getCurrentRaumProgress(useRuuid?: string): Promise<InventoryProgress> {
+    const uuid = useRuuid || this.baseData.getCurrentRuuid();
     const jobid = this.baseData.getCurrentJobid();
-    console.log('getCurrentRaumProgress calls getRaumProgressByRidAndJobid', { rid, jobid });
+    console.log('getCurrentRaumProgress calls getRaumProgressByRidAndJobid', { uuid, jobid });
 
-    return this.getRaumProgressByRidAndJobid(rid, jobid);
+    return this.getRaumProgressByUuidAndJobid(uuid, jobid);
   }
 
-  async getRaumProgressByRidAndJobid(rid: number, jobid: number): Promise<InventoryProgress> {
+  async getRaumProgressByUuidAndJobid(uuid: string, jobid: number): Promise<InventoryProgress> {
     const progress: InventoryProgress = {
       total: 0,
       done: 0,
     };
 
     await Promise.all([
-      this.dexieService.inventar.where( { rid } ).count(),
-      this.dexieService.inventar.where( { rid } ).and( itm => itm.jobid === jobid).count()
+      this.dexieService.inventar.where( { ruuid: uuid } ).count(),
+      this.dexieService.inventar.where( { ruuid: uuid } ).and(itm => itm.jobid === jobid).count()
     ]).then( totalAndProgress => {
       progress.total = totalAndProgress[0];
       progress.done = totalAndProgress[1];
     });
-    console.log('called getRaumProgressByRidAndJobid', { rid, jobid, progress });
+    console.log('called getRaumProgressByUuidAndJobid', { uuid, jobid, progress });
 
     return progress;
   }
 
-  async getCurrentRaumInventarFound(useRid?: number): Promise<DBDIInventar[]> {
-    const rid = useRid || this.baseData.getCurrentRid();
+  async getCurrentRaumInventarFound(useRuuid?: string): Promise<DBDIInventar[]> {
+    const ruuid = useRuuid || this.baseData.getCurrentRuuid();
     const jobid = this.baseData.getCurrentJobid();
 
-    return this.getRaumInventarFoundByRidAndJobid(rid, jobid);
+    return this.getRaumInventarFoundByRuuidAndJobid(ruuid, jobid);
   }
 
-  async getRaumInventarFoundByRidAndJobid(rid: number, jobid: number): Promise<DBDIInventar[]> {
-    return this.dexieService.inventar.where({ rid, jobid }).toArray();
+  async getRaumInventarFoundByRuuidAndJobid(ruuid: string, jobid: number): Promise<DBDIInventar[]> {
+    return this.dexieService.inventar.where({ ruuid, jobid }).toArray();
   }
 
-  async getCurrentRaumInventarNotFound(useRid?: number): Promise<DBDIInventar[]> {
-    const rid = useRid || this.baseData.getCurrentRid();
+  async getCurrentRaumInventarNotFound(useRuuid?: string): Promise<DBDIInventar[]> {
+    const ruuid = useRuuid || this.baseData.getCurrentRuuid();
     const jobid = this.baseData.getCurrentJobid();
 
-    return this.getRaumInventarNotFoundByRidAndJobid(rid, jobid);
+    return this.getRaumInventarNotFoundByRuuidAndJobid(ruuid, jobid);
   }
 
-  async getRaumInventarNotFoundByRidAndJobid(rid: number, jobid: number): Promise<DBDIInventar[]> {
-    return this.dexieService.inventar.where({ rid }).and( item => item.jobid !== jobid).toArray();
+  async getRaumInventarNotFoundByRuuidAndJobid(ruuid: string, jobid: number): Promise<DBDIInventar[]> {
+    return this.dexieService.inventar.where({ ruuid }).and(item => item.jobid !== jobid).toArray();
   }
 
   async getCurrentGebaeudeRaeumeFinished(useGid?: number): Promise<DBDIRaeume[]> {

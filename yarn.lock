@@ -3911,7 +3911,7 @@ detect-node@^2.0.4:
   resolved "https://registry.yarnpkg.com/detect-node/-/detect-node-2.0.4.tgz#014ee8f8f669c5c58023da64b8179c083a28c46c"
   integrity sha512-ZIzRpLJrOj7jjP2miAtgqIfmzbxa4ZOr5jJc601zklsfEx9oTzmmj2nVpIPRpNlRTIh8lc1kyViIY7BWSGNmKw==
 
-dexie-observable@^1.0.0-beta.6:
+dexie-observable@1.0.0-beta.7:
   version "1.0.0-beta.7"
   resolved "https://registry.yarnpkg.com/dexie-observable/-/dexie-observable-1.0.0-beta.7.tgz#505dc21b0619f1533f5f441b248ee0b67d638d7e"
   integrity sha512-abkC2y8MYIfG8bDAWb9T6xvQUDhuBgYLF/V8EenI1BeWkwSjpXNxUI5cGXjxlebHPDH9KCLFXK7F8jcXjHLOtg==
@@ -3921,12 +3921,12 @@ dexie-relationships@^1.2.11:
   resolved "https://registry.yarnpkg.com/dexie-relationships/-/dexie-relationships-1.2.11.tgz#04c5b1edede09b53b6a9e8a4a6b07ca504addae6"
   integrity sha512-dptIUMiCiEPnSPyZno6yOrmFo+xf0Y1PVC4LX2HO/VgPAYIoaf/wMcC7mbna+RMZ6wRIOEb4T+lgR5v21q2EnA==
 
-dexie-syncable@^1.0.0-beta.6:
-  version "1.0.0-beta.7"
-  resolved "https://registry.yarnpkg.com/dexie-syncable/-/dexie-syncable-1.0.0-beta.7.tgz#6e33509ebbf5980b5c98c8cfbbd814808a76478f"
-  integrity sha512-9z6Zil7EROoZbCGyVii6pl1Qsc/AfPNo8dTo9syyrZy3ZwS8XO9tnduY4JAn+9Q+e4mjG4+5iNje1/AnnZH/hg==
+dexie-syncable@1.0.0-beta.6:
+  version "1.0.0-beta.6"
+  resolved "https://registry.yarnpkg.com/dexie-syncable/-/dexie-syncable-1.0.0-beta.6.tgz#88a2ba1b5533d2d37390e8aaa7acdd2f821dcfc9"
+  integrity sha512-7obU3X9dngNhkslL2D0/OlkJsvHO6+X9uRMxMV4UB8jAvj8m51obPAezeUYVjVZBvAdhBgiv6u1SQv01sB6BWQ==
 
-dexie@^2.0.4:
+dexie@2.0.4:
   version "2.0.4"
   resolved "https://registry.yarnpkg.com/dexie/-/dexie-2.0.4.tgz#6027a5e05879424e8f9979d8c14e7420f27e3a11"
   integrity sha512-aQ/s1U2wHxwBKRrt2Z/mwFNHMQWhESerFsMYzE+5P5OsIe5o1kgpFMWkzKTtkvkyyEni6mWr/T4HUJuY9xIHLA==

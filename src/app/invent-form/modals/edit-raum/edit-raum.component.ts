@@ -35,7 +35,7 @@ export class EditRaumComponent implements OnInit {
   formIsValid = false;
   formError = '';
 
-  private rid: number;
+  private uuid: string;
   private gid: number;
 
   @Output() raumSearching = new EventEmitter<number>();
@@ -88,7 +88,7 @@ export class EditRaumComponent implements OnInit {
     if (this.raumInput.code.trim().length > 0 && this.raumInput.code !== this.raumDaten.code) {
       const codeExists = await this.raumService.codeExistsInInventur(
         this.raumDaten.for_jobid,
-        this.raumDaten.rid,
+        this.raumDaten.uuid,
         this.raumInput.code
       );
       if (codeExists) {
@@ -101,7 +101,7 @@ export class EditRaumComponent implements OnInit {
     if (this.raumInput.Raum.trim().length > 0 && this.raumInput.Raum.trim() !== this.raumDaten.Raum) {
       if (await this.raumService.raumExistsInInventur(
         this.raumDaten.for_jobid,
-        this.raumDaten.rid,
+        this.raumDaten.uuid,
         this.raumInput.Raum
       )) {
         this.validationErrors.push('Raum-Name ist bereits für einen anderen Raum vergeben!');
@@ -115,31 +115,31 @@ export class EditRaumComponent implements OnInit {
     return this.formIsValid;
   }
 
-  get raumId() {
-    console.log('called get raumId() ', this.rid);
-    return this.rid;
+  get raumUuid() {
+    console.log('called get raumId() ', this.uuid);
+    return this.uuid;
   }
 
-  set raumId(rid: number) {
-    console.log( 'called set raumId', 'param', rid, 'old-rid', this.rid);
-    this.raumService.get( rid ).then(raum => {
+  set raumUuid(uuid: string) {
+    console.log( 'called set raumId', 'param', uuid, 'old-uuid', this.uuid);
+    this.raumService.get( uuid ).then(raum => {
       this.raumDaten = raum;
       if (raum) {
-        this.rid = raum.rid;
+        this.uuid = raum.uuid;
         for (const inputFld of Object.keys(this.raumInput) ) {
           this.raumInput[inputFld] = raum[inputFld];
         }
-        console.log('#128 edit-raum.component.ts set raumId(rid: ' + rid + ')', { raum, raumInput: { ...this.raumInput}});
+        console.log('#128 edit-raum.component.ts set raumId(uuid: ' + uuid + ')', { raum, raumInput: { ...this.raumInput}});
         this.etagen = [];
         this.raumService.getEtagenByGidInInventur(this.raumDaten.for_jobid, this.raumDaten.gid).then( (etagen) => {
           this.etagen = etagen;
         });
       } else {
-        this.rid = 0;
+        this.uuid = '';
       }
     }).catch( () => {
       this.raumDaten = null;
-      this.rid = 0;
+      this.uuid = '';
     });
   }
 
@@ -180,7 +180,7 @@ export class EditRaumComponent implements OnInit {
       for (const col of Object.keys(this.raumDaten)) {
 
       }
-      const result = await this.raumService.updateById( this.raumDaten.rid, this.raumInput );
+      const result = await this.raumService.updateByUuid( this.raumDaten.uuid, this.raumInput );
       console.log('save raumdaten result ', result);
       if (!result.success) {
         this.formError = 'Daten konnten nicht aktualisiert werden!<br>' + result.errorMsg;

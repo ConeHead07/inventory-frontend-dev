@@ -1,7 +1,13 @@
 import {Component, OnDestroy, OnInit} from '@angular/core';
-import {DBSyncClientService, SyncJobResult, SyncJobStatus} from '../../../dbsync-client.service';
+import {
+  DBSyncClientService,
+  SyncJobResult,
+  SyncJobStatus,
+  SyncServerError, SyncServerErrorChange,
+  SyncServerErrorEvent
+} from '../../../dbsync-client.service';
 import {BasedataService} from '../../../basedata.service';
-import {DBDIInventuren} from '../../../dexie.interfaces';
+import {DBDIInventuren, DBDIServerSyncErrors} from '../../../dexie.interfaces';
 import {faSync, faSyncAlt} from '@fortawesome/free-solid-svg-icons';
 import {DataService} from '../../service/data.service';
 import {ConnectionService} from '../../../connection-service.service';
@@ -14,6 +20,7 @@ import {
   SyncError
 } from '../../../dbsync-log.service';
 import {User} from '../../../auth/user.model';
+import {DexieService} from '../../../dexie.service';
 
 interface TotalSyncProgressPct extends TotalSyncProgress {
   percent: number;
@@ -61,6 +68,11 @@ export class DbsyncComponent implements OnInit, OnDestroy {
   subscriptionSyncTotal: Subscription;
   subscriptionSyncMsg: Subscription;
   subscriptionSyncErr: Subscription;
+  subscriptionLastSyncErr: Subscription;
+
+  lastServerSyncJobid: number;
+  lastServerSyncErrors: DBDIServerSyncErrors[] = [];
+  lastServerSyncDate: Date;
 
   private subscribedSyncJobProcesses: [SyncJobResult, Subscription][] = [];
 
@@ -69,7 +81,8 @@ export class DbsyncComponent implements OnInit, OnDestroy {
     private baseData: BasedataService,
     private networkService: ConnectionService,
     private dataService: DataService,
-    private dbsyncLogService: DbsyncLogService) {
+    private dbsyncLogService: DbsyncLogService,
+    private dexie: DexieService) {
     this.syncTotal = {
       jobid: 0,
       revisionId: 0,
@@ -94,11 +107,21 @@ export class DbsyncComponent implements OnInit, OnDestroy {
     this.subscriptionAutoSyncChange.unsubscribe();
     this.subscriptionProcessStarted.unsubscribe();
     this.subscriptionProcessFinished.unsubscribe();
+    this.subscriptionLastSyncErr.unsubscribe();
     this.removeAllSyncJobStatusSubscriptions();
   }
 
   ngOnInit() {
+    this.jobid = this.baseData.getCurrentJobid();
     this.refreshStatusInfos();
+    this.loadServerSyncErrors(this.jobid);
+
+    this.subscriptionLastSyncErr = this.dbsyncClient.syncErrorChange.subscribe( (result: SyncServerErrorChange) => {
+      this.lastServerSyncErrors = [];
+      if (result.count > 0) {
+        this.loadServerSyncErrors(result.jobid);
+      }
+    });
 
     this.subscriptionSyncTable = this.dbsyncLogService.tableSyncProgress
       .subscribe( (data: TableSyncProgress) => {
@@ -128,11 +151,13 @@ export class DbsyncComponent implements OnInit, OnDestroy {
           this.syncTotal[ k ] = data[ k ];
         }
     });
+
     this.subscriptionSyncMsg = this.dbsyncLogService.syncMessage
       .subscribe( (data: SyncMessage) => {
         this.refreshStatusInfos();
 
     });
+
     this.subscriptionSyncErr = this.dbsyncLogService.syncError
       .subscribe( (data: SyncError) => {
         this.refreshStatusInfos();
@@ -163,6 +188,25 @@ export class DbsyncComponent implements OnInit, OnDestroy {
     });
   }
 
+  async loadServerSyncErrors(jobid): Promise<number> {
+    return this.dexie.serverSyncErrors
+      .where({jobid})
+      .toArray()
+      .then( (errors) => {
+        errors.find( (itm) => {
+          if (itm.timestamp instanceof Date) {
+            this.lastServerSyncDate = itm.timestamp;
+            return true;
+          }
+          return false;
+        });
+        this.lastServerSyncJobid = jobid;
+        this.lastServerSyncErrors = errors;
+
+        return errors.length;
+      });
+  }
+
   async refreshStatusInfos() {
     this.jobid = this.baseData.getCurrentJobid();
     this.syncJobid = this.jobid;
@@ -172,6 +216,7 @@ export class DbsyncComponent implements OnInit, OnDestroy {
     this.syncUid = this.baseData.getCurrentUid();
     this.syncDevid = this.baseData.getCurrentDeviceId();
     this.currProcess = this.dbsyncClient.getProcessByJobId( this.jobid );
+
     console.log({
       method: 'refreshStatusInfos',
       syncUid: this.syncUid,

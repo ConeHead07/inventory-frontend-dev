@@ -14,12 +14,12 @@ interface Raum extends DBDIRaeume {
 }
 
 const raeume: Raum[] = [];
-interface State {id: number; name: string; }
+interface State {uuid: string; name: string; }
 
 const states: State[] = [];
 
 interface RaumOption extends DBDIRaeume {
-  id: number;
+  uuid: string;
   name: string;
 }
 
@@ -129,9 +129,9 @@ export class SelectSearchRaumComponent implements OnInit, AfterViewInit {
           if (raum.Etage) {
             nameParts.push(raum.Etage);
           }
-          const itm = { id: raum.rid, name: nameParts.join(' :: ') };
+          const itm = { uuid: raum.uuid, name: nameParts.join(' :: ') };
           const rOpt: RaumOption = { ...itm, ...raum};
-          if (!states.find( st => st.id === rOpt.id )) {
+          if (!states.find( st => st.uuid === rOpt.uuid )) {
             states.push(rOpt);
           }
           return rOpt;
@@ -140,16 +140,5 @@ export class SelectSearchRaumComponent implements OnInit, AfterViewInit {
         return raeume3;
       })
       .catch( err => { console.error( err ); });
-
-    if (0) {
-      this.search = (text$: Observable<string>) => text$.pipe(
-        debounceTime(200),
-        distinctUntilChanged(),
-        filter(term => term.length >= 2),
-        map(term => raeume
-          .filter(item => new RegExp(term, 'mi').test(item.name))
-          .slice(0, 10))
-      );
-    }
   }
 }

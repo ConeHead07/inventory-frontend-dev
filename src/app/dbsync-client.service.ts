@@ -2,12 +2,12 @@ import {EventEmitter, Injectable, OnDestroy, Output} from '@angular/core';
 import {ApiService} from './api.service';
 import {BasedataService} from './basedata.service';
 import {DexieService} from './dexie.service';
-import {DBDIBarcodeLookup, DBDIClientChangeLog} from './dexie.interfaces';
+import {DBDIBarcodeLookup, DBDIClientChangeLog, DBDIServerSyncErrors} from './dexie.interfaces';
 import {ConnectionService} from './connection-service.service';
 import {VariablesService} from './inventory/service/variables.service';
 import {DbsyncLogService, TableSyncProgress} from './dbsync-log.service';
 import {DatabaseChangeType} from 'dexie-observable/api';
-import {Subscription} from "rxjs";
+import {Subscription} from 'rxjs';
 
 export interface TableSyncProgressList {
   [key: string]: TableSyncProgress;
@@ -40,11 +40,35 @@ interface SyncServerTableChangeLog {
 interface SyncServerChangeLog {
   [key: string ]: SyncServerTableChangeLog;
 }
+export interface SyncServerError {
+  clientChangeLogId: number;
+  table: string;
+  type?: number;
+  uuid: string;
+  ERROR_CODE: string;
+  ERROR_MSG: string;
+  ERROR_DATA?: any;
+  ERROR_REF_TABLE?: string;
+  ERROR_REF_BY?: string;
+  ERROR_REF_UUID?: string;
+}
+
+export interface SyncServerErrorEvent {
+  jobid: number;
+  startDate: Date;
+  errors: SyncServerError[];
+}
+
+export interface SyncServerErrorChange {
+  jobid: number;
+  count: number;
+}
 
 interface SyncMappedIds {
   hersteller?: {[key: string]: number }[];
   objektKatalogGlobal?: {[key: string]: number }[];
   objektKatalogMandant?: {[key: string]: number }[];
+  objektKatalogImages?: {[key: string]: number }[];
   raeume?: {[key: string]: number }[];
   inventar?: {[key: string]: number }[];
   images?: {[key: string]: number }[];
@@ -72,6 +96,7 @@ interface SyncServerResponse {
   setClientDeviceId?: number;
   syncedLogIds: number[];
   aSyncedChangeIds: number[];
+  aSyncErrors: SyncServerError[];
   aFailedChangeIds: { id: number, reason: string}[];
   // serverChanges: SyncServerChangeRevisionLog[];
   serverRechanges: SyncServerReChanges[];
@@ -94,10 +119,6 @@ export interface ServerChangesStatusInfo {
   MaxRevisionId: number;
   NumChanges: number;
   errorMsg?: string;
-}
-
-interface SyncServerResponseTest {
-  syncMappedIds?: SyncMappedIds;
 }
 
 interface SyncIncompleteInventuren {
@@ -234,6 +255,7 @@ export class DBSyncClientService implements OnDestroy {
   @Output() autoSyncChange = new EventEmitter<boolean>();
   @Output() updateStatusChanges = new EventEmitter<any>();
   @Output() currentJobChange = new EventEmitter<CurrentJobSyncStatus>();
+  @Output() syncErrorChange = new EventEmitter<SyncServerErrorChange>();
 
   constructor(
     private dexieService: DexieService,
@@ -483,6 +505,7 @@ export class DBSyncClientService implements OnDestroy {
     let total = 0;
     let executed = 0;
     let chunks = 0;
+    let lastSyncDate: Date;
     const tableLogs: TableSyncProgressList = {};
 
     let syncJobLoop = 0;
@@ -502,6 +525,7 @@ export class DBSyncClientService implements OnDestroy {
 
       syncLogMsg('Download Daten ...');
       syncJobResult.committed = logs.length;
+      lastSyncDate = new Date();
       await this.apiService
         .post<SyncServerResponse>(
           `api/sync/syncWithRevisionId/${jobid}`,
@@ -520,6 +544,12 @@ export class DBSyncClientService implements OnDestroy {
             syncLogErr('Download Fehler: ' + data.errorMsg);
             return this.finishProcess(syncJobResult, SyncJobStatus.ServerAnsweredWithErrors);
           }
+
+          this.saveLastSyncErrorEvent({
+            jobid,
+            startDate: lastSyncDate,
+            errors: data.aSyncErrors || []
+          });
 
           if (total === 0) {
             total = data.serverChanges.total;
@@ -780,17 +810,26 @@ export class DBSyncClientService implements OnDestroy {
         }
       }
 
+      if (itm.table === 'objektKatalogMandant') {
+        if (itm.type === DatabaseChangeType.Create && !itm.obj.gcuuid) {
+          const artikelData = await db.objektKatalogGlobal.where({gcid: itm.obj.gcid}).first();
+          if (artikelData) {
+            itm.obj.gcuuid = artikelData.uuid;
+          }
+        }
+      }
+
       if (itm.table === 'inventar') {
         if (itm.type === DatabaseChangeType.Update) {
           let isEmptyMod = false;
           if (itm.mods.mcid && !itm.mods.mcuuid) {
-            console.log('Found Inventar-Update #872 without mcuuid-Field', {...itm});
-            const artikelRef = await db.objektKatalogMandant.get(itm.mods.mcid);
+            console.error('DBSyncClient Found Inventar-Update #872 without mcuuid-Field', {...itm});
+            const artikelRef = await db.objektKatalogMandant.where({mcid: itm.mods.mcid}).first();
             if (artikelRef) {
               itm.mods.mcuuid = artikelRef.uuid;
-              console.log('Found Inventar-Update #875 added mcuuid-Field', {...itm});
+              console.log('DBSyncClient Found Inventar-Update #875 added mcuuid-Field', {...itm});
             } else {
-              console.error('Found Inventar-Update #875 but don t found ArtikelRefmcuuid-Field', {...itm});
+              console.error('DBSyncClient Found Inventar-Update #875 but don t found ArtikelRefmcuuid-Field', {...itm});
             }
             delete itm.mods.mcid;
           }
@@ -806,34 +845,51 @@ export class DBSyncClientService implements OnDestroy {
             itm = null;
           }
         } else if (itm.type === DatabaseChangeType.Create) {
-          const okg = await db.objektKatalogGlobal.where({uuid: itm.obj.mcuuid }).first();
-          if (okg) {
-            await db.objektKatalogMandant.where({gcid: okg.gcid }).first().then( (okm) => {
-              itm.obj.mcuuid = okm.uuid;
-              db.inventar.update(itm.obj.ivid, { mcuuid: okm.uuid });
-              db.clientChangeLog.update(itm.id, {
-                obj: {
-                  ...itm.obj,
-                  ...{mcuuid: okm.uuid }
-                }
+          // Test und Korrektur falls GCUUID stat MCUUID in Inventar hinterlegt wurde
+          console.log('DBSyncClient #849 Test if inventar has gcuuid instead of mcuuid, itm.obj.mcuuid: ' + itm.obj.mcuuid);
+          await db.objektKatalogGlobal.where({uuid: itm.obj.mcuuid}).first().then( async (rslt) => {
+            console.log('DbSyncClientService #851 result of okm-Query by mcuuid', { rslt });
+            if (rslt) {
+              const okgItm = rslt;
+              await db.objektKatalogMandant.where({gcuuid: okgItm.uuid }).first().then( (okm) => {
+                itm.obj.mcuuid = okm.uuid;
+                db.inventar.update(itm.obj.uuid, { mcuuid: okm.uuid });
+                db.clientChangeLog.update(itm.id, {
+                  obj: {
+                    ...itm.obj,
+                    ...{mcuuid: okm.uuid }
+                  }
+                });
               });
+            }
+            return rslt;
+          })
+            .catch( (reason) => {
+              console.error('DBSyncClient #865 Error on Querying for OKG by ' + itm.obj.mcuuid, {reason});
             });
-          }
+
           if (itm.obj.mcid && itm.obj.mcuuid) {
-            console.log('Found Inventar-Update #872 without mcuuid-Field', {...itm});
+            console.log('DBSyncClient Found Inventar-Update #872 with mcuuid-Field', {...itm});
             delete itm.obj.mcid;
           }
           if (itm.obj.rid && !itm.obj.ruuid) {
-            console.log('Found Inventar-Update #872 without ruuid-Field', {...itm});
-            const raum = await db.raeume.get(itm.obj.rid);
+            console.error('DBSyncClient Found Inventar-Update #872 without ruuid-Field', {...itm});
+            const raum = await db.raeume.where({rid: itm.obj.rid}).first();
             if (raum) {
               itm.obj.ruuid = raum.uuid;
+              console.log('Fixed Missing ruuid-Field', {...itm});
             }
           }
           if (!itm.obj.ruuid || !itm.obj.mcuuid) {
-            console.log('DbSyncClientService #938 Removing incomplete Inventar + Entry from Change-Log', { itm });
+            console.error('DbSyncClientService #938 Removing incomplete Inventar + Entry from Change-Log', { itm });
             db.clientChangeLog.delete(itm.id);
-            db.inventar.delete(itm.key);
+            db.inventar.delete(itm.uuid);
+            if (itm.obj.code && itm.obj.for_jobid && itm.uuid) {
+              db.barcodeLookup
+                .where({code: itm.obj.code, for_jobid: itm.obj.for_jobid})
+                .filter((lkup) => lkup.uuid === itm.uuid)
+                .delete();
+            }
             itm = null;
           }
         }
@@ -904,5 +960,100 @@ export class DBSyncClientService implements OnDestroy {
           return groupIdx;
         })).then( () => listGroupedByJobid);
       });
+  }
+
+  private async saveLastSyncErrorEvent(event: SyncServerErrorEvent): Promise<void> {
+    const jobid = event.jobid;
+    const insertData: DBDIServerSyncErrors[] = event.errors.map( (itm: SyncServerError) => {
+      return {
+        jobid,
+        clientChangeLogId: itm.clientChangeLogId || null,
+        table: itm.table,
+        type: itm.type || null,
+        uuid: itm.uuid,
+        error_code: itm.ERROR_CODE,
+        error_msg: itm.ERROR_MSG || '',
+        error_data: itm.ERROR_DATA || null,
+        error_ref_table: itm.ERROR_REF_TABLE || null,
+        error_ref_by: itm.ERROR_REF_BY || null,
+        error_ref_uuid: itm.ERROR_REF_UUID || null,
+        timestamp: new Date()
+      };
+    });
+    const delAction = this.dexieService.serverSyncErrors.where({jobid}).delete();
+    delAction.finally(() => this.dexieService.serverSyncErrors.bulkAdd(
+      insertData
+    )).then( (n) => {
+      if (n > 0) {
+        this.resyncServerErrors(jobid);
+      }
+    }).finally( () => {
+      this.syncErrorChange.emit({ jobid, count: event.errors.length});
+    });
+  }
+
+  async resyncServerErrors(jobid: number): Promise<any> {
+    const db = this.dexieService;
+    console.log('DBSyncClientService resyncServerErrors #980');
+
+    const aErrors = await db.serverSyncErrors.where({jobid}).toArray();
+
+    aErrors.map( async (err) => {
+      console.log('DBSyncClientService resyncServerErrors #983', { err });
+      if (!('clientChangeLogId' in err) || !err.clientChangeLogId) {
+        console.error('DBSyncClientService resyncServerErrors #985 NO clientChangeLogId in err', { err });
+        return false;
+      }
+      const table = err.table;
+      const uuid = err.uuid;
+      const chId = err.clientChangeLogId;
+      console.log('DBSyncClientService resyncServerErrors #992 ', { id: chId, table, uuid });
+
+      const logItem = await db.clientChangeLog.get(chId);
+
+      if (!logItem || logItem.table !== table || logItem.uuid !== uuid) {
+        console.error('logItem by id ', chId, ' not found', { table, uuid });
+      }
+
+      console.log('DBSyncClientService resyncServerErrors #998 ', {
+        logItem,
+        id: chId,
+        table,
+        uuid
+      });
+
+      console.log('DBSyncClientService resyncServerErrors #1003', { logItem });
+      const data = await db.table( table ).get(uuid);
+      console.log('DBSyncClientService resyncServerErrors #1005', { err_code: err.error_code, data });
+
+      switch (err.error_code) {
+        case 'ITEM_NOT_FOUND':
+          console.log('DBSyncClientService resyncServerErrors #1009 clientChangeLog.delete ', { chId });
+          await db.clientChangeLog.delete(chId);
+          if (data) {
+            const chgLogData: DBDIClientChangeLog = {
+              jobid: logItem.jobid,
+              key: 0,
+              mid: logItem.mid,
+              obj: data,
+              sync_attempts: 0,
+              sync_done: 0,
+              table: logItem.table,
+              timestamp: new Date(),
+              type: 1,
+              uid: logItem.uid,
+              uuid: logItem.uuid
+            };
+            console.log('DBSyncClientService resyncServerErrors #1025 clientChangeLog.add ', { chgLogData });
+            db.clientChangeLog.add(chgLogData);
+          }
+          break;
+
+        case 'NEWER_VERSION_ON_SERVER':
+          console.log('DBSyncClientService resyncServerErrors #1031 clientChangeLog.delete ', { chId });
+          await db.clientChangeLog.delete(chId);
+          break;
+      }
+    });
   }
 }

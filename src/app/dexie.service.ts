@@ -1,26 +1,24 @@
 import {EventEmitter, Injectable, Output} from '@angular/core';
 import Dexie from 'dexie';
 import 'dexie-observable';
-import 'dexie-syncable';
-import relationships from 'dexie-relationships';  // import dexieRelationships from 'dexie-relationships';
 import {DatabaseChangeType, IDatabaseChange, ICreateChange, IDeleteChange, IUpdateChange} from 'dexie-observable/api';
 
+import 'dexie-syncable';
 
 import { DexieSyncClientService } from './dexie-sync-client.service';
 import {BasedataService} from './basedata.service';
 import {
   DBDIBarcodeLookup,
-  DBDIClientChangeLog,
+  DBDIClientChangeLog, DBDIServerSyncErrors,
   DBDIDevices, DBDIGebaeude, DBDIHersteller, DBDIImages,
   DBDIInventar, DBDIInventuren, DBDIInventurenGebaeude, DBDIInventurenUser,
   DBDILieferant, DBDIMandanten, DBDIObjektbuchBarcodesLookup,
   DBDIObjektKatalogGlobal, DBDIObjektKatalogMandant, DBDIObjektKatalogImages,
   DBDIRaeume, DBDIUploads, DBDIUsers, DBDIVariables, DBDIInventurenUserStatus
 } from './dexie.interfaces';
+import {Guid} from 'guid-typescript';
 
-const database = 'merTensIventory';
-// Dexie.addons.push( dexieRelationships );
-Dexie.addons.push( relationships );
+const database = 'merTensIventory.1';
 
 @Injectable({
   providedIn: 'root'
@@ -29,34 +27,42 @@ export class DexieService extends Dexie {
 
   @Output() clientSyncAmountChanged = new EventEmitter<number>();
 
+  barcodeLookup: Dexie.Table<DBDIBarcodeLookup, [string, number]>;
   clientChangeLog: Dexie.Table<DBDIClientChangeLog, number>;
   devices: Dexie.Table<DBDIDevices, number>;
   gebaeude: Dexie.Table<DBDIGebaeude, number>;
-  hersteller: Dexie.Table<DBDIHersteller, number>;
-  inventar: Dexie.Table<DBDIInventar, number>;
+  hersteller: Dexie.Table<DBDIHersteller, string>;
+  images: Dexie.Table<DBDIImages, string>;
+  inventar: Dexie.Table<DBDIInventar, string>;
   inventuren: Dexie.Table<DBDIInventuren, number>;
   inventurenGebaeude: Dexie.Table<DBDIInventurenGebaeude, [number, number, number]>;
   inventurenUser: Dexie.Table<DBDIInventurenUser, [number, number]>;
   inventurenUserStatus: Dexie.Table<DBDIInventurenUserStatus, [number, number, number]>;
   lieferant: Dexie.Table<DBDILieferant, number>;
   mandanten: Dexie.Table<DBDIMandanten, number>;
-  objektKatalogGlobal: Dexie.Table<DBDIObjektKatalogGlobal, number>;
-  objektKatalogMandant: Dexie.Table<DBDIObjektKatalogMandant, number>;
-  objektKatalogImages: Dexie.Table<DBDIObjektKatalogImages, number>;
-  raeume: Dexie.Table<DBDIRaeume, number>;
-  images: Dexie.Table<DBDIImages, number>;
+  objektbuchBarcodesLookup: Dexie.Table<DBDIObjektbuchBarcodesLookup, string>;
+  objektKatalogGlobal: Dexie.Table<DBDIObjektKatalogGlobal, string>;
+  objektKatalogMandant: Dexie.Table<DBDIObjektKatalogMandant, string>;
+  objektKatalogImages: Dexie.Table<DBDIObjektKatalogImages, string>;
+  raeume: Dexie.Table<DBDIRaeume, string>;
+  serverSyncErrors: Dexie.Table<DBDIServerSyncErrors, number>;
   uploads: Dexie.Table<DBDIUploads, number>;
   users: Dexie.Table<DBDIUsers, number>;
-  objektbuchBarcodesLookup: Dexie.Table<DBDIObjektbuchBarcodesLookup, string>;
-
-  barcodeLookup: Dexie.Table<DBDIBarcodeLookup, [string, number]>;
   variables: Dexie.Table<DBDIVariables, string>;
 
-  dbVersion = 1;
+  dbVersion = 12;
+  nextDbVersion = 0;
   stopClientLogForServerLoad = false;
 
   constructor(private syncClient: DexieSyncClientService, private baseData: BasedataService) {
-    super( database ); // , { addons: [ relationships ] });
+    super( database );
+    this.nextDbVersion = this.dbVersion + 1;
+    this.on('versionchange', (event: IDBVersionChangeEvent) => {
+      console.log('DexieService #62 event versionchange ', { event });
+    });
+    this.on('message', event => {
+      console.log('DexieService #65 event message', { event });
+    });
     this.init();
   }
 
@@ -74,8 +80,11 @@ export class DexieService extends Dexie {
 
   init() {
     Dexie.Syncable.registerSyncProtocol('inventorySync', this.syncClient );
+    this.nextDbVersion = this.dbVersion + 1;
 
-    this.version(11).stores({
+    this.version(12).stores({
+      barcodeLookup:
+        '&[code+for_jobid],table,for_jobid,[table+for_jobid],updateHelper,[table+updateHelper]',
       clientChangeLog:
        '++id,table,type,key,uuid,jobid,sync_done',
       devices:
@@ -83,11 +92,11 @@ export class DexieService extends Dexie {
       gebaeude:
        '++gid,mid,Gebaeude',
       hersteller:
-       '++hid,uuid,Hersteller,for_jobid,created_jobid',
+       '$$uuid,hid,Hersteller,for_jobid,created_jobid',
       images:
-        '++id,uuid,name,type,size,width,height,gcuuid,url,for_jobid,created_jobid,modified_jobid',
+        '$$uuid,id,name,type,size,width,height,gcuuid,mcuuid,url,for_jobid,created_jobid,modified_jobid',
       inventar:
-        '++ivid,mcid,uuid,for_jobid,mcuuid,code,[rid+jobid],rid,rid_init,rid_neu,ruuid,jobid,invid,iv_nr',
+        '$$uuid,ivid,mcid,for_jobid,mcuuid,code,[rid+jobid],rid,rid_init,rid_neu,ruuid,jobid,invid,iv_nr',
       inventuren:
        '++jobid,mid,gid,Titel,Start,aktiviert,AbgeschlossenAm',
       inventurenGebaeude:
@@ -100,31 +109,110 @@ export class DexieService extends Dexie {
        '++hid,Lieferant',
       mandanten:
        '++mid,Mandant',
+      objektbuchBarcodesLookup:
+        '&code,for_jobid',
       objektKatalogGlobal:
-       '++gcid,uuid,code,hid,Bezeichnung,Typ,Gruppe,Kategorie,Farbe,Groesse,created_jobid',
+       '$$uuid,gcid,code,hid,Bezeichnung,Typ,Gruppe,Kategorie,Farbe,Groesse,created_jobid',
       objektKatalogMandant:
-       '++mcid,uuid,gcid,gcuuid,code,mid,for_jobid,created_jobid',
+       '$$uuid,mcid,gcid,gcuuid,code,mid,for_jobid,created_jobid',
       objektKatalogImages:
-      '++id,uuid,for_jobid,RefTable,RefUuid,ImgUuid,Kategorie',
+      '$$uuid,id,for_jobid,RefTable,RefUuid,ImgUuid,Kategorie',
       raeume:
-       '++rid,gid,[rid+gid],uuid,for_jobid,code,raumid,Raum,Raumbezeichnung,Etage,current_jobid,current_jobstatus',
+       '$$uuid,rid,gid,[rid+gid],for_jobid,code,raumid,Raum,Raumbezeichnung,Etage,current_jobid,current_jobstatus',
+      serverSyncErrors:
+        '++id,jobid,clientChangeLogId,table,type,uuid,error_code,error_msg',
       uploads:
        '++id,uuid,mid,standort,importkey,filename,filesize,checksum,stat,errors',
       users:
        '++id,name,email,password',
-      objektbuchBarcodesLookup:
-        '&code,for_jobid',
       variables:
-        '&name,value',
-      barcodeLookup:
-        '&[code+for_jobid],table,for_jobid,[table+for_jobid],updateHelper,[table+updateHelper]'
+        '&name,value'
     });
-    // Now, add another version, just to trigger an upgrade for Dexie.Observable
-    this.version(2).stores({}); // No need to add / remove tables. This is just to allow the addon to install its tables.
-    this.version(4).stores({
-      inventurenUserStatus:
-        '&[jobid+uid+device_id],jobid,uid,device_id,status,token'
-    });
+    const sleep = (ms) => {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    };
+
+    if (1) {
+      const v2 = this.nextDbVersion;
+      this.version(v2).stores({
+        images:
+          '$$uuid,id,name,type,size,width,height,gcuuid,mcuuid,url,for_jobid,created_jobid,modified_jobid'
+      }).upgrade((trans) => {
+        console.log('Starte Upgrade for DB-Version ' + v2);
+        this.images.toCollection().each( (img) => {
+          this.objektKatalogMandant.where({mcid: img.mcid}).first().then( (okm) => {
+            this.images.where({uuid: img.uuid}).modify({mcuuid: okm.uuid});
+          });
+        });
+      });
+      this.nextDbVersion += 1;
+    }
+
+    if (1) {
+      const v3 = this.nextDbVersion;
+      this.version(v3).stores({
+        images:
+          '$$uuid,id,name,type,size,width,height,gcuuid,mcuuid,url,for_jobid,created_jobid,modified_jobid'
+      }).upgrade((trans) => {
+        console.log('Starte Upgrade for DB-Version ' + v3);
+        this.images.toCollection().each( (img) => {
+          this.objektKatalogMandant.where({mcid: img.mcid}).first().then( (okm) => {
+            this.images.where({uuid: img.uuid}).modify({mcuuid: okm.uuid});
+          });
+        });
+      });
+      this.nextDbVersion += 1;
+    }
+
+    if (1) {
+      const v4 = this.nextDbVersion;
+      this.version(v4).stores({
+        images:
+          '$$uuid,id,name,type,size,width,height,gcuuid,mcuuid,url,for_jobid,created_jobid,modified_jobid'
+      }).upgrade((trans) => {
+        console.log('Starte Upgrade for DB-Version ' + v4);
+        return trans;
+      });
+      this.nextDbVersion += 1;
+    }
+
+    if (1) {
+      const v5 = this.nextDbVersion;
+      this.version(v5).stores({
+        objektKatalogGlobal:
+          '$$uuid,gcid,code,huuid,Bezeichnung,Typ,Gruppe,Kategorie,Farbe,Groesse,created_jobid',
+      }).upgrade((trans) => {
+        console.log('Starte Upgrade for DB-Version ' + v5);
+        return trans;
+      });
+      this.nextDbVersion += 1;
+    }
+
+    if (1) {
+      const v6 = this.nextDbVersion;
+      this.version(v6).stores({
+        objektKatalogGlobal:
+          '$$uuid,gcid,code,huuid,Bezeichnung,[Bezeichnung+huuid],Typ,Gruppe,Kategorie,Farbe,Groesse,created_jobid',
+      }).upgrade((trans) => {
+        console.log('Starte Upgrade for DB-Version ' + v6);
+        return trans;
+      });
+      this.nextDbVersion += 1;
+    }
+
+    if (1) {
+      const v7 = this.nextDbVersion;
+      this.version(v7).stores({
+        objektKatalogGlobal:
+          '$$uuid,uuid,gcid,code,huuid,Bezeichnung,[Bezeichnung+huuid],Typ,Gruppe,Kategorie,Farbe,Groesse,created_jobid',
+      }).upgrade((trans) => {
+        console.log('Starte Upgrade for DB-Version ' + v7);
+        return trans;
+      });
+      this.nextDbVersion += 1;
+    }
+
+
     const validLogTables = [
       'hersteller',
       'inventar',
@@ -178,7 +266,6 @@ export class DexieService extends Dexie {
           // console.log('#151 dexie.service on changes: ChangeLog disabled for table ', change.table);
           return;
         }
-        console.log('#154 dexie.service on changes: Write ChangeLog for table ', change.table, change.key, 'partial', partial);
 
         this.addChangeLog( change );
       });
@@ -192,7 +279,6 @@ export class DexieService extends Dexie {
     //   return;
     // }
     if (log !== undefined && log !== null && log === false) {
-      console.log('#152 addChangeLog Skip DB-Change-Logging for Server-Sync - Log-Flag === false', { log, change });
       return;
     }
     let uuid = this.getChangeLogUuid(change);
@@ -201,7 +287,6 @@ export class DexieService extends Dexie {
       const obj: any = await this.table( change.table ).get( change.key );
       uuid = ('uuid' in obj) ? obj.uuid : '';
 
-      console.log('#161 addChangeLog Remove LogFlag from Entry ' + change.table + ' with id ' + change.key, { change });
       delete obj.log;
       await this.table( change.table ).put( obj, change.key);
     }
@@ -221,18 +306,15 @@ export class DexieService extends Dexie {
 
     switch ( change.type ) {
       case DatabaseChangeType.Create:
+        const insertChange = change as ICreateChange;
         if ('log' in change.obj) {
           delete change.obj.log;
         }
         chlog.obj = change.obj;
-        console.log('#141  addChangeLog on changes: An object was created: ', change.table, change.key, { chlog } );
         switch (change.table) {
           case 'objektKatalogGlobal':
             if (!('huuid' in chlog.obj)) {
               chlog.obj.huuid = this.getChangeLogProp<string>(change, 'huuid');
-            }
-            if (!('hid' in chlog.obj)) {
-              chlog.obj.hid = this.getChangeLogProp<number>(change, 'hid');
             }
             break;
 
@@ -240,17 +322,11 @@ export class DexieService extends Dexie {
             if (!('gcuuid' in chlog.obj)) {
               chlog.obj.gcuuid = this.getChangeLogProp<string>(change, 'gcuuid');
             }
-            if (!('gcid' in chlog.obj)) {
-              chlog.obj.gcid = this.getChangeLogProp<number>(change, 'gcid');
-            }
             break;
 
           case 'inventar':
             if (!('mcuuid' in chlog.obj)) {
               chlog.obj.mcuuid = this.getChangeLogProp<string>(change, 'mcuuid');
-            }
-            if (!('mcid' in chlog.obj)) {
-              chlog.obj.mcid = this.getChangeLogProp<number>(change, 'mcid');
             }
             if (!('ruuid' in chlog.obj)) {
               chlog.obj.ruuid = this.getChangeLogProp<string>(change, 'ruuid');
@@ -289,9 +365,6 @@ export class DexieService extends Dexie {
             if (!('mcuuid' in chlog.mods)) {
               chlog.mods.mcuuid = this.getChangeLogProp<string>(change, 'mcuuid');
             }
-            if (!('mcid' in chlog.mods)) {
-              chlog.mods.mcid = this.getChangeLogProp<number>(change, 'mcid');
-            }
             if (!('ruuid' in chlog.mods)) {
               chlog.mods.ruuid = this.getChangeLogProp<string>(change, 'ruuid');
             }
@@ -310,11 +383,13 @@ export class DexieService extends Dexie {
 
       case DatabaseChangeType.Delete:
         const deleteChange = change as IDeleteChange;
-        console.log('#145  addChangeLog on changes: ABORT! We dont log Deletess: ', change.table, change.key, deleteChange);
         return;
         break;
     }
-    this.clientChangeLog.add( chlog );
+
+    this.clientChangeLog.add(chlog).catch( (e) => {
+      console.error('DexieService addChangeLog #400', { e });
+    });
   }
 
   getChangeLogUuid(change: IDatabaseChange): string|undefined {

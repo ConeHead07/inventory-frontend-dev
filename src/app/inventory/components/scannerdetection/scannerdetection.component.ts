@@ -39,7 +39,7 @@ export class ScannerdetectionComponent implements OnInit {
     scanTimeout: 100,
     ignoreChars: '',
     ignoreEndsWith: true,
-    ignoreOverElements: [ 'INPUT' ],
+    ignoreOverElements: [], // [ 'INPUT' ],
     barcodeType: 'code128'
   };
 
@@ -73,6 +73,14 @@ export class ScannerdetectionComponent implements OnInit {
       .filter( name => name.startsWith('.'))
       .map(name => name.substr(1));
 
+    const isEditableTextInput = (
+      target instanceof HTMLInputElement
+      && target.tagName === 'input'
+      && target.type.match(/text|number|/)
+      && !target.readOnly
+      && !target.disabled
+    );
+
     if (ignoreElementIds.indexOf( targetElementId ) !== -1) {
       emitScanData = false;
     }
@@ -85,27 +93,32 @@ export class ScannerdetectionComponent implements OnInit {
       emitScanData = false;
     }
 
+    if (isEditableTextInput) {
+      emitScanData = false;
+    }
+
     if (!emitScanData) {
       console.log('#89 scannerDetection target is not our target: ', {
         useTarget,
+        isEditableTextInput,
         ignoreTagNames,
         ignoreElementIds,
         ignoreClassNames
       });
+      return;
     }
 
     const now = Date.now();
     const diff = now - this.lastKeyEventTime;
     const isScanInput: boolean = diff > this.detectorConfig.scanTimeout;
-    const key = event.key;
-    const code = event.code;
+    const key = 'key' in event ? event.key : '';
     const isShiftKey = event.shiftKey;
-    const isCtrlKey = event.ctrlKey;
 
     if (!isScanInput) {
       this.input = key;
       console.log('#101 scannerDetection Start, input', this.input);
     } else {
+      console.log('#109 scannerDetection isScanInput', { target, key, 'this.input': this.input, 'event.type': event.type, event});
       if (key.length === 1 ) {
         this.input += !isShiftKey ? key : key.toUpperCase();
         const barcode = this.input;

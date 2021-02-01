@@ -24,12 +24,12 @@ export interface DBUpdateRaumResult extends DbUpdateResult {
 }
 
 export interface RaumIDAndStatus {
-  rid: number;
+  uuid: string;
   status: DBDIRaumEditStatus;
 }
 
 export interface RaumStatusProgress {
-  rid: number;
+  uuid: string;
   Raum: string;
   Etage: string;
   editStatus: DBDIRaumEditStatus;
@@ -71,23 +71,23 @@ export class RaumService {
     return 0 < numRaeume;
   }
 
-  public async codeExistsInInventur(jobid: number, rid: number, code: string): Promise<boolean> {
+  public async codeExistsInInventur(jobid: number, ruuid: string, code: string): Promise<boolean> {
     const raeume = this.dexie.raeume
       .where('code')
       .equalsIgnoreCase(code.trim())
-      .filter(itm => itm.rid !== rid && itm.for_jobid !== jobid);
+      .filter(itm => itm.uuid !== ruuid && itm.for_jobid !== jobid);
 
     const numRaeume = await this.dexie.raeume
       .where('code')
       .equalsIgnoreCase(code.trim())
-      .filter(itm => itm.rid !== rid && itm.for_jobid !== jobid)
+      .filter(itm => itm.uuid !== ruuid && itm.for_jobid !== jobid)
       .count();
     const exists = 0 < numRaeume;
 
     console.log('#85 raum.service.ts codeExistsInInventur', {
       params: {
         jobid,
-        rid,
+        ruuid,
         code
       },
       result: {
@@ -99,18 +99,18 @@ export class RaumService {
     return exists;
   }
 
-  public async raumExistsInInventur(jobid: number, rid: number, Raum: string): Promise<boolean> {
+  public async raumExistsInInventur(jobid: number, ruuid: string, Raum: string): Promise<boolean> {
     const numRaeume = await this.dexie.raeume
       .where('Raum')
       .equalsIgnoreCase(Raum.trim())
-      .filter(itm => itm.rid !== rid && itm.for_jobid !== jobid)
+      .filter(itm => itm.uuid !== ruuid && itm.for_jobid !== jobid)
       .count();
 
     return 0 < numRaeume;
   }
 
-  async get(rid: number): Promise<DBDIRaeume> {
-    return this.dexie.raeume.get(rid);
+  async get(uuid: string): Promise<DBDIRaeume> {
+    return this.dexie.raeume.get(uuid);
   }
 
   public async insert(daten: RaumBasisDaten, useJobId?: number): Promise<DBInsertRaumResult> {
@@ -121,7 +121,7 @@ export class RaumService {
       uuid: Guid.create().toString(),
       hash: '',
       for_jobid: jobid,
-      code: '',
+      code: daten.code,
       raumid: '',
       Raum: daten.Raum,
       Raumbezeichnung: daten.Raumbezeichnung,
@@ -134,7 +134,7 @@ export class RaumService {
     };
     const log = { log: true };
 
-    let newId = 0;
+    let newId = '';
     let newItem = null;
     try {
       newId = await this.dexie.raeume.add( { ...insertData, ...log });
@@ -158,11 +158,13 @@ export class RaumService {
     };
   }
 
-  public async updateById(rid: number, raum: DBDIRaeume|RaumBasisDaten): Promise<DBUpdateRaumResult> {
-    console.log('#162 raum.service.ts updateById:', { rid, raum });
+  public async updateByUuid(uuid: string, raum: DBDIRaeume|RaumBasisDaten): Promise<DBUpdateRaumResult> {
+    console.log('#162 raum.service.ts updateById:', { uuid, raum });
     const jobid = this.baseDataService.getCurrentJobid();
-    const savedRaumData = await this.dexie.raeume.get(rid);
-    // uuid: "5bd9a47f-4b0b-11eb-8949-0242ac140002"
+    const savedRaumData = await this.dexie.raeume.get(uuid);
+
+    const hasUuid = ('uuid' in raum) && (typeof raum.uuid === 'string') && raum.uuid !== '';
+    const updUuid = hasUuid && ('uuid' in raum)  ? raum.uuid : uuid;
 
     if (savedRaumData.code !== raum.code) {
       const lkupKey = {
@@ -181,46 +183,57 @@ export class RaumService {
       console.log('#184 raum.service.ts create new bcItem', {
         code: raum.code,
         for_jobid: jobid,
-        id: rid,
-        key: 'rid',
+        id: uuid,
+        key: 'uuid',
         table: 'raeume',
         updateHelper: 1,
-        uuid: savedRaumData.uuid
+        uuid: updUuid
       });
       this.dexie.barcodeLookup.put({
         code: raum.code,
         for_jobid: jobid,
-        id: rid,
-        key: 'rid',
+        key: 'uuid',
         table: 'raeume',
         updateHelper: 1,
-        uuid: savedRaumData.uuid
+        uuid: updUuid
       });
+    } else if (raum.code) {
+      const bcItem = await this.dexie.barcodeLookup.get({code: raum.code, for_jobid: jobid});
+      if (!bcItem) {
+        this.dexie.barcodeLookup.put({
+          code: raum.code,
+          for_jobid: jobid,
+          key: 'uuid',
+          table: 'raeume',
+          updateHelper: 1,
+          uuid: updUuid
+        });
+      }
     }
 
-    console.log('#205 raum.service.ts update raum', { rid, raum });
-    const numChanges = await this.dexie.raeume.update(rid, raum);
-    const savedData = await this.dexie.raeume.get(rid);
-    console.log('#208 raum.service.ts get updated raumItem', { rid, savedData, 'return': {
+    console.log('#205 raum.service.ts update raum', { uuid, raum });
+    const numChanges = await this.dexie.raeume.update(uuid, raum);
+    const savedData = await this.dexie.raeume.get(uuid);
+    console.log('#208 raum.service.ts get updated raumItem', { uuid, savedData, return: {
         success: numChanges > 0,
-        id: rid,
+        id: uuid,
         item: savedData,
         data: raum
       }});
     return {
       success: numChanges > 0,
-      id: rid,
+      id: uuid,
       item: savedData,
       data: raum
     };
   }
 
-  public async updateByUuid(uuid: string, raum: DBDIRaeume|RaumBasisDaten): Promise<DBUpdateRaumResult> {
+  public async __DEL__updateByUuid(uuid: string, raum: DBDIRaeume|RaumBasisDaten): Promise<DBUpdateRaumResult> {
     const numChanges = await this.dexie.raeume.where({ uuid }).modify(raum);
     const savedData = await this.dexie.raeume.where({ uuid }).first();
     return {
       success: numChanges > 0,
-      id: savedData.rid,
+      id: savedData.uuid,
       item: savedData,
       data: raum
     };
@@ -236,62 +249,62 @@ export class RaumService {
     }).then( () => etagen );
   }
 
-  public async getRaumStatus(rid: number): Promise<DBDIRaumEditStatus> {
-    const raum = await this.dexie.raeume.get(rid);
+  public async getRaumStatus(uuid: string): Promise<DBDIRaumEditStatus> {
+    const raum = await this.dexie.raeume.get(uuid);
     if (raum) {
       return raum.current_jobstatus;
     }
-    throwError( `ERROR - GetRaumStatus: Raum mit ID ${rid} wurde nicht gefunden`);
+    throwError( `ERROR - GetRaumStatus: Raum mit ID ${uuid} wurde nicht gefunden`);
   }
 
-  public async triggerRaumStatus(rid: number): Promise<void> {
-    const raum = await this.dexie.raeume.get(rid);
+  public async triggerRaumStatus(uuid: string): Promise<void> {
+    const raum = await this.dexie.raeume.get(uuid);
     this.raumStatusChanged.emit({
-      rid,
+      uuid,
       status: raum.current_jobstatus
     });
   }
 
 
-  public async setRaumStatus(stat: DBDIRaumEditStatus, rid: number, jobid: number): Promise<number> {
+  public async setRaumStatus(stat: DBDIRaumEditStatus, uuid: string, jobid: number): Promise<number> {
     const log = true;
-    const numChanges = await this.dexie.raeume.where({rid}).modify({
+    const numChanges = await this.dexie.raeume.where({uuid}).modify({
       current_jobstatus: stat,
       current_jobid: jobid,
       log
     });
 
     if (numChanges) {
-      this.triggerRaumStatus(rid);
+      this.triggerRaumStatus(uuid);
     }
     return numChanges;
   }
 
-  public async setRaumStatusInit(rid: number, jobid: number): Promise<number> {
-    return await this.setRaumStatus(DBDIRaumEditStatus.Init, rid, jobid);
+  public async setRaumStatusInit(uuid: string, jobid: number): Promise<number> {
+    return await this.setRaumStatus(DBDIRaumEditStatus.Init, uuid, jobid);
   }
 
-  public async setRaumStatusStarted(rid: number, jobid: number): Promise<number> {
-    return await this.setRaumStatus(DBDIRaumEditStatus.Started, rid, jobid);
+  public async setRaumStatusStarted(uuid: string, jobid: number): Promise<number> {
+    return await this.setRaumStatus(DBDIRaumEditStatus.Started, uuid, jobid);
   }
 
-  public async setRaumStatusClosed(rid: number, jobid: number): Promise<number> {
-    return await this.setRaumStatus(DBDIRaumEditStatus.Closed, rid, jobid);
+  public async setRaumStatusClosed(uuid: string, jobid: number): Promise<number> {
+    return await this.setRaumStatus(DBDIRaumEditStatus.Closed, uuid, jobid);
   }
 
   public async getRaeumeStartedByGebaeudeId(gid: number, jobid: number): Promise<RaumStatusProgress[]> {
     const raeume = await this.dexie.raeume.where({ gid }).toArray();
     const raeumeStat = await Promise.all( raeume.map( (raum: DBDIRaeume) => {
       return Promise.all([
-        this.dexie.inventar.where({ rid: raum.rid }).count(),
-        this.dexie.inventar.where('[rid+jobid]').equals([raum.rid, jobid]).count()
+        this.dexie.inventar.where({ ruuid: raum.uuid }).count(),
+        this.dexie.inventar.where({ ruuid: raum.uuid, jobid }).count()
         ]).then( (results) => {
           const total = results[0];
           const done = results[1];
           const progress = total > 0 ? done * 100 / total : -1;
 
           return {
-            rid: raum.rid,
+            uuid: raum.uuid,
             Raum: raum.Raum,
             Etage: raum.Etage,
             editStatus: raum.current_jobstatus,
@@ -312,11 +325,11 @@ export class RaumService {
 
     const raeumeStat = await Promise.all(raeume.map( (raum: DBDIRaeume) => {
       return Promise.all([
-        this.dexie.inventar.where({ rid: raum.rid }).count(),
-        this.dexie.inventar.where('[rid+jobid]').equals([raum.rid, jobid]).count()
+        this.dexie.inventar.where({ ruuid: raum.uuid }).count(),
+        this.dexie.inventar.where({ ruuid: raum.uuid, jobid }).count()
       ]).then( (results) => {
         return {
-          rid: raum.rid,
+          uuid: raum.uuid,
           Raum: raum.Raum,
           Etage: raum.Etage,
           progress: 0,

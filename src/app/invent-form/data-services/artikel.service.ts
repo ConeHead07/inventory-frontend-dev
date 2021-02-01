@@ -18,11 +18,13 @@ import {
   TableIdxProps
 } from '../../inventory/service/data.service';
 import {BasedataService} from '../../basedata.service';
+import {HerstellerService} from './hersteller.service';
 
 
 export interface ArtikelBasisDaten {
   mid?: number;
   mcid?: number;
+  mcuuid?: string;
   gcid?: number;
   gcuuid?: string;
   Bezeichnung?: string;
@@ -46,6 +48,8 @@ export interface ArtikelRefInsertData {
 
 export interface DBInsertArtikelResult extends DbInsertResult {
   newItem?: DBDIArtikel;
+  artikelRef: DBDIObjektKatalogMandant;
+  artikelData: DBDIObjektKatalogGlobal;
 }
 
 export interface DBUpdateArtikelResult extends DbUpdateResult {
@@ -93,7 +97,8 @@ export class ArtikelService {
   constructor(private dexie: DexieService,
               private authService: AuthService,
               private dataService: DataService,
-              private baseData: BasedataService) {}
+              private baseData: BasedataService,
+              private herstellerService: HerstellerService) {}
 
   public async artikelBezeichnungExistsGlobal(bezeichnung: string): Promise<number> {
     return await this.dexie.objektKatalogGlobal
@@ -102,7 +107,7 @@ export class ArtikelService {
       .count();
   }
 
-  public async artikelExistsMandant(mid: number, gcid: number): Promise<boolean> {
+  public async ___DEL__artikelExistsMandant(mid: number, gcid: number): Promise<boolean> {
     const numItems = await this.dexie.objektKatalogMandant
       .where({ mid, gcid })
       .count();
@@ -119,21 +124,21 @@ export class ArtikelService {
     return items;
   }
 
-  public async artikelMcidByGcids(mid: number, gcids: number|number[]): Promise<DBDIObjektKatalogMandant[]> {
-    if (typeof gcids === 'number') {
-      gcids = [ gcids ];
+  public async artikelMcuuidByGcuuids(mid: number, gcuuids: string|string[]): Promise<DBDIObjektKatalogMandant[]> {
+    if (typeof gcuuids === 'string') {
+      gcuuids = [ gcuuids ];
     }
 
     const items = await this.dexie.objektKatalogMandant
-      .where( 'gcid').anyOf(gcids)
+      .where( 'gcuuid').anyOf(gcuuids)
       .filter( itm => itm.mid === mid)
       .toArray();
 
     return items;
   }
 
-  public async getGcuuidByGcid(gcid: number): Promise<string> {
-    return this.dexie.objektKatalogGlobal.get( gcid ).then( (itm) => itm.uuid );
+  public async ___DEL__getGcuuidByGcuuid(uuid: string): Promise<string> {
+    return this.dexie.objektKatalogGlobal.get( uuid ).then( (itm) => itm.uuid );
   }
 
   public async insertArtikelData(daten: ArtikelBasisDaten): Promise<DBDIObjektKatalogGlobal> {
@@ -146,13 +151,17 @@ export class ArtikelService {
     const uuid = Guid.create().toString();
     const log = { log: true };
 
-    if (daten.hid && !daten.huuid) {
-      const hst = await hersteller.get(daten.hid);
-      daten.huuid = hst.uuid;
+    if (daten.Hersteller) {
+      console.log('ArtikelService insertArtikelDate() #153');
+      await this.herstellerService.getByNameOrCreate(daten.Hersteller).then( hstData => {
+        daten.hid = hstData.hid;
+        daten.huuid = hstData.uuid;
+      });
     }
 
     const exists = await katalog.where({
-      Bezeichnung: daten.Bezeichnung
+      Bezeichnung: daten.Bezeichnung,
+      huuid: daten.huuid
     }).toArray();
 
     if (exists) {
@@ -165,6 +174,7 @@ export class ArtikelService {
         return true;
       });
       if (sameData.length > 0) {
+        console.log('ArtikelService insertArtikelData() #175');
         return sameData[0];
       } else {
         throwError({
@@ -206,12 +216,17 @@ export class ArtikelService {
       Kst: !('Kst' in daten) ? null : (daten as any).Kst,
       log: true
     };
+    const insertNewData = { ...insertData, ...log };
     const insertKey = await katalog.add({ ...insertData, ...log });
-    insertData.gcid = insertKey;
-    return insertData;
+    if (!insertKey) {
+      console.error('ArtikelService # 220 insertArtikelData(daten) empty result insertKey', { insertKey, insertNewData});
+      alert('#219 ArtikelService.insertArtikelData(daten) empty Result. See console.log');
+    }
+    console.log('ArtikelService insertArtikelData() #223');
+    return katalog.get(insertKey);
   }
 
-  public async insertArtikelRefByGcidGcuuid(gcid: number, gcuuid?: string): Promise<DBDIObjektKatalogMandant> {
+  public async insertArtikelRefByGcidGcuuid(gcuuid: string): Promise<DBDIObjektKatalogMandant> {
     const db = this.dexie;
     const artikelRef = db.objektKatalogMandant;
     const jobid = this.baseData.getCurrentJobid();
@@ -220,19 +235,14 @@ export class ArtikelService {
     const uuid = Guid.create().toString();
     const devID = this.baseData.getCurrentDeviceId();
     const log = { log: true };
-    let code = uuid;
-
-    if (!gcuuid) {
-      gcuuid = await db.objektKatalogGlobal.get(gcid).then( (rslt) => {
-        return rslt.uuid;
-      }).catch( () => '');
-    }
+    const d = new Date();
+    const code = uuid;
 
     const insertData = {
-      ...{ gcid, gcuuid },
+      ...{ gcuuid },
       ...{
         mid,
-        code: uuid,
+        code,
         for_jobid: jobid,
         created_at: new Date(),
         created_uid: uid,
@@ -241,18 +251,9 @@ export class ArtikelService {
       },
       ...log
     } as DBDIObjektKatalogMandant;
-    const mcid = await artikelRef.add( insertData );
+    const mcuuid = await artikelRef.add( insertData );
 
-    code = `A-${mcid}-${mid}-${gcid}`;
-    if (code.length < 14) {
-      code = (code + '-' + uuid.substr(4, 15)).substr(0, 15);
-      if (code.endsWith('-')) {
-        code = code.substr(0, code.length - 1);
-      }
-    }
-    await artikelRef.update(mcid, { code });
-
-    return artikelRef.get(mcid);
+    return artikelRef.get(mcuuid);
   }
 
   public async insertArtikelRef(daten: ArtikelBasisDaten): Promise<DBDIObjektKatalogMandant> {
@@ -265,8 +266,16 @@ export class ArtikelService {
     const devID = this.baseData.getCurrentDeviceId();
     const log = { log: true };
 
-    if (!daten.gcid && !daten.gcuuid) {
-      const artikelData = await this.insertArtikelData({ ...daten, ...log});
+    if (!daten.gcuuid) {
+      console.log('ArtikelService insertArtikelRef() #265', { daten: {...daten}});
+      const artikelData: DBDIObjektKatalogGlobal = await this.insertArtikelData({ ...daten, ...log});
+      console.log('ArtikelService insertArtikelRef() #270 artikelData', { artikelData: {...artikelData}});
+      if (!artikelData) {
+        console.error('ArtikelService #267 unexpected empty Result: artikelData = this.insertArikelData()',
+          { artikelData, daten });
+        alert('ArikelService #269 unexpected Result for insertArtikelData. See console.log');
+        return null;
+      }
       daten.gcid = artikelData.gcid;
       daten.gcuuid = artikelData.uuid;
     }
@@ -274,34 +283,58 @@ export class ArtikelService {
     const insertData: DBDIArtikel = {
       mid: daten.mid || defaultMid,
       gcid: daten.gcid,
-      uuid: Guid.create().toString(),
-      hash: '',
+      gcuuid: daten.gcuuid,
+      uuid,
       code: uuid,
       created_at: new Date(),
-      created_uid: this.authService.getUser().id,
+      created_uid: uid,
       created_jobid: jobid,
       created_device_id: devID,
       modified_at: null,
       modified_uid: null
     };
-    const insertKey = await artikelRef.add( {...insertData, ...log} );
-    insertData.mcid = insertKey;
-    return insertData;
+    const insertUuid = await artikelRef.add( {...insertData, ...log} );
+    console.log('ArtikelService insertArtikelRef() #295', { uuid, insertUuid });
+    return artikelRef.get({uuid: insertUuid});
   }
 
   public async insert(daten: ArtikelBasisDaten): Promise<DBInsertArtikelResult> {
     try {
-      const artikelRefData = await this.insertArtikelRef( daten );
+      console.log('ArtikelService #295 insert(daten) call this.getFirstArtikelGcuuidByBasisDaten(daten)', { daten });
+      try {
+        const existingGcuuid = await this.getFirstArtikelGcuuidByBasisDaten(daten);
+        daten.gcuuid = existingGcuuid;
+      } catch (e) {
+        console.error('ArtikelService #299', { e });
+        throw e;
+      }
+      console.log('ArtikelService #303 insert(daten) call this.insertArtikelRef(daten)');
+      const artikelRefData: DBDIObjektKatalogMandant = await this.insertArtikelRef( daten );
+      console.log('ArtikelService #305 artikelRefData = insert(daten)', { daten, artikelRefData });
+      if (!artikelRefData || !('gcuuid' in artikelRefData)) {
+        alert('ERROR: #307 ArtikelService.insert() after calling ArtikelService.insertArtikelRef(daten)' +
+          JSON.stringify({daten}));
+        return {
+          success: false,
+          newId: null,
+          data: null,
+          newItem: null,
+          artikelRef: null,
+          artikelData: null
+        };
+      }
 
-      const gItem = await this.dexie.objektKatalogGlobal.get( artikelRefData.gcid );
-      const mItem = await this.dexie.objektKatalogMandant.get( artikelRefData.mcid );
-      const item = { ...mItem, ...gItem };
+      const gItem = await this.dexie.objektKatalogGlobal.get( {uuid: artikelRefData.gcuuid});
+      const mItem = artikelRefData;
+      const item = { ...mItem, ...gItem, ...{ mcuuid: mItem.uuid } };
 
       return {
         success: true,
-        newId: artikelRefData.mcid,
+        newId: artikelRefData.uuid,
         data: artikelRefData,
         newItem: item,
+        artikelRef: artikelRefData,
+        artikelData: gItem
       } as DBInsertArtikelResult;
     } catch ( err ) {
       const errorMsg = ( 'name' in err ? err.name + ': ' : '')
@@ -315,7 +348,72 @@ export class ArtikelService {
     }
   }
 
-  public async update(artikel: DBDIArtikel): Promise<DBUpdateArtikelResult> {
+  public async getFirstArtikelGcuuidByBasisDaten(properties: ArtikelBasisDaten): Promise<string> {
+    if ( ('Hersteller' in properties) && properties.Hersteller.length > 0) {
+      const hst = await this.herstellerService.getByName(properties.Hersteller);
+      if (hst && hst.uuid) {
+        properties.huuid = hst.uuid;
+      } else {
+        return '';
+      }
+    }
+
+    const filledProps: any = {};
+    const emptyProps: any = {};
+    for (const pName of Object.keys(properties)) {
+      if (!(pName in properties)) {
+        continue;
+      }
+      if (properties[pName] !== '' && properties[pName] !== null) {
+        filledProps[pName] = properties[pName];
+      } else {
+        emptyProps[pName] = properties[pName];
+      }
+    }
+
+    if (Object.keys(filledProps).length === 0) {
+      return '';
+    }
+
+    if (!('huuid' in filledProps) && !('Bezeichnung' in filledProps)) {
+      return '';
+    }
+
+    let query: Dexie.Collection<DBDIObjektKatalogGlobal, string>;
+
+    if (properties.huuid && 'huuid' in filledProps) {
+      query = this.dexie.objektKatalogGlobal.where({huuid: properties.huuid});
+      delete filledProps.huuid;
+    } else if (properties.Bezeichnung && 'Bezeichnung' in filledProps) {
+      query = this.dexie.objektKatalogGlobal.where('Bezeichnung').equalsIgnoreCase(properties.Bezeichnung);
+      delete filledProps.Bezeichnung;
+    }
+
+    query.filter( (okg) => {
+      for (const k of Object.keys(filledProps)) {
+        if ( (k in okg) && okg[k] !== filledProps[k]) {
+          return false;
+        }
+      }
+      for (const k of Object.keys(emptyProps)) {
+        if (!(k in okg) || okg[k] === emptyProps[k]) {
+          continue;
+        }
+        if (okg[k] !== null && okg[k] !== '') {
+          return false;
+        }
+      }
+      return true;
+    }).first().then( (okg) => {
+      if (okg && ('uuid' in okg)) {
+        return okg.uuid;
+      } else {
+        return '';
+      }
+    });
+  }
+
+  public async __DEL__update(artikel: DBDIArtikel): Promise<DBUpdateArtikelResult> {
     return {
       success: false
     };
@@ -326,11 +424,6 @@ export class ArtikelService {
     return await artikelTbl.where({ huuid }).count();
   }
 
-  public async countArticleByHerstellerId(hid: number): Promise<number> {
-    const artikelTbl = this.dexie.objektKatalogGlobal;
-    return await artikelTbl.where({ hid }).count();
-  }
-
   public async countArticleByProperties(props: ArtikelPropertiesForQueryCount): Promise<number> {
     const artikelTbl = this.dexie.objektKatalogGlobal;
     let query: any = artikelTbl;
@@ -339,9 +432,6 @@ export class ArtikelService {
     if (props.huuid) {
       query = artikelTbl.where({ huuid: props.huuid });
       delete props.huuid;
-    } else if (props.hid) {
-      query = artikelTbl.where({ hid: props.hid });
-      delete props.hid;
     }
     if (!('filter' in query)) {
       throwError('query has an Unexpected Type. ' +
@@ -355,7 +445,6 @@ export class ArtikelService {
     mid: number, hstId: string|number, props: ArtikelPropertiesForQueryCount
   ): Promise<ArtikelHerstellerImg[]> {
     const huuid = (typeof hstId === 'string') ? hstId : null;
-    const hid = (typeof hstId === 'number') ? hstId : null;
 
     let propKeys = Object.keys( props );
     propKeys.forEach( k => {
@@ -369,16 +458,16 @@ export class ArtikelService {
 
     const join: JoinFlexFormatted = {
       table: 'objektKatalogGlobal',
-      where: (hid) ? { hid } : null,
+      where: (huuid) ? { huuid } : null,
       joins: [
-        { parentKey: 'hid', key: 'hid', table: 'hersteller', alias: 'hersteller', resultType: JoinResultType.First },
+        { parentKey: 'huuid', key: 'uuid', table: 'hersteller', alias: 'hersteller', resultType: JoinResultType.First },
         { parentKey: 'uuid', table: 'images', key: 'gcuuid', alias: 'image', resultType: JoinResultType.First },
-        { parentKey: 'gcid', table: 'objektKatalogMandant', key: 'gcid', alias: 'artikelRef', multi: true,
+        { parentKey: 'uuid', table: 'objektKatalogMandant', key: 'gcuuid', alias: 'artikelRef', multi: true,
           where: { mid },
           joins: [{
-            parentKey: 'mcid', table: 'inventar', key: 'mcid', alias: 'inventar_count', multi: true,
+            parentKey: 'uuid', table: 'inventar', key: 'mcuuid', alias: 'inventar_count', multi: true,
             resultType: JoinResultType.Count,
-            map: (obj: DBDIInventar) => ({ ivid: obj.ivid, rid: obj.rid })
+            map: (obj: DBDIInventar) => ({ uuid: obj.uuid, ruuid: obj.ruuid })
           }],
           filter: (obj: DBDIObjektKatalogMandant) => obj.mid === mid
       }],

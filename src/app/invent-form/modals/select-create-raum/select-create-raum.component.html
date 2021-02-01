@@ -80,7 +80,7 @@
           <div class="input-group-prepend">
             <span class="input-group-text">BCode</span>
           </div>
-          <input id="newRaumBarcode" #newRaumBarcode class="form-control formcontrol-edit-barcode" (paste)="$event.preventDefault()" placeholder="Barcode"
+          <input readonly id="newRaumBarcode" #newRaumBarcode class="form-control formcontrol-edit-barcode" (paste)="$event.preventDefault()" placeholder="Barcode"
                  name="code"
                  [(ngModel)]="raumDaten.code"
                  #code="ngModel"

@@ -32,7 +32,7 @@ export class ImagesService {
   constructor(private dexie: DexieService,
               private baseData: BasedataService) { }
 
-  async insertImage(image: ImageBaseData, useJobid?: number): Promise<number> {
+  async insertImage(image: ImageBaseData, useJobid?: number): Promise<string> {
     const jobid = useJobid || this.baseData.getCurrentJobid();
     const uid = this.baseData.getCurrentUid();
     const item = {
@@ -56,7 +56,7 @@ export class ImagesService {
     return rs;
   }
 
-  async putImage(image: ImageBaseData, useJobid?: number): Promise<number> {
+  async putImage(image: ImageBaseData, useJobid?: number): Promise<string> {
 
     await this.dexie.images.where({ gcuuid: image.gcuuid }).delete();
 
@@ -64,7 +64,7 @@ export class ImagesService {
   }
 
   async getImage(gcuuid: string): Promise<DBDIImages> {
-    return this.dexie.images.get({ gcuuid });
+    return this.dexie.images.where({ gcuuid }).first();
   }
 
   async imageExistsOfGcuuid(gcuuid: string): Promise<boolean> {

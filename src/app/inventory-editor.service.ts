@@ -22,8 +22,6 @@ export interface InventoryEditorInsertResult extends InventoryEditorResult {
   insertID?: number;
 }
 
-
-
 export enum InventoryEditorErrorCode {
   NoError,
   RaumNotFound,
@@ -64,21 +62,21 @@ export class InventoryEditorService {
 
   async updateArtikelImage(invid: number, data: Blob) {}
 
-  async assignInventarToRaum(ivid: number, rid: number, useJobid?: number): Promise<InventoryEditorResult> {
+  async assignInventarToRaum(invUuid: string, ruuid: string, useJobid?: number): Promise<InventoryEditorResult> {
     const jobid = useJobid || this.baseData.getCurrentJobid();
     const uid = this.baseData.getCurrentUid();
     const devid = this.baseData.getCurrentDeviceId();
     console.log('InventoryEditorService.assignInventarToRaum', {
-      ivid,
-      rid,
+      invUuid,
+      ruuid,
       jobid,
       uid,
       devid
     });
 
     return Promise.all([
-        this.dexieService.inventar.get(ivid),
-        this.dexieService.raeume.get(rid)
+        this.dexieService.inventar.get(invUuid),
+        this.dexieService.raeume.get(ruuid)
       ])
       .then(result => {
         const inv = result[0];
@@ -96,8 +94,7 @@ export class InventoryEditorService {
           return this.returnResultError( { errorCode: InventoryEditorErrorCode.RaumNotFound });
         }
 
-        return this.dexieService.inventar.update(inv.ivid, {
-          rid,
+        return this.dexieService.inventar.update(inv.uuid, {
           ruuid: raum.uuid,
           jobid,
           modified_uid: uid,
@@ -107,23 +104,23 @@ export class InventoryEditorService {
       });
   }
 
-  async undoAssignedInventarToRaum(ivid: number, rid: number, useJobid?: number): Promise<InventoryEditorResult> {
+  async undoAssignedInventarToRaum(invUuid: string, ruuid: string, useJobid?: number): Promise<InventoryEditorResult> {
     const jobid = useJobid || this.baseData.getCurrentJobid();
     return this.dexieService.clientChangeLog
-      .where({ table: 'raeume', key: ivid, jobid })
-      .filter( item => item.obj && ('rid' in item.obj) && item.obj.rid === rid )
+      .where({ table: 'raeume', uuid: invUuid, jobid })
+      .filter( item => item.obj && ('uuid' in item.obj) && item.obj.uuid === ruuid )
       .last()
       .then( item => {
 
         if (item.type === DatabaseChangeType.Create) {
           return this.dexieService.inventar
-            .delete( item.key )
+            .delete( item.uuid )
             .then( () => this.dexieService.clientChangeLog.delete( item.id) )
             .then( () => this.returnResultSuccess());
 
         } else if (item.type === DatabaseChangeType.Update) {
           return this.dexieService.inventar
-            .update(ivid, item.oldObj)
+            .update(invUuid, item.oldObj)
             .then( (num: number) => {
               if (num > 0) {
                 return this.dexieService.clientChangeLog.delete( item.id);
@@ -138,10 +135,4 @@ export class InventoryEditorService {
         }
       });
   }
-
-  async createKatalogArtikel(data: DBDIArtikel) {}
-
-  async undoCreatedKatalogArtikel(invid: number) {}
-
-  async assignArtikelToRaum(invid: number, rid: number) {}
 }

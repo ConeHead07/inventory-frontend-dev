@@ -7,11 +7,11 @@ export interface DbTransactionResult {
 }
 
 export interface DbInsertResult extends DbTransactionResult {
-  newId?: number;
+  newId?: string;
   newItem?: object;
 }
 
 export interface DbUpdateResult extends DbTransactionResult {
-  id?: number;
+  id?: string;
   item?: object;
 }

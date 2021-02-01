@@ -61,8 +61,37 @@ syncAutoRun: {{ syncAutoRun | json }}<br>
     <div class="col">{{ currProcess.starttime | date }}</div>
   </div>
 </div>
+<div *ngIf="lastServerSyncErrors.length > 0">
+  <h4>Synchronisations-Fehler</h4>
+  Fehler bei letzter Synchroniserung (InventurId: {{ lastServerSyncJobid}}) um {{ lastServerSyncDate | date }}<br>
+  Anzahl: {{ lastServerSyncErrors.length }}<br>
 
-<div id="totalProgress">
+    <table class="table table-striped">
+      <thead>
+      <tr>
+        <th scope="col">#</th>
+        <th scope="col">Table</th>
+        <th scope="col">Log-Id</th>
+        <th scope="col">Aktion</th>
+        <th scope="col">Fehlercode</th>
+        <th scope="col">Fehlermeldung</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr *ngFor="let item of lastServerSyncErrors; index as i">
+        <th scope="row">{{ i + 1 }}</th>
+        <td>{{ item.table }}</td>
+        <td>{{ item.clientChangeLogId | number }}</td>
+        <td>{{ item.type | number }}</td>
+        <td>{{ item.error_code }}</td>
+        <td>{{ item.error_msg }}</td>
+      </tr>
+      </tbody>
+    </table>
+    * type: 1=Insert, 2=Update, 3=Delete
+</div>
+
+<div id="totalProgress" *ngIf="syncTotal && syncTotal.total">
   <p><ngb-progressbar [striped]="true" [animated]="true" [value]="syncTotal.percent"></ngb-progressbar></p>
   <div class="row">
     <div class="col">{{ syncTotal.executed }}</div>
@@ -70,7 +99,7 @@ syncAutoRun: {{ syncAutoRun | json }}<br>
     <div class="col pull-right">{{ syncTotal.percent }} %</div>
   </div>
 </div>
-<div id="tableProgress">
+<div id="tableProgress" *ngIf="syncTables && syncTables.length > 0">
   <div class="row" *ngFor="let st of syncTables; let stIdx = index">
     <div class="col">{{ st.total }}</div>
     <div class="col">{{ st.puts }}</div>

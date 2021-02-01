@@ -71,14 +71,14 @@
         >
       </div>
     </div>
-
+i
     <div class="form-group">
       <label for="editRaumBarcode" class="d-none">Barcode: </label>
       <div class="input-group mb-1">
         <div class="input-group-prepend">
           <span class="input-group-text">BCode</span>
         </div>
-        <input readonly id="editRaumBarcode" #editRaumBarcode (change)="formValidate()" class="form-control formcontrol-edit-barcode" (paste)="$event.preventDefault()" placeholder="Barcode"
+        <input readonly id="editRaumBarcode" #editRaumBarcode (change)="formValidate()" class="form-control formcontrol-xedit-barcode" (paste)="$event.preventDefault()" placeholder="Barcode"
                name="code"
                [(ngModel)]="raumInput.code"
                #code="ngModel"

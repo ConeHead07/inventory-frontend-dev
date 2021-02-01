@@ -15,7 +15,7 @@ export class GesamtListRestComponent implements OnInit {
   gebaeudeDaten?: DBDIGebaeude;
   raeumeListDone?: RaumStatusProgress[];
 
-  @Output() raumSelected = new EventEmitter<number>();
+  @Output() raumSelected = new EventEmitter<string>();
 
   faSignOutAlt = faSignOutAlt;
 
@@ -33,8 +33,8 @@ export class GesamtListRestComponent implements OnInit {
     this.loadGebaeudeStat();
   }
 
-  onSelectRaum(rid) {
-    this.raumSelected.emit( rid );
+  onSelectRaum(ruuid: string) {
+    this.raumSelected.emit( ruuid );
     this.activeModal.close();
   }
 

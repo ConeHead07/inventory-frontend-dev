@@ -12,13 +12,12 @@ interface Artikel extends DBDIArtikel {
   name: string;
 }
 
-interface State {id: number; name: string; }
+interface State {uuid: string; name: string; }
 
 const states: State[] = [];
 
 export interface ArtikelOption {
-  id: number;
-  mcid: number;
+  uuid: string;
   mcuuid: string;
   name: string;
 }
@@ -135,8 +134,7 @@ export class SelectSearchArtikelComponent implements OnInit, AfterViewInit {
             }
 
             const option: ArtikelOption = {
-              id: artikel.mcid,
-              mcid: artikel.mcid,
+              uuid: artikel.mcuuid,
               mcuuid: artikel.mcuuid,
               name: nameParts.join(' :: ')
             };

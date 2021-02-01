@@ -29,8 +29,8 @@ interface LastInventoryDetails {
   Titel: string;
   Gebaeude: string;
   Mandant: string;
-  routeParams: number[];
-  rid?: number;
+  routeParams: [number, number, string?];
+  ruuid?: string;
   Etage?: string;
   Raum?: string;
   Raumbezeichnung?: string;
@@ -201,17 +201,16 @@ export class SelectInventoryComponent implements OnInit, OnDestroy {
         Mandant: mandant.Mandant,
         Gebaeude: geb.Gebaeude,
         routeParams: [inv.mid, geb.gid],
-        rid: 0,
         Etage: null,
         Raum: null,
         Raumbezeichnung: null
       };
       if (rm) {
-        this.lastInventoryDetails.rid = rm.rid;
+        this.lastInventoryDetails.ruuid = rm.uuid;
         this.lastInventoryDetails.Etage = rm.Etage;
         this.lastInventoryDetails.Raum = rm.Raum;
         this.lastInventoryDetails.Raumbezeichnung = rm.Raumbezeichnung;
-        this.lastInventoryDetails.routeParams.push( rm.rid );
+        this.lastInventoryDetails.routeParams.push( rm.uuid );
       }
     }
   }
@@ -222,10 +221,10 @@ export class SelectInventoryComponent implements OnInit, OnDestroy {
     }
   }
 
-  private gotoFormInventory(mid: number, gid: number, rid?: number): void {
+  private gotoFormInventory(mid: number, gid: number, ruuid?: string): void {
     const routeData = [ '/form-inventory', mid, gid ];
-    if (!isNaN(rid) && rid > 0) {
-      routeData.push(rid);
+    if (ruuid && ruuid.length > 0) {
+      routeData.push(ruuid);
     }
     this.router.navigate( routeData );
   }
@@ -267,7 +266,7 @@ export class SelectInventoryComponent implements OnInit, OnDestroy {
     const lastMid = this.baseData.getCurrentMid() || 0;
     const lastGid = this.baseData.getCurrentGid() || 0;
     const lastJobid = this.baseData.getCurrentJobid();
-    const lastRid = this.baseData.getCurrentRid();
+    const lastRuuid = this.baseData.getCurrentRuuid();
 
     return await this.dataService.getUserAssignedInventories( uid )
       .then( (result: DBDIInventuren[]) => {

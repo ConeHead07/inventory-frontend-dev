@@ -52,7 +52,7 @@ export class BarcodeService {
   async indexLookup(barcode: string, jobid: number): Promise<BarcodeLookupSimpleResult> {
     barcode = this.bcTrimZero(barcode);
     const found = await this.lkup.get( { code: barcode, for_jobid: jobid } );
-    console.log('#47 barcode.service.ts indexLookup(', { barcode, jobid}, ')', { found });
+    console.log('BarcodeService #47 indexLookup(', { barcode, jobid}, ')', { found });
 
     const result: BarcodeLookupSimpleResult = {
       barcode,
@@ -62,9 +62,12 @@ export class BarcodeService {
       data: null
     };
 
-    if (found) {
-      const searchKey = found.uuid ? { uuid: found.uuid } : found.id;
+    if (found && found.uuid) {
+      const searchKey = { uuid: found.uuid };
       const item = await this.db.table( found.table ).get( searchKey );
+      console.log('BarcodeService #68 indexLookup item = this.db.table(', found.table, ').get(', searchKey, ')',
+        { item });
+
       if (item) {
         result.success = true;
         result.data = item;
@@ -95,6 +98,7 @@ export class BarcodeService {
         }
       }
     }
+    console.log('BarcodeService #99 indexLookup(', { result, barcode, jobid}, ')', { found });
 
     return result;
   }
@@ -123,7 +127,7 @@ export class BarcodeService {
       result.lookupResultTable = LookupResultTable.Raeume;
       result.success = true;
       result.foundRef = {
-        code: barcode, key: 'rid', id: (result.data as DBDIRaeume).rid,
+        code: barcode, key: 'uuid', id: (result.data as DBDIRaeume).uuid,
         for_jobid: jobid, table: 'raeume', updateHelper: 0, uuid: result.data.uuid};
       return result;
     }
@@ -133,7 +137,7 @@ export class BarcodeService {
       result.lookupResultTable = LookupResultTable.ObjektKatalogMandant;
       result.success = true;
       result.foundRef = {
-        code: barcode, key: 'mcid', id: (result.data as DBDIObjektKatalogMandant).mcid,
+        code: barcode, key: 'uuid', id: (result.data as DBDIObjektKatalogMandant).uuid,
         for_jobid: jobid, table: 'objektKatalogMandant', updateHelper: 0, uuid: result.data.uuid};
       return result;
     }
@@ -161,31 +165,28 @@ export class BarcodeService {
     if ( matchesObjektbuchArtikel ) {
       const [, , sMcid ] = matchesObjektbuchArtikel;
       foundTable = 'objektKatalogMandant';
-      foundTableKey = 'mcid';
-      foundTableId = parseInt(sMcid, 10);
+      foundTableKey = 'uuid';
     } else if ( matchesObjektbuchRaum) {
       const [, , sRid ] = matchesObjektbuchRaum;
       foundTable = 'raeume';
-      foundTableKey = 'rid';
-      foundTableId = parseInt(sRid, 10);
+      foundTableKey = 'uuid';
     }
 
-    if (foundTable && foundTableId) {
-      result.data = await this.db.table(foundTable).get(foundTableId);
-      let matchJobId = true;
-      if (!result.data) {
-        matchJobId = false;
-      } else if ('for_jobid' in result.data && result.data.for_jobid !== jobid) {
-        matchJobId = false;
-      } else if ('jobid' in result.data && result.data.jobid !== jobid) {
-        matchJobId = false;
-      }
-      if (result.data && matchJobId) {
+    const objBookLkUp = await this.db.objektbuchBarcodesLookup.where({
+      code: barcode,
+      for_jobid: jobid,
+      table: foundTable
+    }).first();
+
+    if (foundTable && objBookLkUp) {
+      result.data = await this.db.table(foundTable).where({uuid: objBookLkUp.uuid }).first();
+
+      if (result.data) {
         result.foundRef = {
           code: barcode,
           table: foundTable,
           key: foundTableKey,
-          id: foundTableId,
+          id: result.data.uuid,
           uuid: result.data.uuid || null
         };
         result.success = true;
@@ -242,17 +243,28 @@ export class BarcodeService {
         break;
 
       case LookupResultTable.Inventar:
-        console.log(`#171 fullLookup for ${barcode} fetch artikelRef/global/image/raum Data for ${lookupResultTableText}`);
-        simpleResult.artikelRef = await this.db.objektKatalogMandant.get( simpleResult.inventar.mcid );
+        console.log(`#245 fullLookup for ${barcode} fetch artikelRef/global/image/raum Data for ${lookupResultTableText}`,
+          { mcuuid: simpleResult.inventar.mcuuid }
+          );
+
+        simpleResult.artikelRef = await this.db.objektKatalogMandant.get( { uuid: simpleResult.inventar.mcuuid });
         if (simpleResult.artikelRef) {
+          console.log('#252 ', { gcuuid: simpleResult.artikelRef.gcuuid });
           simpleResult.artikelData = await this.db.objektKatalogGlobal.get({ uuid: simpleResult.artikelRef.gcuuid });
-          simpleResult.image = await this.db.images.get({gcuuid: simpleResult.artikelRef.gcuuid });
+          console.log('#254 ');
+          simpleResult.image = await this.db.images.filter((img) => {
+            return ('mcuuid' in img) && (img.mcuuid === simpleResult.artikelRef.uuid);
+          }).first();
+          if (!simpleResult.image) {
+            simpleResult.image = await this.db.images.where({gcuuid: simpleResult.artikelRef.gcuuid }).first();
+          }
           if (simpleResult.image) {
             simpleResult.image.data_url = null;
             simpleResult.image.data_binary = null;
           }
         }
-        simpleResult.raum = await this.db.raeume.get( simpleResult.inventar.rid );
+        console.log('#261 ');
+        simpleResult.raum = await this.db.raeume.get( { uuid: simpleResult.inventar.ruuid });
         break;
 
       default:
@@ -275,7 +287,7 @@ export class BarcodeService {
     });
   }
 
-  async rebuildTable<I extends DBDITableWithBarcode>(table: Dexie.Table<I, number>): Promise<boolean> {
+  async rebuildTable<I extends DBDITableWithBarcode>(table: Dexie.Table<I, string|number>): Promise<boolean> {
     if (this.rebuildProcesses.find( p => p.table === table.name) ) {
       return false;
     }
@@ -317,7 +329,7 @@ export class BarcodeService {
     });
   }
 
-  async rebuildTableByJobid<I extends DBDITableWithBarcode>(table: Dexie.Table<I, number>, jobid: number): Promise<boolean> {
+  async rebuildTableByJobid<I extends DBDITableWithBarcode>(table: Dexie.Table<I, string|number>, jobid: number): Promise<boolean> {
     if (this.rebuildProcesses.find( p => (p.jobid === 0 || p.jobid === jobid) && p.table === table.name) ) {
       console.error('Abort barcode rebuild, it is already running');
       return false;
@@ -391,7 +403,7 @@ export class BarcodeService {
     });
   }
 
-  async rebuildTableOnRunningSystemByJobid<I extends DBDITableWithBarcode>(table: Dexie.Table<I, number>, jobid: number) {
+  async rebuildTableOnRunningSystemByJobid<I extends DBDITableWithBarcode>(table: Dexie.Table<I, string|number>, jobid: number) {
     if (this.rebuildProcesses.find( p => (p.jobid === 0 || p.jobid === jobid) && p.table === table.name) ) {
       return false;
     }
@@ -449,7 +461,7 @@ export class BarcodeService {
     });
   }
 
-  async rebuildTableOnRunningSystem<I extends DBDITableWithBarcode>(table: Dexie.Table<I, number>): Promise<boolean> {
+  async rebuildTableOnRunningSystem<I extends DBDITableWithBarcode>(table: Dexie.Table<I, string|number>): Promise<boolean> {
     if (this.rebuildProcesses.find( p => p.table === table.name)) {
       return false;
     }
@@ -488,7 +500,7 @@ export class BarcodeService {
   }
 
   async addBarcode(item: DBDIBarcodeLookup, log: boolean = false): Promise<string> {
-    return this.db.barcodeLookup.put({...item, ...{log}}).then( (key) => key[0]);
+    return this.db.barcodeLookup.add({...item, ...{log}}).then( (key) => key[0]);
   }
 
   addError( err: any) {
