@@ -117,7 +117,7 @@ export class BarcodeService {
       result.lookupResultTable = LookupResultTable.Inventar;
       result.success = true;
       result.foundRef = {
-        code: barcode, key: 'ivid', id: (result.data as DBDIInventar).ivid,
+        code: barcode, key: 'uuid', id: (result.data as DBDIInventar).uuid,
         for_jobid: jobid, table: 'inventar', updateHelper: 0, uuid: result.inventar.uuid};
       return result;
     }

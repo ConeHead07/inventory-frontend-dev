@@ -245,8 +245,8 @@ export class ScannerComponent implements OnInit {
     };
     const lastResult = this.scanResultCurrent;
 
-    if (this.scannedBarcodeInfoImg && this.scannedBarcodeInfoImg.gcuuid) {
-      this.loadImageByGcuuid(this.scannedBarcodeInfoImg.gcuuid).then( img => {
+    if (this.scannedBarcodeInfoImg && this.scannedBarcodeInfoImg.mcuuid) {
+      this.loadImageByMcuuid(this.scannedBarcodeInfoImg.mcuuid).then(img => {
         if (this.scanResultCurrent === lastResult) {
           this.scanResultCurrent.image.data_url = img.data_url;
         } else {
@@ -353,10 +353,10 @@ export class ScannerComponent implements OnInit {
     }
   }
 
-  async loadImageByGcuuid(gcuuid: string): Promise<DBDIImages|null> {
-    console.log('called loadImageByGcuuid', gcuuid);
-    if (gcuuid) {
-      return this.imageService.getImage(gcuuid)
+  async loadImageByMcuuid(mcuuid: string): Promise<DBDIImages|null> {
+    console.log('called loadImageByGcuuid', mcuuid);
+    if (mcuuid) {
+      return this.imageService.getImageByMcuuid(mcuuid)
         .then( image => {
           return image;
         })

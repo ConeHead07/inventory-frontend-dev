@@ -22,7 +22,6 @@ import { ProgressbarComponent } from './inventory/components/progressbar/progres
 import { AuthInterceptorService } from './auth/auth-interceptor.service';
 import { SelectCreateRaumComponent } from './invent-form/modals/select-create-raum/select-create-raum.component';
 import { SelectCreateArtikelComponent } from './invent-form/modals/select-create-artikel/select-create-artikel.component';
-import { CreateArtikelImageWebcamComponent } from './invent-form/modals/create-artikel-image-webcam/create-artikel-image.component';
 import { CreateArtikelImageComponent } from './invent-form/modals/create-artikel-image/create-artikel-image.component';
 import { ShowArtikelImageComponent } from './invent-form/modals/show-artikel-image/show-artikel-image.component';
 import { SelectSearchRaumComponent } from './invent-form/modals/select-search-raum/select-search-raum.component';
@@ -83,7 +82,6 @@ persist();
     SelectCreateRaumComponent,
     SelectCreateArtikelComponent,
     CreateArtikelImageComponent,
-    CreateArtikelImageWebcamComponent,
     ShowArtikelImageComponent,
     ScannerComponent,
     ScannerinputDirective,
@@ -127,7 +125,6 @@ persist();
   ],
   entryComponents: [
     CreateArtikelImageComponent,
-    CreateArtikelImageWebcamComponent,
     ShowArtikelImageComponent,
     ScannerComponent,
     SelectCreateArtikelComponent,

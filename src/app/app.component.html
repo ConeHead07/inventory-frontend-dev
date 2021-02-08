@@ -8,6 +8,7 @@
   <app-status-check></app-status-check>
   <button *ngIf="!heartBeatState" (click)="setHeartBeatState(true)">Enable HeartBeat Check</button>
   <button *ngIf="heartBeatState" (click)="setHeartBeatState(false)">Disable HeartBeat Check</button>
+  <button *ngIf="deferredInstallPrompt" (click)="installApp()">Install app</button>
 </div>
 <div #addScripts></div>
 

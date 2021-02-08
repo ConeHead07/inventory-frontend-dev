@@ -829,7 +829,7 @@ export class DBSyncClientService implements OnDestroy {
               itm.mods.mcuuid = artikelRef.uuid;
               console.log('DBSyncClient Found Inventar-Update #875 added mcuuid-Field', {...itm});
             } else {
-              console.error('DBSyncClient Found Inventar-Update #875 but don t found ArtikelRefmcuuid-Field', {...itm});
+              console.error('DBSyncClient Found Inventar-Update #875 but don t found ArtikelRef.mcuuid-Field', {...itm});
             }
             delete itm.mods.mcid;
           }

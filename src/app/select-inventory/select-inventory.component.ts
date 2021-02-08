@@ -1,5 +1,5 @@
 import {Component, OnDestroy, OnInit, ViewChild} from '@angular/core';
-import { DataService   } from '../inventory/service/data.service';
+import {DataService, TableLoadingStatus, TablesLoadingStatus} from '../inventory/service/data.service';
 import {EventService} from '../event.service';
 import {NgForm} from '@angular/forms';
 import {ActivatedRoute, Router} from '@angular/router';
@@ -85,11 +85,16 @@ export class SelectInventoryComponent implements OnInit, OnDestroy {
   subscriptionMetaMsg: Subscription;
   subscriptionMetaErr: Subscription;
   subscriptionMetaData: Subscription;
+  subscriptionLoadingStatus: Subscription;
   listMetaData: LoadingMetaData[] = [];
   listMetaMsg: {type: string, message: string}[] = [];
   lastMetaErr = '';
   lastMetaMsg = '';
   showListmetaMsg = false;
+
+  tablesLoadingStatus: TableLoadingStatus[] = [];
+  tablesLoadingStarted = false;
+  tablesLoadingDetailsIsExpanded = false;
 
   constructor(
     private dataService: DataService,
@@ -121,6 +126,7 @@ export class SelectInventoryComponent implements OnInit, OnDestroy {
     this.lastInventory = this.baseData.getCurrentInventur();
     this.lastBuilding = this.baseData.getCurrentGebaeude();
     this.lastRaum = this.baseData.getCurrentRaum();
+    this.tablesLoadingStarted = Object.keys(this.tablesLoadingStatus).length > 0;
 
     this.routingSubscription = this.route.params.subscribe(params => {
       console.log({params});
@@ -128,6 +134,27 @@ export class SelectInventoryComponent implements OnInit, OnDestroy {
 
     this.hasConnection = this.connection.hasServerAccess;
     this.hasServerConnection = this.connection.hasServerAccess;
+
+    this.subscriptionLoadingStatus = this.dataService.loadingDataChanged
+      .subscribe( (stat: TablesLoadingStatus) => {
+        this.tablesLoadingStarted = true;
+        for (const tbl in stat) {
+          if (!stat.hasOwnProperty(tbl)) {
+            continue;
+          }
+          if (!this.tablesLoadingStatus.find( (tblStat) => tblStat.table === tbl)) {
+            this.tablesLoadingStatus.push(stat[tbl]);
+            continue;
+          }
+          const tblIdx = this.tablesLoadingStatus.findIndex( (tblStat) => tblStat.table === tbl);
+
+          for (const statKey in stat[tbl]) {
+            if ( stat[tbl].hasOwnProperty(statKey) && stat[tbl][statKey] !== this.tablesLoadingStatus[tblIdx][statKey]) {
+              this.tablesLoadingStatus[tblIdx][statKey] = stat[tbl][statKey];
+            }
+          }
+        }
+    });
 
     this.connectionSubscription = this.connection.monitor().subscribe( (conn: ConnectionState) => {
       this.hasConnection = conn.hasNetworkConnection;
@@ -138,7 +165,7 @@ export class SelectInventoryComponent implements OnInit, OnDestroy {
       }
     });
 
-    this.subscriptionMetaData = this.dbsyncLogService.loadingMetaData.subscribe( (data) => {
+    this.subscriptionMetaData = this.dbsyncLogService.loadingMetaData.subscribe( (data: LoadingMetaData) => {
       if (data.table) {
         const existing = this.listMetaData.find((item) => item.table === data.table);
         if (existing) {
@@ -153,7 +180,7 @@ export class SelectInventoryComponent implements OnInit, OnDestroy {
       }
     });
 
-    this.subscriptionMetaMsg = this.dbsyncLogService.loadingMetaMessage.subscribe( (data) => {
+    this.subscriptionMetaMsg = this.dbsyncLogService.loadingMetaMessage.subscribe( (data: LoadingMetaMessage) => {
       this.lastMetaMsg = data.message;
       this.listMetaMsg.push({
         type: 'success',

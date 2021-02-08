@@ -487,8 +487,8 @@ export class EditInventarComponent implements OnInit {
     this.formError = '';
     console.log('save inventar');
     if (await this.formValidate()) {
-      const ivid = this.uuid;
-      const result = await this.inventarService.updateByUuid(ivid, this.inventarInput);
+      const uuid = this.uuid;
+      const result = await this.inventarService.updateByUuid(uuid, this.inventarInput);
       if (result.success) {
         this.inventarChanged.emit(result);
 

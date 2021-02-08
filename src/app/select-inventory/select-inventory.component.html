@@ -125,18 +125,39 @@
     <app-progressbar [title]="'Anzahl Elemente'" [value]="doneElements" [total]="totalElements"></app-progressbar>
   </div>
 
-  <div class="row">
+  <div class="form-group">
     <div class="col col-sm-6 offset-sm-6">
       <button [disabled]="!building || loading" class="btn btn-primary w-100">Starten</button>
-  </div>
-    <div *ngIf="status" class="alert-info">{{status}}</div>
+    </div>
+    <div>
+    <ngb-alert [type]="'info'" *ngIf="status" class="alert-info">{{status}}</ngb-alert>
+    </div>
   </div>
 
-  <div *ngIf="lastMetaMsg !== ''">
+  <div class="form-group" *ngIf="tablesLoadingStarted">
+    <button type="button" class="btn btn-outline-primary" (click)="tablesLoadingDetailsIsExpanded=!tablesLoadingDetailsIsExpanded"
+            [attr.aria-expanded]="!tablesLoadingDetailsIsExpanded"
+            aria-controls="collapseExample">
+      Details {{ tablesLoadingDetailsIsExpanded ? "ausblenden" : "einblenden"}}
+    </button>
+    <div class="card" *ngIf="tablesLoadingDetailsIsExpanded">
+      <div class="card-body">
+        <div *ngFor="let item of tablesLoadingStatus; let t = index">
+          {{ item.table }} {{ item.status }}
+          <p><ngb-progressbar type="success"
+                            [value]="item.progress"
+                            [striped]="!item.finished"
+                            [animated]="!item.finished">{{item.current}} von {{item.total}}</ngb-progressbar></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div *ngIf="lastMetaMsg !== '' && !tablesLoadingStarted">
     <ngb-alert [type]="'success'" (close)="lastMetaMsg = ''">{{ lastMetaMsg }}</ngb-alert>
   </div>
 
-  <div *ngIf="lastMetaErr !== ''">
+  <div *ngIf="lastMetaErr !== '' && !tablesLoadingStarted">
     <ngb-alert [type]="'danger'" (close)="lastMetaErr = ''">{{ lastMetaErr }}</ngb-alert>
   </div>
 

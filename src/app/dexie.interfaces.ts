@@ -119,9 +119,9 @@ export interface DBDIInventar extends DBDITableWithBarcode {
   iv_nr?: string;
   ErsteAufnahmeAm?: Date;
   LetzteAufnahmeAm?: Date;
-  created_at: Date;
+  created_at?: Date;
   modified_at?: Date;
-  created_uid: number;
+  created_uid?: number;
   modified_uid?: number;
   created_jobid?: number;
   modified_jobid?: number;
@@ -297,6 +297,7 @@ export interface DBDIImages {
   mcuuid?: string;
   mcid?: number;
   url?: string;
+  desc: string;
   data_binary?: string;
   data_url?: string;
   revnr: number;

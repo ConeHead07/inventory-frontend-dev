@@ -9,7 +9,17 @@ import {
   faUndo, faRedo, faTrashAlt, faTrashRestore, faTrashRestoreAlt,
   faCheck, faBan, faSave, faCamera,
   faArrowsAlt, faArrowsAltH, faArrowsAltV,
-  faDownload, faUpload, faSignOutAlt } from '@fortawesome/free-solid-svg-icons';
+  faDownload, faUpload, faSignOutAlt
+} from '@fortawesome/free-solid-svg-icons';
+import {DBDIImages} from '../../../dexie.interfaces';
+
+export interface ArtikelImageMetaData {
+  name?: string;
+  gcuuid?: string;
+  mcuuid?: string;
+  for_jobid?: number;
+  desc?: string;
+}
 
 const infoLogWorkaround = (...args: any[]): void => {
   args.unshift('[INFO]');
@@ -58,10 +68,7 @@ export class CreateArtikelImageComponent implements OnInit {
   faTrashRestore = faTrashRestore;
   faTrashRestoreAlt = faTrashRestoreAlt;
 
-
-
-  gcuuid = '';
-  name = '';
+  imgMetaData: ArtikelImageMetaData;
 
   allowDelete = false;
   inputFile?: File = null;
@@ -105,28 +112,8 @@ export class CreateArtikelImageComponent implements OnInit {
   constructor(public activeModal: NgbActiveModal, private imageService: ImagesService) {
   }
 
-  setGcuuid(gcuuid: string) {
-    console.log('called setGcuuid', this.gcuuid);
-    const $self = this;
-    this.gcuuid = gcuuid;
-    this.inputFile = null;
-    if (gcuuid) {
-      this.imageService
-        .getImage(gcuuid)
-          .then( image => {
-            this.imageUrl = image.data_url;
-            const b: any = this.converterDataURItoBlob(image.data_url);
-            b.lastModifiedDate = new Date();
-            b.name = image.name;
-            b.size = image.size;
-            b.type = image.type;
-            this.inputFile = b as unknown as File;
-            this.prepareInputImageFile();
-          })
-          .catch( err => {
-            console.error( err );
-          });
-    }
+  setMetaData(metaData: ArtikelImageMetaData) {
+    this.imgMetaData = metaData;
   }
 
   openInputUploadFile() {
@@ -288,10 +275,6 @@ export class CreateArtikelImageComponent implements OnInit {
       console.log('read ' + ev.loaded + ' of ' + ev.total);
     };
     rd.readAsDataURL(this.inputFile);
-    // const img = new Image();
-    // img.src = null;
-    // if (this.inputFile.size) {
-    // }
   }
 
   onCropperReady(data) {
@@ -392,14 +375,17 @@ export class CreateArtikelImageComponent implements OnInit {
     console.log('save this.angularCropper:', this.angularCropper);
     this.angularCropper.cropper.disable();
     const cropData = this.angularCropper.cropper.getImageData();
-    this.inputImgSavedData = this.angularCropper.cropper.getCroppedCanvas().toDataURL('image/jpeg');
-    return this.imageService.putImage({
-      name: this.name,
+    this.inputImgSavedData = this.angularCropper.cropper.getCroppedCanvas().toDataURL('image/jpeg', 0.8);
+    return this.imageService.putArtikelImage({
+      name: this.imgMetaData.name,
+      desc: this.imgMetaData.desc,
+      for_jobid: this.imgMetaData.for_jobid,
+      mcuuid: this.imgMetaData.mcuuid,
+      gcuuid: this.imgMetaData.gcuuid,
       type: 'image/jpeg',
       size: this.inputImgSavedData.toString().length,
       width: cropData.width,
       height: cropData.height,
-      gcuuid: this.gcuuid,
       data_url: this.inputImgSavedData
     }).then( () => {
       this.activeModal.close();

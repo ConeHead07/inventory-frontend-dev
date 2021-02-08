@@ -39,6 +39,20 @@ export interface LoadApiDataResult {
   debug?: any;
 }
 
+export interface TableLoadingStatus {
+  table: string;
+  status: string;
+  total: number;
+  current: number;
+  progress: number;
+  startDate: Date;
+  finished: Date;
+}
+
+export interface TablesLoadingStatus {
+  [key: string]: TableLoadingStatus;
+}
+
 export interface ArtikelRefAndData {
   artikelRef: DBDIObjektKatalogMandant;
   artikelData: DBDIObjektKatalogGlobal;
@@ -164,6 +178,7 @@ export class DataService implements OnDestroy {
   currentState: ConnectionState;
   lastLoadFailed = false;
   lastFailed;
+  @Output() loadingDataChanged = new EventEmitter<TablesLoadingStatus>();
   @Output() clientSyncAmountChanged = new EventEmitter<number>();
   private subscriptionClientLogsChanged: Subscription;
 
@@ -401,13 +416,45 @@ export class DataService implements OnDestroy {
       hersteller: 'pending',
       images: 'pending',
       inventar: 'pending',
-      objektkatalogglobal: 'pending',
-      objektkatalogmandant: 'pending',
+      objektKatalogGlobal: 'pending',
+      objektKatalogMandant: 'pending',
+      objektKatalogImages: 'pending',
       objektbuchBarcodesLookup: 'pending'
     };
 
-    const tblStatus = (table, status) => {
-      tables[ table ] = status;
+    const tablesLoadingStatus: TablesLoadingStatus = {};
+    for (const t in tables) {
+      if (!tables.hasOwnProperty(t)) {
+        continue;
+      }
+      tablesLoadingStatus[t] = {
+        table: t,
+        status: 'pending',
+        total: -1,
+        current: -1,
+        progress: 0,
+        startDate: null,
+        finished: null
+      };
+    }
+
+    const tblStatus = (table, statKey: string|object, value?: string|number|Date) => {
+      console.log('#441 tblStatus', { table, statKey, value, tables, tablesLoadingStatus });
+      if (typeof statKey === 'string' && typeof value !== 'undefined') {
+        tablesLoadingStatus[table][statKey] = value;
+        tables[ table ] = statKey + ' ' + value;
+      } else if (typeof statKey === 'string') {
+        tablesLoadingStatus[table].status = statKey;
+        tables[ table ] = statKey;
+      } else if (typeof statKey === 'object') {
+        for (const k in statKey) {
+          if (statKey.hasOwnProperty(k)) {
+            tablesLoadingStatus[table][k] = statKey[k];
+            tables[ table ] = k + ' ' + statKey[k];
+          }
+        }
+      }
+      this.loadingDataChanged.emit(tablesLoadingStatus);
       console.log( tables );
     };
 
@@ -595,9 +642,6 @@ export class DataService implements OnDestroy {
     const syncLogData = this.dbSyncLogService.log.bind(this.dbSyncLogService);
 
     console.log('#425  data.service loadTableDataByUrl ', table);
-    if (cbTblStatus) {
-      cbTblStatus(table, 'downloading');
-    }
     const jobid = options.jobid;
     const reset = options.reset || false;
     const varLastRevisionId = `${table}-${jobid}-revision-id`;
@@ -639,18 +683,20 @@ export class DataService implements OnDestroy {
     while (nextUrl) {
       const url = nextUrl;
 
+      if (cbTblStatus) {
+        cbTblStatus(table, {
+          status: 'downloading Part ' + (numChunks + 1),
+          startDate: new Date()
+        });
+      }
+
       console.log({ function: 'loadTableDataByUrl', table, url, cbTblStatus, options });
       await this.api.get<any>( url).toPromise()
-        .then( (data: ApiCollectionDataResponse<T>) => {
+        .then( async (data: ApiCollectionDataResponse<T>) => {
 
           nextUrl = ('nextUrl' in data) ? data.nextUrl : '';
 
           console.log('#452 data.service: Retrieved Data ', table, ' for processing!');
-
-          if (cbTblStatus) {
-            cbTblStatus(table, 'process import ' + data.rows.length);
-            cbTblStatus(table, 'total: ' + data.rows.length);
-          }
 
           numChunks++;
           const numRows = data.rows.length;
@@ -658,6 +704,13 @@ export class DataService implements OnDestroy {
             total = data.total;
           } else {
             total = numRows;
+          }
+
+          if (cbTblStatus) {
+            cbTblStatus(table, {
+              status: 'process import',
+              total
+            });
           }
           revisionId = data.revisionId || 0;
           this.settingsService.set(varLastLoadSuccess, lastLoadAttemptDate);
@@ -668,19 +721,21 @@ export class DataService implements OnDestroy {
             console.error('#468 data.service loadTableDataByUrl Invalid Data-Structure from ', { url, data});
           }
 
-          const asyncJobs: Promise<any>[] = data.rows.map((item: T, i) => {
-            if (((i + 1) % stepSize === 0 || (i + 1) === total) && cbTblStatus) {
-              cbTblStatus(table, i + 1);
-            }
+          return await Promise.all(data.rows.map(async (item: T, i) => {
             return this.dexie.table(table).put({ ...item, ...{log: false}}).then(() => {
+              if (((i + 1) % stepSize === 0 || (i + 1) === total) && cbTblStatus) {
+                cbTblStatus(table, {
+                  current: inserts + 1,
+                  progress: ((inserts + 1) * 100 / total).toFixed(1)
+                });
+              }
               inserts += 1;
               if (inserts % 100 === 0) {
                 syncLogData( logData(inserts) );
               }
               return true;
             });
-          });
-          return asyncJobs;
+          }));
         });
     }
 
@@ -691,7 +746,10 @@ export class DataService implements OnDestroy {
     syncLogMsg('Finished Table ' + table);
 
     if (cbTblStatus) {
-      cbTblStatus(table, 'finished');
+      cbTblStatus(table, {
+        status: 'finished',
+        finished: new Date()
+      });
     }
 
     console.log( '#543 data.service loadTableDataByUrl Finished Importprocess Data ', table, ' inserts', inserts );

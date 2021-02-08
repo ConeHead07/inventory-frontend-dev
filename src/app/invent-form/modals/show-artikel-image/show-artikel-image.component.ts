@@ -31,7 +31,7 @@ export class ShowArtikelImageComponent implements OnInit {
   @ViewChild('angularCropper', { static: false })
   public angularCropper: CropperComponent;
 
-  gcuuid?: string = null;
+  mcuuid?: string = null;
   inputFile?: File = null;
   previewEnable = false;
   imageUrl = null;
@@ -65,16 +65,16 @@ export class ShowArtikelImageComponent implements OnInit {
     console.log('called ShowArtikelImageComponent.ngOnInit');
   }
 
-  setGcuuid(gcuuid: string) {
-    console.log('called setGcuuid', this.gcuuid);
-    this.gcuuid = gcuuid;
-    this.loadImageByGcuuid( this.gcuuid );
+  setMcuuid(mcuuid: string) {
+    console.log('called setMcuuid', this.mcuuid);
+    this.mcuuid = mcuuid;
+    this.loadImageByMcuuid( this.mcuuid );
   }
 
-  async loadImageByGcuuid(gcuuid: string) {
-    console.log('called loadImageByGcuuid', gcuuid);
-    if (gcuuid) {
-      this.imageService.getImage(gcuuid)
+  async loadImageByMcuuid(mcuuid: string) {
+    console.log('called loadImageByGcuuid', mcuuid);
+    if (mcuuid) {
+      this.imageService.getImageByMcuuid(mcuuid)
         .then( image => {
           this.imageUrl = image.data_url;
         })

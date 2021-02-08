@@ -153,9 +153,9 @@ export class InventarService {
       hersteller: null
     };
 
-    console.log('InventarService #155 getInventar(ivid: ', uuid , ')');
+    console.log('InventarService #155 getInventar(uuid: ', uuid , ')');
     result.inventar = await this.dexie.inventar.get(uuid);
-    console.log('InventarService #157 inventar.get(ivid: ', uuid , ')', { result });
+    console.log('InventarService #157 inventar.get(uuid: ', uuid , ')', { result });
 
     if (result.inventar) {
       console.log('InventarService #160 objektKatalogMandant.get(uuid: ', result.inventar.mcuuid , ')');
@@ -233,9 +233,63 @@ export class InventarService {
     });
   }
 
+  async updateArtikelRef(uuid: string, inventar: DBDIInventar, useJobid?: number): Promise<InventarEditResult> {
+    const jobid = useJobid || this.getJobiId();
+    const uid = this.getUserId();
+
+    /*
+    const inventar: DBDIInventar = {
+      mcid: this.formInventar.mcid,
+      mcuuid: this.formInventar.mcuuid,
+      ruuid: this.formInventar.ruuid,
+      code: this.formInventar.Barcode,
+      jobid,
+      created_at: new Date(),
+      created_uid: uid
+    };
+    */
+    const inventarEditResult: InventarEditResult = {
+      type: InventarChangeType.Update,
+      success: false,
+      message: '',
+      errorMsg: '',
+      errorCode: InventarEditErrorCode.NoError,
+      insertUUID: uuid
+    };
+
+    const item: DBDIInventar = {
+      mcid: inventar.mcid,
+      uuid,
+      mcuuid: inventar.mcuuid,
+      code: inventar.code,
+      jobid: inventar.jobid || jobid,
+      modified_at: inventar.modified_at || new Date(),
+      modified_uid: inventar.modified_uid || uid,
+      modified_jobid: inventar.modified_jobid || jobid
+    };
+    return this.dexie.inventar.update(uuid, item).then(
+      (n: number) => {
+        inventarEditResult.success = true;
+        inventarEditResult.message = 'Inventar wurde aktualisiert!';
+        return inventarEditResult;
+    },
+      (reason: any) => {
+        console.error('InventarService updateArtikelRef #277', {
+          uuid,
+          inventar,
+          updateData: item,
+          reason
+        });
+        inventarEditResult.errorCode = InventarEditErrorCode.InventarNotFound;
+        inventarEditResult.message = 'Fehler bei Aktualisierung der Inventardaten! (siehe console.error)';
+        inventarEditResult.errorMsg = JSON.stringify(reason);
+        return inventarEditResult;
+      });
+  }
+
   async updateByUuid(uuid: string, daten: InventarBasisDaten): Promise<InventarFoundResult> {
     // return this.getInventar(ivid);
-    console.log('#205 updateById', { ivid: uuid, daten });
+    console.log('#205 updateById', { uuid, daten });
 
     const updateData = daten;
     const jobid = this.getJobiId();
@@ -405,7 +459,7 @@ export class InventarService {
   }
 
   async updateBarcodeLookup(uuid: string, code: string, oldCode?: string) {
-    console.log('InventarService #410 called updateBarcodelookup(', { ivid: uuid, code }, ')');
+    console.log('InventarService #410 called updateBarcodelookup(', { uuid, code }, ')');
     let savedRaumDataCode = oldCode;
     const savedRaumData = await this.dexie.inventar.get(uuid);
     if (!oldCode) {
@@ -429,7 +483,7 @@ export class InventarService {
         this.dexie.barcodeLookup.put({
           code,
           for_jobid: jobid,
-          key: 'ivid',
+          key: 'uuid',
           table: 'inventar',
           updateHelper: 1,
           uuid: savedRaumData.uuid
@@ -516,7 +570,7 @@ export class InventarService {
           this.changed.emit({
             type: InventarChangeType.Update,
             table: inventar.name,
-            key: inv.ivid,
+            key: inv.uuid,
             uuid: inv.uuid,
             obj: { ...inv, ...changes },
             mods: changes

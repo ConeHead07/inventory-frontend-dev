@@ -1,4 +1,4 @@
-import {AfterViewInit, Component, ElementRef, OnInit, ViewChild} from '@angular/core';
+import {AfterViewInit, Component, ElementRef, HostListener, OnInit, ViewChild} from '@angular/core';
 
 import { ConnectionService } from './connection-service.service';
 import {SwPush, SwUpdate} from '@angular/service-worker';
@@ -16,6 +16,7 @@ export class AppComponent {
   readonly VAPID_PUBLIC_KEY = 'BG2ymYfILNZzi183knEsp5PkW8jaGhsMR0u1iAriOfRUjKrLuAQLE6oZf_TguLnBPDksMDE900zi_qnoqmjOE3Y';
 
   heartBeatState;
+  deferredInstallPrompt: any;
 
   constructor(private connectionService: ConnectionService,
               private toastr: ToastrService,
@@ -26,9 +27,12 @@ export class AppComponent {
     if (this.swUpdate.isEnabled) {
       this.setupUpdates();
     }
-    if (this.swPush.isEnabled) {
-      this.setupPush();
-    }
+  }
+
+  @HostListener('window:beforeinstallprompt', ['$event'])
+  onPrompt(event: Event) {
+    this.deferredInstallPrompt = event;
+    return false;
   }
 
   setHeartBeatState(state: boolean) {
@@ -82,16 +86,21 @@ export class AppComponent {
     this.swUpdate.checkForUpdate();
   }
 
-  setupPush() {
+  async setupPush() {
 
-    this.swPush.requestSubscription({
+    const pushSubscription = await this.swPush.requestSubscription({
       serverPublicKey: this.VAPID_PUBLIC_KEY
     })
-      .then(sub => {
+      .then( (sub: PushSubscription) => {
           console.log('Push Subscription', sub );
         },
-        err => {
+        (err: any) => {
           console.error('error registering for push', err);
         });
+    console.log({pushSubscription});
+  }
+
+  installApp() {
+    this.deferredInstallPrompt.prompt();
   }
 }

@@ -179,7 +179,7 @@
         </div>
       </div>
   </div>
-  <ngb-alert *ngIf="waitingForInventarData" type="danger">
+  <ngb-alert *ngIf="waitingForInventarData" type="danger" (close)="clearFormInventar()">
     Warte auf Artikelzuweisung für neuen Inventar-Barcode: {{ formInventar.Barcode }}
   </ngb-alert>
   <ngb-alert *ngIf="waitingForNewInventarBarcode" type="danger">
@@ -205,7 +205,7 @@
       </div>
       <input  id="elmArtTyp" type="text" [attr.value]="formInventar.Typ" class="form-control">
       <div class="input-group-append">
-        <button class="btn btn-outline-success" [disabled]="!formInventar.ivid" type="button" (click)="openEditInventar()">
+        <button class="btn btn-outline-success" [disabled]="!formInventar.uuid" type="button" (click)="openEditInventar()">
           <fa-icon [icon]="faEdit"></fa-icon>
         </button>
       </div>
