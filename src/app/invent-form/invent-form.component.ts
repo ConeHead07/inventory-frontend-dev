@@ -368,6 +368,10 @@ export class InventFormComponent implements OnInit, OnDestroy {
   clearFormInventar() {
     this.waitingForNewInventarBarcode = false;
     this.waitingForInventarData = false;
+
+    this.inventarData = null;
+    this.artikelUuiD = null;
+
     this.formInventar.uuid = '';
     this.formInventar.mcid = 0;
     this.formInventar.mcuuid = '';
@@ -997,7 +1001,6 @@ export class InventFormComponent implements OnInit, OnDestroy {
     if (this.waitingForNewInventarBarcode) {
       console.log('InventFormComponente #949 handleScanData');
       if (bcResult.lookupResultTable === LookupResultTable.None) {
-        this.clearFormInventar();
         this.formInventar.Barcode = bcResult.barcode;
         console.log('InventFormComponente #952 handleScanData');
         console.log('InventFormComponente #953 call this.saveNewInventar() from this.handleScanData');
@@ -1043,6 +1046,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
     switch (bcResult.lookupResultTable) {
       case LookupResultTable.None:
         console.log('InventFormComponente #990 handleScanData LookupResultTable.None');
+        this.clearFormInventar();
         this.formInventar.Barcode = bcResult.barcode;
         this.waitingForInventarData = true;
 
