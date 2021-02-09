@@ -85,7 +85,9 @@ export class EditRaumComponent implements OnInit {
   async formValidate(): Promise<boolean> {
     console.log('called formValidate');
     this.validationErrors.length = 0;
-    if (this.raumInput.code.trim().length > 0 && this.raumInput.code !== this.raumDaten.code) {
+    if (typeof this.raumInput.code === 'string' &&
+      this.raumInput.code.trim().length > 0 &&
+      this.raumInput.code !== this.raumDaten.code) {
       const codeExists = await this.raumService.codeExistsInInventur(
         this.raumDaten.for_jobid,
         this.raumDaten.uuid,

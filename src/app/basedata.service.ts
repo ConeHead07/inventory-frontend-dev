@@ -1,5 +1,5 @@
 import {EventEmitter, Injectable, Output} from '@angular/core';
-import {DBDIGebaeude, DBDIInventuren, DBDIJobLockStatus, DBDIRaeume} from './dexie.interfaces';
+import {DBDIGebaeude, DBDIInventuren, DBDIJobLockStatus, DBDIMandanten, DBDIRaeume} from './dexie.interfaces';
 import {User} from './auth/user.model';
 
 type stringCallback = () => string;
@@ -9,6 +9,7 @@ type stringCallback = () => string;
 export class BasedataService {
 
   @Output() userChanged = new EventEmitter<User>();
+  @Output() mandantChanged = new EventEmitter<DBDIMandanten>();
   @Output() inventurChanged = new EventEmitter<DBDIInventuren>();
   @Output() gebaeudeChanged = new EventEmitter<DBDIGebaeude>();
   @Output() raumChanged = new EventEmitter<DBDIRaeume>();
@@ -16,6 +17,7 @@ export class BasedataService {
   @Output() inventurStatusChanged = new EventEmitter<DBDIJobLockStatus>();
   @Output() apiBaseUrlChanged = new EventEmitter<string>();
 
+  private currentMandant: DBDIMandanten;
   private currentInventur: DBDIInventuren;
   private currentGebaeude: DBDIGebaeude;
   private currentRaum: DBDIRaeume;
@@ -26,6 +28,7 @@ export class BasedataService {
   private currentApiBaseUrl: string;
 
   constructor() {
+    this.currentMandant = JSON.parse( localStorage.getItem( 'currentMandant' ) );
     this.currentInventur = JSON.parse( localStorage.getItem( 'currentInventur' ) );
     this.currentUser = JSON.parse(localStorage.getItem('currentUser' ) );
     this.previousUser = JSON.parse(localStorage.getItem('previousUser' ) );
@@ -34,6 +37,12 @@ export class BasedataService {
     this.currentDevice = JSON.parse( localStorage.getItem( 'currentDevice' ) );
     this.currentInventurStatus = JSON.parse( localStorage.getItem( 'currentInventurStatus' ) );
     this.currentApiBaseUrl = JSON.parse( localStorage.getItem( 'currentApiBaseUrl' ) );
+  }
+
+  setCurrentMandant(mandant: DBDIMandanten) {
+    this.currentMandant = mandant;
+    localStorage.setItem('currentMandant', JSON.stringify( mandant ) );
+    this.mandantChanged.emit( this.currentMandant );
   }
 
   setCurrentInventur(inventur: DBDIInventuren) {
@@ -117,6 +126,10 @@ export class BasedataService {
     } catch (e) {
       return 0;
     }
+  }
+
+  getCurrentMandant(): DBDIMandanten {
+    return this.currentMandant;
   }
 
   getCurrentInventur(): DBDIInventuren {

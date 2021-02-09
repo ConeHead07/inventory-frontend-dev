@@ -5,7 +5,7 @@ import {DataService, InventarData} from '../inventory/service/data.service';
 import {
   DBDIArtikel,
   DBDIGebaeude,
-  DBDIInventar,
+  DBDIInventar, DBDIInventuren,
   DBDIJobLockStatus,
   DBDIMandanten,
   DBDIRaeume,
@@ -176,6 +176,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
   };
 
   public jobid: number;
+  public inventur: DBDIInventuren;
   public kunde?: DBDIMandanten;
   public gebaeude?: DBDIGebaeude;
   public raum?: DBDIRaeume;
@@ -308,6 +309,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
 
       this.dataService.getClient( this.clientID ).then( (clnt) => {
         this.kunde = clnt;
+        this.baseData.setCurrentMandant( this.kunde );
       });
 
       this.dataService.getBuilding( this.buildingID, this.clientID ).then( (bldg) => {
@@ -326,6 +328,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
       this.refreshInventoryProgress();
     });
     this.jobid = this.baseData.getCurrentJobid();
+    this.inventur = this.baseData.getCurrentInventur();
 
     this.variables.get('manualBarcodeInput', false).then( (status) => {
       this.manualBCInputEnabled = status;

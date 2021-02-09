@@ -427,8 +427,10 @@ export class SelectInventoryComponent implements OnInit, OnDestroy {
     }
 
     this.jobid = this.inventory.jobid;
+    this.baseData.setCurrentMandant(this.client);
     this.baseData.setCurrentInventur( this.inventory );
     this.baseData.setCurrentGebaeude( this.building );
+
     if (
       this.lastInventory && this.lastInventory.jobid === this.jobid
       && this.lastBuilding && this.lastBuilding.gid === this.building.gid

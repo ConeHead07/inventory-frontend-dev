@@ -166,7 +166,7 @@ export class RaumService {
     const hasUuid = ('uuid' in raum) && (typeof raum.uuid === 'string') && raum.uuid !== '';
     const updUuid = hasUuid && ('uuid' in raum)  ? raum.uuid : uuid;
 
-    if (savedRaumData.code !== raum.code) {
+    if (savedRaumData.code && savedRaumData.code !== raum.code) {
       const lkupKey = {
         code: savedRaumData.code,
         for_jobid: jobid
@@ -189,14 +189,17 @@ export class RaumService {
         updateHelper: 1,
         uuid: updUuid
       });
-      this.dexie.barcodeLookup.put({
-        code: raum.code,
-        for_jobid: jobid,
-        key: 'uuid',
-        table: 'raeume',
-        updateHelper: 1,
-        uuid: updUuid
-      });
+
+      if (raum.code) {
+        this.dexie.barcodeLookup.put({
+          code: raum.code,
+          for_jobid: jobid,
+          key: 'uuid',
+          table: 'raeume',
+          updateHelper: 1,
+          uuid: updUuid
+        });
+      }
     } else if (raum.code) {
       const bcItem = await this.dexie.barcodeLookup.get({code: raum.code, for_jobid: jobid});
       if (!bcItem) {

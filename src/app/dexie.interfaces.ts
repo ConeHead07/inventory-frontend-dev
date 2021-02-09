@@ -251,7 +251,7 @@ export interface DBDIObjektKatalogImages {
   Kategorie: string;
   created_at: Date;
   created_uid?: number;
-  created_jobid?: string;
+  created_jobid?: number;
   created_device_id?: number;
   modified_at?: Date;
   modified_uid?: number;

@@ -100,6 +100,7 @@ export class ImagesService {
       Kategorie: data.Kategorie,
       created_at: new Date(),
       created_uid: uid,
+      created_jobid: jobid,
       created_device_id: devID
     });
     return uuid;

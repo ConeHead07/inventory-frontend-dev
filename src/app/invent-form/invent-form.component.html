@@ -14,6 +14,7 @@
     </ng-container>
   </div>
 </div>
+
 <div class="row no-gutters mb-1">
   <div class="form-group col-4">
     <label for="kunde" class="mb-0">Mandant</label>
@@ -49,9 +50,9 @@
 </div>
 
 <div class="row mt-4">
-  <label for="raumCode" class="col-8"><strong>Raumdaten</strong></label>
+  <label for="raumCode" class="col-6"><strong>Raumdaten</strong></label>
 
-  <div class="col-4 text-right">
+  <div class="col-6 text-right">
     <div #invDrop="ngbDropdown" ngbDropdown style="display: inline-block">
       <button [ngClass]="{
         'btn-outline-success': jobLockStatus === 2,
@@ -236,7 +237,13 @@
     Bitte wählen Sie einen Raum aus!
   </ngb-alert>
 </ng-template>
-<hr>
+
+<div id="formBottomDivider" class="row no-gutters mb-0 border-bottom">
+  <div id="inventurTitel" class="col">
+    {{ inventur.Titel }}
+  </div>
+</div>
+
 <div [hidden]="!manualBCInputEnabled">
   <h5>Barcode-Scanning Test</h5>
   <div class="row">
