@@ -1,6 +1,5 @@
 import {Component, OnDestroy, OnInit, ViewChild} from '@angular/core';
 import {DataService, TableLoadingStatus, TablesLoadingStatus} from '../inventory/service/data.service';
-import {EventService} from '../event.service';
 import {NgForm} from '@angular/forms';
 import {ActivatedRoute, Router} from '@angular/router';
 import {DBDIGebaeude, DBDIInventuren, DBDIMandanten, DBDIRaeume} from '../dexie.interfaces';
@@ -98,7 +97,6 @@ export class SelectInventoryComponent implements OnInit, OnDestroy {
 
   constructor(
     private dataService: DataService,
-    private eventService: EventService,
     private route: ActivatedRoute,
     private router: Router,
     private auth: AuthService,
