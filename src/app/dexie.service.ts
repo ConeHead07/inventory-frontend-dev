@@ -212,6 +212,27 @@ export class DexieService extends Dexie {
       this.nextDbVersion += 1;
     }
 
+    if (1) {
+      const v8 = this.nextDbVersion;
+      this.version(v8).stores({
+        images:
+          '$$uuid,id,name,type,size,width,height,gcuuid,mcuuid,url,for_jobid,created_jobid,modified_jobid',
+      }).upgrade((trans) => {
+        console.log('Starte Upgrade for DB-Version ' + v8);
+        return trans;
+      });
+      this.nextDbVersion += 1;
+    }
+
+    if (1) {
+      const v9 = this.nextDbVersion;
+      this.version(v9).stores({
+        images:
+          '$$uuid,id,name,type,size,width,height,gcuuid,mcuuid,url,for_jobid',
+      });
+      this.nextDbVersion += 1;
+    }
+
 
     const validLogTables = [
       'hersteller',

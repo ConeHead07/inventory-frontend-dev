@@ -244,20 +244,20 @@ export class CreateArtikelImageComponent implements OnInit {
         const KB = 1024;
         console.log( 'this.prepareImgCanvas', this.prepareImgCanvas);
 
-        if (this.inputImgHeight > 2000 || this.inputImgWidth > 2000) {
+        if (this.inputImgHeight > 1000 || this.inputImgWidth > 1000) {
           const canv: HTMLCanvasElement = this.prepareImgCanvas.nativeElement;
           const ctx = canv.getContext('2d');
           const iRel = this.inputImgWidth / this.inputImgHeight;
-          canv.width = (iRel > 1) ? 2000 : (2000 * iRel);
-          canv.height = (iRel > 1) ? (2000 / iRel) : 2000;
+          canv.width = (iRel > 1) ? 1000 : (1000 * iRel);
+          canv.height = (iRel > 1) ? (1000 / iRel) : 1000;
           ctx.drawImage(img, 0, 0, this.inputImgWidth, this.inputImgHeight, 0, 0, canv.width, canv.height);
-          this.imageUrl = canv.toDataURL('image/jpeg', 0.7);
-        } else if (this.inputImgSize > 200 * KB) {
+          this.imageUrl = canv.toDataURL('image/jpeg', 0.6);
+        } else if (this.inputImgSize > 100 * KB) {
           // 1264270 => 1.235 KB
           const canv: HTMLCanvasElement = this.prepareImgCanvas.nativeElement;
           const ctx = canv.getContext('2d');
           const iRel = this.inputImgWidth / this.inputImgHeight;
-          canv.width = this.inputImgWidth
+          canv.width = this.inputImgWidth;
           canv.height = this.inputImgHeight;
           ctx.drawImage(img, 0, 0);
           this.imageUrl = canv.toDataURL('image/jpeg', 0.7);

@@ -114,7 +114,17 @@ export class ImagesService {
   }
 
   async getImageByMcuuid(mcuuid: string): Promise<DBDIImages> {
+    console.log('called ImageService.getImageByMcuuid:', mcuuid);
+    return this.dexie.images.filter( (img) => 'mcuuid' in img && img.mcuuid === mcuuid).first()
+      .then( img => img, err => null);
+
+    // Dexie hat den Index 'mcuuid' in Images nicht übernommen
     return this.dexie.images.where({ mcuuid }).first();
+  }
+
+  async getImageByGcuuid(gcuuid: string): Promise<DBDIImages> {
+    console.log('called ImageService.getImageByGcuuid:', gcuuid);
+    return this.dexie.images.where({ gcuuid }).first();
   }
 
   async imageExistsOfGcuuid(gcuuid: string): Promise<boolean> {

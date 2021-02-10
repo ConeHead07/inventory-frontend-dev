@@ -75,7 +75,7 @@ export class SelectInventoryComponent implements OnInit, OnDestroy {
   private routingSubscription: any;
 
   inventories: DBDIInventuren[];
-  private inventoriesSelectable: DBDIInventuren[];
+  inventoriesSelectable: DBDIInventuren[];
   lastInventory: DBDIInventuren;
   lastBuilding: DBDIGebaeude;
   lastRaum: DBDIRaeume;
@@ -415,6 +415,10 @@ export class SelectInventoryComponent implements OnInit, OnDestroy {
     this.buildings = await this.dataService.getBuildingList( this.client.mid );
     this.inventoriesSelectable = this.inventories.filter( (inv) => inv.mid === this.client.mid );
     console.log( 'assign selection buildings: ', this.buildings );
+    if (this.inventory && this.inventory.mid !== this.client.mid) {
+      this.inventory = null;
+      this.building = null;
+    }
     return true;
   }
 

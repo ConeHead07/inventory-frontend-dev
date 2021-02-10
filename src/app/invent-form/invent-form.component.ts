@@ -629,7 +629,13 @@ export class InventFormComponent implements OnInit, OnDestroy {
     const modalRef = this.modalService.open(CreateArtikelImageComponent);
     this.modalWatch(modalRef, 'CreateArtikelImage');
     modalRef.componentInstance.name = this.formInventar.Bezeichnung + '/' + this.formInventar.Typ;
-    modalRef.componentInstance.setMcuuid( this.formInventar.mcuuid );
+    modalRef.componentInstance.setMetaData({
+      mcuuid: this.formInventar.mcuuid,
+      gcuuid: this.formInventar.gcuuid,
+      for_jobid: this.jobid,
+      name: this.formInventar.Bezeichnung,
+      desc: this.formInventar.Bezeichnung
+    });
     modalRef.result.then( () => {
       this.reloadImageExistsStatus();
     });
@@ -639,7 +645,8 @@ export class InventFormComponent implements OnInit, OnDestroy {
     const modalRef = this.modalService.open(ShowArtikelImageComponent);
     this.modalWatch(modalRef, 'ShowArtikelImage');
     modalRef.componentInstance.name = 'World';
-    modalRef.componentInstance.setMcuuid( this.formInventar.mcuuid );
+    console.log('openShowArtikelImage #642 setMcuuid: ', this.formInventar.mcuuid);
+    modalRef.componentInstance.setMcuuid( this.formInventar.mcuuid, this.formInventar.gcuuid );
     modalRef.result.then( () => {
       this.reloadImageExistsStatus();
     });

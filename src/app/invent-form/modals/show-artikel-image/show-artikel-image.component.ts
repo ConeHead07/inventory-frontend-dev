@@ -32,6 +32,7 @@ export class ShowArtikelImageComponent implements OnInit {
   public angularCropper: CropperComponent;
 
   mcuuid?: string = null;
+  gcuuid?: string = null;
   inputFile?: File = null;
   previewEnable = false;
   imageUrl = null;
@@ -65,23 +66,67 @@ export class ShowArtikelImageComponent implements OnInit {
     console.log('called ShowArtikelImageComponent.ngOnInit');
   }
 
-  setMcuuid(mcuuid: string) {
-    console.log('called setMcuuid', this.mcuuid);
+  setMcuuid(mcuuid: string, gcuuid: string = '') {
     this.mcuuid = mcuuid;
-    this.loadImageByMcuuid( this.mcuuid );
+    this.gcuuid = gcuuid;
+    console.log('called setMcuuid', this.mcuuid);
+    this.loadImageByMcuuid(this.mcuuid).then( mSuccess => {
+      if (!mSuccess && gcuuid) {
+        this.loadImageByGcuuid(this.gcuuid).then( gSuccess => {
+          if (!gSuccess) {
+            alert('Bild konnte leider nicht geladen werden!');
+          }
+        });
+      }
+    }, err => {
+      if (gcuuid) {
+        this.loadImageByGcuuid(this.gcuuid).then( gSuccess => {
+          if (!gSuccess) {
+            alert('Bild konnte leider nicht geladen werden!');
+          }
+        });
+      } else {
+        alert('Bild konnte leider nicht geladen werden!');
+      }
+    });
   }
 
-  async loadImageByMcuuid(mcuuid: string) {
+  async loadImageByMcuuid(mcuuid: string): Promise<boolean> {
     console.log('called loadImageByGcuuid', mcuuid);
     if (mcuuid) {
-      this.imageService.getImageByMcuuid(mcuuid)
+      return this.imageService.getImageByMcuuid(mcuuid)
         .then( image => {
-          this.imageUrl = image.data_url;
+          if (image) {
+            this.imageUrl = image.data_url;
+            return true;
+          }
+          return false;
         })
         .catch( err => {
           console.error( err );
+          return false;
         });
     }
+    return false;
+  }
+
+  async loadImageByGcuuid(gcuuid: string): Promise<boolean> {
+    console.log('called loadImageByGcuuid', gcuuid);
+    if (gcuuid) {
+      return this.imageService.getImageByGcuuid(gcuuid)
+        .then( image => {
+          if (image) {
+            this.imageUrl = image.data_url;
+            return true;
+          }
+          return false;
+        })
+        .catch( err => {
+          console.error( err );
+          return false;
+        });
+    }
+    return false;
   }
 
   zoomed(e) {

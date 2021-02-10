@@ -76,12 +76,12 @@
           <ng-container *ngIf="inventory && lastInventory && inventory.jobid === lastInventory.jobid"><span>{{ inventory.Titel }} (Zuletzt in Arbeit)</span></ng-container>
           <ng-container *ngIf="inventory && (!lastInventory || inventory.jobid !== lastInventory.jobid)"><span>{{ inventory.Titel }}</span></ng-container>
           <ng-container *ngIf="!inventory && statusLoadingUserInventories < 5"><span>Inventarisierungen werden geladen</span></ng-container>
-          <ng-container *ngIf="!inventory && statusLoadingUserInventories >= 5 && inventories && inventories.length > 0"><span>Bitte Inventur auswählen</span></ng-container>
-          <ng-container *ngIf="!inventory && statusLoadingUserInventories >= 5 && (!inventories || inventories.length === 0)"><span>Keine Auswahl vorhanden</span></ng-container>
+          <ng-container *ngIf="!inventory && statusLoadingUserInventories >= 5 && inventoriesSelectable && inventoriesSelectable.length > 0"><span>Bitte Inventur auswählen</span></ng-container>
+          <ng-container *ngIf="!inventory && statusLoadingUserInventories >= 5 && (!inventoriesSelectable || inventoriesSelectable.length === 0)"><span>Keine Auswahl vorhanden</span></ng-container>
         </button>
 
         <div ngbDropdownMenu aria-labelledby="dropInventory" class="border-secondary rounded-bottom">
-          <button ngbDropdownItem *ngFor="let _inventory of inventories; let i = index"
+          <button ngbDropdownItem *ngFor="let _inventory of inventoriesSelectable; let i = index"
                   (click)="$event.preventDefault(); $event.stopPropagation(); inventorySelectionChanged(_inventory.jobid)"
                   [attr.data-index]="_inventory.jobid"
                   [value]="_inventory.jobid">{{_inventory.Titel}}
