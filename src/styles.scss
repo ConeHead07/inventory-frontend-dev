@@ -3,9 +3,9 @@
 @import "~bootstrap/scss/bootstrap";
 
 div.c1 {
-    div.c1-2 {
-        color: rgb(117, 0, 128);
-    }
+  div.c1-2 {
+    color: rgb(117, 0, 128);
+  }
 }
 
 // regular style toast
@@ -106,4 +106,14 @@ div.c1 {
     opacity: .3;
     box-shadow: 0 0 0 0 rgba(51, 217, 178, 0);
   }
+}
+
+app-root {
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+}
+
+app-root > .app-content {
+  flex: 1;
 }

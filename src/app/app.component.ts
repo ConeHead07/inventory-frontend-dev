@@ -4,6 +4,7 @@ import { ConnectionService } from './shared/services/connection-service.service'
 import {SwPush, SwUpdate} from '@angular/service-worker';
 import {ToastrService} from 'ngx-toastr';
 import {environment} from '../environments/environment';
+import {NavigationEnd, Router} from '@angular/router';
 
 @Component({
   selector: 'app-root',
@@ -12,6 +13,8 @@ import {environment} from '../environments/environment';
 })
 export class AppComponent {
   title = 'frontend';
+  url = '';
+  isLoginPage = false;
   currentApplicationVersion = environment.appVersion;
   readonly VAPID_PUBLIC_KEY = 'BG2ymYfILNZzi183knEsp5PkW8jaGhsMR0u1iAriOfRUjKrLuAQLE6oZf_TguLnBPDksMDE900zi_qnoqmjOE3Y';
 
@@ -20,6 +23,7 @@ export class AppComponent {
 
   constructor(private connectionService: ConnectionService,
               private toastr: ToastrService,
+              private router: Router,
               private swUpdate: SwUpdate,
               private swPush: SwPush) {
     this.heartBeatState = this.connectionService.options.enableHeartbeat;
@@ -27,6 +31,15 @@ export class AppComponent {
     if (this.swUpdate.isEnabled) {
       this.setupUpdates();
     }
+
+    this.router.events.subscribe( event => {
+      if (event instanceof NavigationEnd) {
+        console.log('router.event (NavigationEnd)', this.router.url, { event });
+        this.url = (event as NavigationEnd).url;
+        const rgxAuth = new RegExp('\/auth\\b');
+        this.isLoginPage = rgxAuth.test(this.url);
+      }
+    });
   }
 
   @HostListener('window:beforeinstallprompt', ['$event'])
