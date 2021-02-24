@@ -5,10 +5,14 @@
       <router-outlet></router-outlet>
     </div>
   </div>
-  <app-status-check></app-status-check>
-  <button *ngIf="!heartBeatState" (click)="setHeartBeatState(true)">Enable HeartBeat Check</button>
-  <button *ngIf="heartBeatState" (click)="setHeartBeatState(false)">Disable HeartBeat Check</button>
-  <button *ngIf="deferredInstallPrompt" (click)="installApp()">Install app</button>
 </div>
+<footer class="card small mt-2 app-footer">
+  <div class="card-footer text-center">
+    <app-status-check></app-status-check>
+    <button *ngIf="false && !heartBeatState" (click)="setHeartBeatState(true)">Enable HeartBeat Check</button>
+    <button *ngIf="false && heartBeatState" (click)="setHeartBeatState(false)">Disable HeartBeat Check</button>
+    <button *ngIf="deferredInstallPrompt" (click)="installApp()">Install app</button>
+  </div>
+</footer>
 <div #addScripts></div>
 

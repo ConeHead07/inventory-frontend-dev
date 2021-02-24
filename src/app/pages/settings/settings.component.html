@@ -1,0 +1,89 @@
+<div class="blobs-overlay" *ngIf="blobAlert && useOverlay === 1">
+  <div class="blobs-container">
+    <ng-container [ngSwitch]="blobAlert">
+      <div class="blob red animate" *ngSwitchCase="'danger'"></div>
+      <div class="blob green animate" *ngSwitchCase="'success'"></div>
+    </ng-container>
+  </div>
+</div>
+<div class="blobs-overlay" *ngIf="blobAlert && useOverlay === 2">
+  <div class="blobs-container">
+    <ng-container [ngSwitch]="blobAlert">
+      <div class="blob red animate" *ngSwitchCase="'danger'"></div>
+      <div class="blob green animate" *ngSwitchCase="'success'"></div>
+    </ng-container>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <h5 class="card-title">Datenbank leeren</h5>
+    <p class="card-text">
+      Mit dieser Funktion werden 'alle' Datenbank-Inhalte gelöscht.
+      Benutzen Sie diese Funktion nur wenn alle Daten bereits synchronisiert sind.
+    </p>
+    <button class="btn btn-primary" [disabled]="buildBcLookup" (click)="dbClear()">Datenbank leeren</button>
+  </div>
+</div>
+
+<div class="card mt-1">
+  <div class="card-body">
+    <h5 class="card-title">Barcode-Index neu aufbauen</h5>
+    <p class="card-text">
+      Der Barcode-Index dient der schnelleren Auswertung von Barcode-Eingaben.
+      Sollten Barcodes nicht gefunden werden, obwohl sie vorhanden sein sollten,
+      nutzen sie diese Funktion, um den Index basierend auf Objektkatalog-, Inventar- und Raumdaten
+      neu aufzubauen
+    </p>
+    <button class="btn btn-primary" [disabled]="buildBcLookup" (click)="reIndexBarcodeLookup()">reIndexBarcodeLookup</button>
+  </div>
+</div>
+
+
+<div class="card mt-1">
+  <div class="card-body">
+    <h5 class="card-title">Sound und visuelles Feedback testen</h5>
+    <div class="card-text">
+      Barcode-Scans werden mit akkustischen und visuellen Feedback quittiert.
+      <h6>Erfolgreiche Scans:</h6>
+      Grüne Welle und einer Piep-Ton
+
+      <h6>Fehlerhafte Scan:</h6>
+      Rote Welle und länger anhaltender Piep-Ton
+    </div>
+    <button class="btn btn-success" (click)="playSuccess()">Sound Success</button>
+    <button class="btn btn-danger" (click)="playError()">Sound Error</button>
+  </div>
+</div>
+
+<div class="card mt-1">
+  <div class="card-body">
+    <h5 class="card-title">Manuelle Barcode-Simulation</h5>
+    <div class="card-text">
+      Die Barcode-Eingabe kann zu Testzwecken manuelle simuliert werden.
+    </div>
+
+    <div class="btn-group btn-group-toggle" ngbRadioGroup (change)="changeManualBCInput($event)" name="radioBasic" [(ngModel)]="enableManualBCInput">
+
+      <label ngbButtonLabel class="btn-primary">
+        <input ngbButton type="radio" [value]="true"> On
+      </label>
+      <label ngbButtonLabel class="btn-primary">
+        <input ngbButton type="radio" [value]="false"> Off
+      </label>
+    </div>
+  </div>
+</div>
+
+<div class="card mt-1">
+  <div class="card-body">
+    <h5 class="card-title">In der App verwaltete Status-Variablen</h5>
+    <div class="card-body">
+      <div class="variables-list">
+        <div class="row" *ngFor="let varItem of variableList">
+          <div class="col-3">{{ varItem.name }}</div>
+          <div class="col-9">{{ varItem.value | json }}</div>
+        </div>
+      </div>
+    </div>
+  </div>

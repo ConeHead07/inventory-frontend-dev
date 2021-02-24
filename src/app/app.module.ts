@@ -12,22 +12,22 @@ import { faStackOverflow, faGithub, faMedium } from '@fortawesome/free-brands-sv
 
 import { AppComponent } from './app.component';
 import { NgbModule } from '@ng-bootstrap/ng-bootstrap';
-import { AuthComponent } from './auth/auth.component';
+import { AuthComponent } from './pages/auth/auth.component';
 import { Routes, RouterModule } from '@angular/router';
-import { SelectInventoryComponent } from './select-inventory/select-inventory.component';
-import { NgbheaderComponent } from './ngbheader/ngbheader.component';
-import { InventFormComponent } from './invent-form/invent-form.component';
-import { InventoryProgressDirective } from './inventory-progress.directive';
-import { ProgressbarComponent } from './inventory/components/progressbar/progressbar.component';
-import { AuthInterceptorService } from './auth/auth-interceptor.service';
-import { SelectCreateRaumComponent } from './invent-form/modals/select-create-raum/select-create-raum.component';
-import { SelectCreateArtikelComponent } from './invent-form/modals/select-create-artikel/select-create-artikel.component';
-import { CreateArtikelImageComponent } from './invent-form/modals/create-artikel-image/create-artikel-image.component';
-import { ShowArtikelImageComponent } from './invent-form/modals/show-artikel-image/show-artikel-image.component';
-import { SelectSearchRaumComponent } from './invent-form/modals/select-search-raum/select-search-raum.component';
-import { SelectSearchArtikelComponent } from './invent-form/modals/select-search-artikel/select-search-artikel.component';
-import { ApiService } from './api.service';
-import { StatusCheckComponent } from './status-check/status-check.component';
+import { SelectInventoryComponent } from './pages/select-inventory/select-inventory.component';
+import { NgbheaderComponent } from './shared/components/ngbheader/ngbheader.component';
+import { InventFormComponent } from './pages/invent-form/invent-form.component';
+import { InventoryProgressDirective } from './shared/inventory-progress/inventory-progress.directive';
+import { ProgressbarComponent } from './shared/components/progressbar/progressbar.component';
+import { AuthInterceptorService } from './pages/auth/auth-interceptor.service';
+import { SelectCreateRaumComponent } from './pages/invent-form/modals/select-create-raum/select-create-raum.component';
+import { SelectCreateArtikelComponent } from './pages/invent-form/modals/select-create-artikel/select-create-artikel.component';
+import { CreateArtikelImageComponent } from './pages/invent-form/modals/create-artikel-image/create-artikel-image.component';
+import { ShowArtikelImageComponent } from './pages/invent-form/modals/show-artikel-image/show-artikel-image.component';
+import { SelectSearchRaumComponent } from './pages/invent-form/modals/select-search-raum/select-search-raum.component';
+import { SelectSearchArtikelComponent } from './pages/invent-form/modals/select-search-artikel/select-search-artikel.component';
+import { ApiService } from './shared/services/api.service';
+import { StatusCheckComponent } from './shared/components/status-check/status-check.component';
 import { WebcamModule } from 'ngx-webcam';
 import { AngularCropperjsModule } from 'angular-cropperjs';
 // import imageCompression from 'browser-image-compression';
@@ -37,29 +37,32 @@ import { ToastrModule } from 'ngx-toastr';
 
 // the scanner
 import { ZXingScannerModule } from '@zxing/ngx-scanner';
-import { ScannerComponent } from './invent-form/modals/scanner/scanner.component';
-import { ScannerinputDirective } from './scannerinput.directive';
-import { ScannerdetectionComponent } from './inventory/components/scannerdetection/scannerdetection.component';
-import { RaumListDoneComponent } from './invent-form/modals/raum-list-done/raum-list-done.component';
-import { RaumListRestComponent } from './invent-form/modals/raum-list-rest/raum-list-rest.component';
-import { GesamtListRestComponent } from './invent-form/modals/gesamt-list-rest/gesamt-list-rest.component';
-import { GesamtListDoneComponent } from './invent-form/modals/gesamt-list-done/gesamt-list-done.component';
-import { DbsyncComponent } from './inventory/components/dbsync/dbsync.component';
-import { SettingsComponent } from './inventory/components/settings/settings.component';
+import { ScannerComponent } from './pages/invent-form/modals/scanner/scanner.component';
+import { ScannerinputDirective } from './shared/directives/scannerinput.directive';
+import { ScannerdetectionComponent } from './shared/components/scannerdetection/scannerdetection.component';
+import { RaumListDoneComponent } from './pages/invent-form/modals/raum-list-done/raum-list-done.component';
+import { RaumListRestComponent } from './pages/invent-form/modals/raum-list-rest/raum-list-rest.component';
+import { GesamtListRestComponent } from './pages/invent-form/modals/gesamt-list-rest/gesamt-list-rest.component';
+import { GesamtListDoneComponent } from './pages/invent-form/modals/gesamt-list-done/gesamt-list-done.component';
+import { DbsyncComponent } from './pages/dbsync/dbsync.component';
+import { SettingsComponent } from './pages/settings/settings.component';
 import { environment } from '../environments/environment';
 import { ServiceWorkerModule } from '@angular/service-worker';
-import { EditRaumComponent } from './invent-form/modals/edit-raum/edit-raum.component';
-import { EditInventarComponent } from './invent-form/modals/edit-inventar/edit-inventar.component';
+import { EditRaumComponent } from './pages/invent-form/modals/edit-raum/edit-raum.component';
+import { EditInventarComponent } from './pages/invent-form/modals/edit-inventar/edit-inventar.component';
+
+import { AuthGuardService as AuthGuard } from './pages/auth/auth-guard.service';
 
 const appRoutes: Routes = [
   { path: '', component: AuthComponent },
   { path: 'auth', component: AuthComponent },
-  { path: 'select-inventory', component: SelectInventoryComponent },
-  { path: 'form-inventory/:clientid/:buildingid/:roomid', component: InventFormComponent },
-  { path: 'form-inventory/:clientid/:buildingid', component: InventFormComponent },
-  { path: 'form-inventory', component: InventFormComponent },
-  { path: 'sync', component: DbsyncComponent },
-  { path: 'settings', component: SettingsComponent }
+  { path: 'auth/logout', component: AuthComponent },
+  { path: 'select-inventory', component: SelectInventoryComponent, canActivate: [AuthGuard]},
+  { path: 'form-inventory/:clientid/:buildingid/:roomid', component: InventFormComponent, canActivate: [AuthGuard] },
+  { path: 'form-inventory/:clientid/:buildingid', component: InventFormComponent, canActivate: [AuthGuard] },
+  { path: 'form-inventory', component: InventFormComponent, canActivate: [AuthGuard] },
+  { path: 'sync', component: DbsyncComponent, canActivate: [AuthGuard] },
+  { path: 'settings', component: SettingsComponent, canActivate: [AuthGuard] }
 ];
 
 async function persist() {

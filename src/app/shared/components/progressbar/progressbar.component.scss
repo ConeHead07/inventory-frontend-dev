@@ -1,0 +1,16 @@
+.progress.progress-elemente {
+  height:calc(1.5em + 0.75rem + 2px);
+  position: relative;
+}
+
+.progress-text{
+  position:absolute;
+  top:0;
+  left: calc(50% - 1rem);
+  color:#fff;
+  line-height: calc(1.5em + 0.75rem + 2px);
+}
+
+button.btn.btn-sx {
+  font-size: 0.7rem;
+}

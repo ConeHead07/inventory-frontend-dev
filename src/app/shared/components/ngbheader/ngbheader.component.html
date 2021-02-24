@@ -1,0 +1,38 @@
+<nav class="navbar navbar-expand-md navbar-light bg-light">
+  <span class="navbar-brand">Inventory</span>
+  <button class="navbar-toggler" type="button"
+          aria-controls="navbarContent" [attr.aria-expanded]="!collapsed"
+          aria-label="Toggle navigation" (click)="collapsed = !collapsed">
+    <span class="navbar-toggler-icon"></span>
+  </button>
+
+  <div class="navbar-collapse" [class.collapse]="collapsed" id="navbarContent">
+    <ul class="navbar-nav ml-auto">
+
+      <li *ngIf="false" routerLinkActive="active" class="nav-item">
+        <a class="nav-link" routerLink="/auth">Login</a>
+      </li>
+
+      <li routerLinkActive="active" class="nav-item">
+        <a class="nav-link" routerLink="/select-inventory">Select</a>
+      </li>
+
+      <li routerLinkActive="active" class="nav-item">
+        <a class="nav-link" (click)="continueLastInventory()">Inventarisieren</a>
+      </li>
+
+      <li routerLinkActive="active" class="nav-item">
+        <a class="nav-link" routerLink="/sync">Sync</a>
+      </li>
+
+      <li routerLinkActive="active" class="nav-item">
+        <a class="nav-link" routerLink="/settings"><fa-icon [icon]="faCog"></fa-icon></a>
+      </li>
+
+
+      <li routerLinkActive="active" class="nav-item">
+        <a class="nav-link" routerLink="/auth/logout">Logout</a>
+      </li>
+    </ul>
+  </div>
+</nav>

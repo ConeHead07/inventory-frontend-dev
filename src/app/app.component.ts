@@ -1,6 +1,6 @@
 import {AfterViewInit, Component, ElementRef, HostListener, OnInit, ViewChild} from '@angular/core';
 
-import { ConnectionService } from './connection-service.service';
+import { ConnectionService } from './shared/services/connection-service.service';
 import {SwPush, SwUpdate} from '@angular/service-worker';
 import {ToastrService} from 'ngx-toastr';
 import {environment} from '../environments/environment';

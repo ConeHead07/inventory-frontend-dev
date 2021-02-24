@@ -1,0 +1,142 @@
+<div *ngIf="currInventur">
+  <div class="card mt-1">
+    <div class="card-header">Aktuelle Inventur: {{ currInventur.Titel }}</div>
+    <div class="card-body">
+      <h5 class="card-title"></h5>
+      <div class="row">
+        <div class="col-3">Titel</div>
+        <div class="col">{{ currInventur.Titel }}</div>
+      </div>
+      <div class="row">
+        <div class="col-3">Inventur-ID (Jobid)</div>
+        <div class="col">{{ currInventur.jobid }}</div>
+      </div>
+      <div class="row">
+        <div class="col-3">Mandant-ID</div>
+        <div class="col">{{ currInventur.mid }}</div>
+      </div>
+      <div class="row">
+        <div class="col-3">Created</div>
+        <div class="col">{{ currInventur.created_at }}</div>
+      </div>
+
+      <div *ngIf="currUser" class="row">
+        <div class="col">User</div>
+        <div class="col">{{ currUser.email }}</div>
+      </div>
+
+    </div>
+    <div class="card-footer">
+      <button [disabled]="syncInProcess" class="btn btn-danger" (click)="resetCurrJob()">Inventurdaten komplett neu laden</button>
+    </div>
+  </div>
+</div>
+
+<div class="card mt-2">
+  <div class="card-header">Synchronisierung</div>
+  <div class="card-body">
+    <h4 class="card-title">Aktueller Status</h4>
+    <div class="row">
+      <div class="col-3">Client-Revision-ID</div>
+      <div class="col">{{ clientRevisionId }}</div>
+    </div>
+    <div class="row">
+      <div class="col-3">Unsynced Changes</div>
+      <div class="col">{{ numUnsyncedChanges }}</div>
+    </div>
+    <div class="row">
+      <div class="col-3">Server-Revision-ID</div>
+      <div class="col">{{ serverRevisionId }}</div>
+    </div>
+    <div class="row">
+      <div class="col-3">Server-Changes</div>
+      <div class="col">{{ numServerChanges }}</div>
+    </div>
+
+    <div class="row">
+      <div class="col-3">Status</div>
+      <div class="col">{{syncStatusName}} ({{syncStatus}})</div>
+    </div>
+
+    <div class="row">
+      <div class="col-3">Finished</div>
+      <div class="col">{{syncFinished | json }}</div>
+    </div>
+
+    <div class="row">
+      <div class="col-3">Auto-Run</div>
+      <div class="col">{{ syncAutoRun | json }}</div>
+    </div>
+  </div>
+  <div class="card-footer">
+    <button *ngIf="syncAutoRun" class="btn btn-danger" (click)="syncAutoStop()"> Autmatische Synchronisierung stoppen</button>
+    <button *ngIf="!syncAutoRun" class="btn btn-success" (click)="syncAutoStart()"> Autmatische Synchronisierung starten</button>
+  </div>
+</div>
+
+<div class="card mt-2" *ngIf="currProcess">
+  <div class="card-header">Laufender Prozess</div>
+  <div class="card-body">
+    <div class="row">
+      <div class="col">Status</div>
+      <div class="col">{{ syncStatusName }}</div>
+    </div>
+    <div class="row">
+      <div class="col">Start</div>
+      <div class="col">{{ currProcess.starttime | date }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="card mt-2" *ngIf="lastServerSyncErrors.length > 0">
+  <div class="card-header">Synchronisations-Fehler</div>
+  <h4 class="card-title">Fehler bei letzter Synchroniserung
+    (InventurId: {{ lastServerSyncJobid}}) um {{ lastServerSyncDate | date }}</h4>
+  Anzahl: {{ lastServerSyncErrors.length }}<br>
+
+    <table class="table table-striped">
+      <thead>
+      <tr>
+        <th scope="col">#</th>
+        <th scope="col">Table</th>
+        <th scope="col">Log-Id</th>
+        <th scope="col">Aktion</th>
+        <th scope="col">Fehlercode</th>
+        <th scope="col">Fehlermeldung</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr *ngFor="let item of lastServerSyncErrors; index as i">
+        <th scope="row">{{ i + 1 }}</th>
+        <td>{{ item.table }}</td>
+        <td>{{ item.clientChangeLogId | number }}</td>
+        <td>{{ item.type | number }}</td>
+        <td>{{ item.error_code }}</td>
+        <td>{{ item.error_msg }}</td>
+      </tr>
+      </tbody>
+    </table>
+    * type: 1=Insert, 2=Update, 3=Delete
+</div>
+
+<div class="card mt-2" id="totalProgress" *ngIf="syncTotal && syncTotal.total">
+  <p><ngb-progressbar [striped]="true" [animated]="true" [value]="syncTotal.percent"></ngb-progressbar></p>
+  <div class="row">
+    <div class="col">{{ syncTotal.executed }}</div>
+    <div class="col">von {{ syncTotal.total }}</div>
+    <div class="col pull-right">{{ syncTotal.percent }} %</div>
+  </div>
+</div>
+
+<div class="card mt-2" id="tableProgress" *ngIf="syncTables && syncTables.length > 0">
+  <div class="row" *ngFor="let st of syncTables; let stIdx = index">
+    <div class="col">{{ st.total }}</div>
+    <div class="col">{{ st.puts }}</div>
+    <div class="col">{{ st.modified }}</div>
+    <div class="col">{{ st.deleted }}</div>
+    <div class="col">{{ st.executed }}</div>
+  </div>
+</div>
+
+
+
