@@ -15,17 +15,6 @@
   </div>
 </div>
 
-<div class="card">
-  <div class="card-body">
-    <h5 class="card-title">Datenbank leeren</h5>
-    <p class="card-text">
-      Mit dieser Funktion werden 'alle' Datenbank-Inhalte gelöscht.
-      Benutzen Sie diese Funktion nur wenn alle Daten bereits synchronisiert sind.
-    </p>
-    <button class="btn btn-primary" [disabled]="buildBcLookup" (click)="dbClear()">Datenbank leeren</button>
-  </div>
-</div>
-
 <div class="card mt-1">
   <div class="card-body">
     <h5 class="card-title">Barcode-Index neu aufbauen</h5>
@@ -38,7 +27,6 @@
     <button class="btn btn-primary" [disabled]="buildBcLookup" (click)="reIndexBarcodeLookup()">reIndexBarcodeLookup</button>
   </div>
 </div>
-
 
 <div class="card mt-1">
   <div class="card-body">
@@ -75,15 +63,13 @@
   </div>
 </div>
 
-<div class="card mt-1">
+<div class="card">
   <div class="card-body">
-    <h5 class="card-title">In der App verwaltete Status-Variablen</h5>
-    <div class="card-body">
-      <div class="variables-list">
-        <div class="row" *ngFor="let varItem of variableList">
-          <div class="col-3">{{ varItem.name }}</div>
-          <div class="col-9">{{ varItem.value | json }}</div>
-        </div>
-      </div>
-    </div>
+    <h5 class="card-title">Datenbank leeren</h5>
+    <p class="card-text">
+      Mit dieser Funktion werden 'alle' Datenbank-Inhalte gelöscht.
+      Benutzen Sie diese Funktion nur wenn alle Daten bereits synchronisiert sind.
+    </p>
+    <button class="btn btn-danger" [disabled]="buildBcLookup" (click)="dbClear()">Datenbank leeren</button>
   </div>
+</div>

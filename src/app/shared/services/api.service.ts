@@ -18,6 +18,13 @@ export class ApiService {
     const hostName = window.location.hostname;
     let defaultUrl = '';
 
+    const rgx = /(demo-)(.*?)(-app)(.mertens.services)/;
+    if (rgx.test(hostName)) {
+      defaultUrl = 'https://' + hostName.replace(rgx, '$1$2-admin$4') + '/';
+      console.log('ApiService #24 getDefaultApiUrl()', { hostName, defaultUrl });
+      return defaultUrl;
+    }
+
     switch (hostName) {
       case 'inventory.local':
       case '127.0.0.1':
@@ -25,8 +32,14 @@ export class ApiService {
         defaultUrl = 'https://' + hostName + ':8040/';
         break;
 
-      case 'https://mertens-inventory-client.bluebirdapp.de/':
+      case 'mertens-inventory-client.bluebirdapp.de':
         defaultUrl = 'https://mertens-inventory.bluebirdapp.de/';
+        break;
+
+      case 'demo-rheinenergie-app.mertens.services':
+      case 'demo-apo-app.mertens.services':
+      case 'demo-pc-app.mertens.services':
+        defaultUrl = 'https://' + hostName.replace('-app.mertens.services', '-admin.mertens.services') + '/';
         break;
 
       case 'mertens-inventory.firebaseapp.com':
@@ -34,7 +47,7 @@ export class ApiService {
       default:
         defaultUrl = 'https://inventory.mertens.services/';
     }
-    console.log('ApiService #37 getDefaultApiUrl()', { hostName, defaultUrl });
+    console.log('ApiService #50 getDefaultApiUrl()', { hostName, defaultUrl });
     return defaultUrl;
   }
 
