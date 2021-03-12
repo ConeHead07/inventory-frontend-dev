@@ -1,43 +1,48 @@
 <div class="bg"></div>
 <div class="container h-100">
     <div class="d-flex justify-content-center h-100">
-      <div>
-        <h1>merTens Inventory</h1>
-        <div class="user_card">
+      <div class="w-100 justify-content-center align-self-center">
+        <div class="brand-circle-container">
+          <div class="brand-circle-grey"></div>
+        </div>
+        <h1><span class="lato-black">Inventory</span><span class="lato-light">App</span></h1>
+        <div class="user_card user_card_loginbox_bg">
 
-            <div class="d-flex justify-content-center">
+            <div class="d-flex justify-content-center lato-light mb-2">
               <h2>Anmeldung</h2>
             </div>
 
             <div class="d-flex justify-content-center form_container">
                 <form #loginForm=ngForm (ngSubmit)="onLoginSubmit()">
-                    <div class="input-group mb-3">
+
+                    <div class="input-group mb-4">
                         <div class="input-group-append">
                             <span class="input-group-text">
                                 <fa-icon [icon]="['fa', 'user']"></fa-icon>
                             </span>
                         </div>
-                        <input type="text" class="form-control input_user" name="user" placeholder="Benutzername"
+                        <input type="text" class="form-control input_user lato-light" name="user" placeholder="Benutzername"
                             [(ngModel)]="form.email"
                             minlength="3"
                             pattern="[a-zA-Z0-9.@]{3,}"
                             required
                         >
                     </div>
-                    <div class="input-group mb-2">
+
+                    <div class="input-group mb-5">
                         <div class="input-group-append">
                             <span class="input-group-text">
                                 <fa-icon [icon]="['fa', 'key']"></fa-icon>
                             </span>
                         </div>
-                        <input required type="password" class="form-control input_pass" name="password" placeholder="Passwort"
+                        <input required type="password" class="form-control input_pass lato-light" name="password" placeholder="Passwort"
                         [(ngModel)]="form.password"
                         required>
                     </div>
                     <div class="d-flex justify-content-center login_container">
-                     <button type="button" name="button" class="btn login_btn"
+                     <button type="button" name="button" class="btn login_btn lato-light"
                      (click)="onLoginSubmit()"
-                     [disabled]="loginForm.invalid">anmelden</button>
+                     [disabled]="loginForm.invalid">LOGIN</button>
                    </div>
                 </form>
             </div>
@@ -46,5 +51,3 @@
       </div>
     </div>
 </div>
-
-<div style="display: none"><p>login works!</p></div>

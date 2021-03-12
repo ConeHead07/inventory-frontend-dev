@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import {Component, Input} from '@angular/core';
 import { faCog } from '@fortawesome/free-solid-svg-icons';
 import {BasedataService} from '../../services/basedata.service';
 import {Router} from '@angular/router';
@@ -11,6 +11,7 @@ import {Router} from '@angular/router';
 export class NgbheaderComponent {
   collapsed = true;
   faCog = faCog;
+  @Input() isLoginPage = false;
 
   constructor(private baseData: BasedataService, private router: Router) {
   }

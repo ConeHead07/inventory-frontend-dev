@@ -1,6 +1,38 @@
 /* You can add global styles to this file, and also import other style files */
+@import 'assets/fonts/_fonts.css';
 
 @import "~bootstrap/scss/bootstrap";
+
+html,
+body,
+app-root {
+  height: 100%;
+}
+
+.debug-box-sizes div {
+  box-shadow: 2px 2px 2px 1px teal;
+}
+
+.lato-light {
+  font-family: 'Lato';
+  font-weight: 300;
+  font-style: normal;
+}
+.lato-regular {
+  font-family: 'Lato';
+  font-weight: normal;
+  font-style: normal;
+}
+.lato-bold {
+  font-family: 'Lato';
+  font-weight: bold;
+  font-style: normal;
+}
+.lato-black {
+  font-family: 'Lato';
+  font-weight: 900;
+  font-style: normal;
+}
 
 div.c1 {
   div.c1-2 {
