@@ -317,8 +317,10 @@ export class SelectCreateArtikelComponent implements OnInit {
   setKunstFormLabels() {
     this.formLabels.Bezeichnung.label = 'Titel';
     this.formLabels.Bezeichnung.labelShort = 'Titel';
+    this.formLabels.Bezeichnung.placeholder = 'Titel';
     this.formLabels.Typ.label = 'Künstler';
     this.formLabels.Typ.labelShort = 'Künstler';
+    this.formLabels.Typ.placeholder = 'Künstler';
     this.artikelDaten.Kategorie = 'Kunst';
   }
 
