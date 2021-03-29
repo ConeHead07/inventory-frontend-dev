@@ -13,6 +13,7 @@ import { DatabaseChangeType} from 'dexie-observable/api';
 import { AuthService} from '../../auth/auth.service';
 import { ArtikelService } from './artikel.service';
 import {HerstellerService} from './hersteller.service';
+import {VariablesService} from "../../../shared/services/variables.service";
 
 export interface InventarFoundResult {
   success: boolean;
@@ -98,7 +99,8 @@ export class InventarService {
               private authService: AuthService,
               private baseData: BasedataService,
               private herstellerService: HerstellerService,
-              private artikelService: ArtikelService
+              private artikelService: ArtikelService,
+              private variablesService: VariablesService
   ) { }
 
   returnResultSuccess<T extends InventarEditResult>(data: InventarEditResultPresets): T {
@@ -128,6 +130,33 @@ export class InventarService {
 
   getFreshUuid(): string {
     return Guid.create().toString();
+  }
+
+  async getNewKunstBarcode(): Promise<string> {
+    const jobid = this.getJobiId();
+    const varLastOffset = 'KunstBarcodeOffset_' + jobid;
+    const devid = this.baseData.getCurrentDeviceId().toString(10);
+    const offsetDefault = '9' + devid.padStart(4, '0') + '00001';
+
+    let codeCheckInc =  await this.variablesService.get(varLastOffset, parseInt(offsetDefault, 10) );
+    if (!codeCheckInc) {
+      codeCheckInc = parseInt(offsetDefault, 10);
+    }
+    let code = ''; // codeCheckInc;
+    let itemCheck: DBDIInventar = null;
+
+    do {
+      code = codeCheckInc.toString(10);
+      itemCheck = await this.dexie.inventar.where({
+        for_jobid: jobid,
+        code
+      }).first();
+      ++codeCheckInc;
+    } while (itemCheck);
+
+    await this.variablesService.set(varLastOffset, parseInt(code, 10) );
+
+    return code;
   }
 
   returnResultError(data: InventarEditResultPresets): InventarEditResult {

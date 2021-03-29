@@ -9,21 +9,20 @@
   </div>
 </div>
 <div class="modal-header">
-  <h4 class="modal-title" id="modal-basic-title">Neuen Artikel anlegen</h4>
+  <h4 class="modal-title" id="modal-basic-title">{{ formTitle }}</h4>
 </div>
-<div class="modal-body artikel-form">
+<div class="modal-body artikel-form" [ngClass]="{ 'artikel-form-kunst': formType === formTypeKunst }">
   <form #myForm="ngForm">
-
-    <div class="form-group">
-      <label for="Hersteller" class="d-none">Hersteller:</label>
+    <div *ngIf="formLabels.Hersteller.isVisible" class="form-group">
+      <label for="Hersteller" class="d-none">{{ formLabels.Hersteller.label }}:</label>
       <div class="input-group mb-3">
         <div class="input-group-prepend">
-          <span class="input-group-text">HST</span>
+          <span class="input-group-text">{{ formLabels.Hersteller.labelShort }}</span>
         </div>
       <input
         id="Hersteller"
         name="Hersteller"
-        placeholder="Hersteller"
+        [placeholder]="formLabels.Hersteller.placeholder"
         type="text"
         class="form-control"
         [(ngModel)]="artikelDaten.Hersteller"
@@ -39,14 +38,15 @@
       </div>
     </div>
 
-    <div class="form-group">
-      <label for="typ" class="d-none">Gruppe: </label>
+    <div *ngIf="formLabels.Gruppe.isVisible" class="form-group">
+      <label for="typ" class="d-none">{{ formLabels.Gruppe.label }}: </label>
 
       <div class="input-group mb-3">
         <div class="input-group-prepend">
-          <span class="input-group-text">GRP</span>
+          <span class="input-group-text">{{ formLabels.Gruppe.labelShort }}</span>
         </div>
-        <input id="Gruppe" class="form-control" placeholder="Gruppe"
+        <input id="Gruppe" class="form-control"
+               [placeholder]="formLabels.Gruppe.placeholder"
                name="Gruppe"
                [(ngModel)]="artikelDaten.Gruppe"
                (change)="onChangeGruppe($event)"
@@ -62,13 +62,14 @@
       </div>
     </div>
 
-    <div class="form-group">
-      <label for="typ" class="d-none">Kategorie: </label>
+    <div *ngIf="formLabels.Kategorie.isVisible" class="form-group">
+      <label for="typ" class="d-none">{{ formLabels.Kategorie.label }}: </label>
       <div class="input-group mb-3">
         <div class="input-group-prepend">
-          <span class="input-group-text">KTG</span>
+          <span class="input-group-text">{{ formLabels.Kategorie.labelShort }}</span>
         </div>
-        <input id="Kategorie" class="form-control" placeholder="Kategorie"
+        <input id="Kategorie" class="form-control"
+               [placeholder]="formLabels.Kategorie.placeholder"
                name="Kategorie"
                [(ngModel)]="artikelDaten.Kategorie"
                (change)="onChange($event)"
@@ -84,16 +85,17 @@
       </div>
     </div>
 
-    <div class="form-group" [ngClass]="{
+    <div *ngIf="formLabels.Bezeichnung.isVisible" class="form-group" [ngClass]="{
         'has-error': bezeichnung.dirty && (bezeichnung.invalid || numBezeichnungExists === 1),
         'has-info': bezeichnung.dirty && numBezeichnungExists === -1
         }">
-      <label for="Bezeichnung" class="d-none">Artikel-Bez: </label>
+      <label for="Bezeichnung" class="d-none">{{ formLabels.Bezeichnung.label }}: </label>
       <div class="input-group mb-3">
         <div class="input-group-prepend">
-          <span class="input-group-text">BEZ</span>
+          <span class="input-group-text">{{ formLabels.Bezeichnung.labelShort }}</span>
         </div>
-        <input id="Bezeichnung" class="form-control" placeholder="Bezeichnung"
+        <input id="Bezeichnung" class="form-control"
+               [placeholder]="formLabels.Bezeichnung.placeholder"
                name="Bezeichnung"
                [(ngModel)]="artikelDaten.Bezeichnung"
                #bezeichnung="ngModel"
@@ -103,18 +105,19 @@
         >
       </div>
       <div *ngIf="bezeichnung.valid">
-        <div *ngIf="numBezeichnungExists===-1" class="help-block">Artikelangabe wird geprüft</div>
-        <div *ngIf="numBezeichnungExists===1" class="help-block">Artikel existiert bereits</div>
+        <div *ngIf="numBezeichnungExists === -1" class="help-block">Artikelangabe wird geprüft {{ numBezeichnungExists }}</div>
+        <div *ngIf="numBezeichnungExists > 0" class="help-block">Artikel existiert bereits {{ numBezeichnungExists }}</div>
       </div>
     </div>
 
-    <div class="form-group">
-      <label for="typ" class="d-none">Artikel-Typ: </label>
+    <div *ngIf="formLabels.Typ.isVisible" class="form-group">
+      <label for="typ" class="d-none">{{ formLabels.Typ.label }}: </label>
       <div class="input-group mb-3">
         <div class="input-group-prepend">
-          <span class="input-group-text">TYP</span>
+          <span class="input-group-text">{{ formLabels.Typ.labelShort }}</span>
         </div>
-        <input id="typ" class="form-control" placeholder="Artikel-Typ"
+        <input id="typ" class="form-control"
+               [placeholder]="formLabels.Typ.placeholder"
                name="typ"
                [(ngModel)]="artikelDaten.Typ"
                (change)="onChange($event)"
@@ -130,13 +133,14 @@
       </div>
     </div>
 
-    <div class="form-group">
-      <label for="Groesse" class="d-none">Abmessungen: </label>
+    <div *ngIf="formLabels.Groesse.isVisible" class="form-group">
+      <label for="Groesse" class="d-none">{{ formLabels.Groesse.label }}: </label>
       <div class="input-group mb-3">
         <div class="input-group-prepend">
-          <span class="input-group-text">Größe</span>
+          <span class="input-group-text">{{ formLabels.Groesse.labelShort }}</span>
         </div>
-        <input id="Groesse" class="form-control" placeholder="Groesse"
+        <input id="Groesse" class="form-control"
+               [placeholder]="formLabels.Groesse.placeholder"
                name="Groesse"
                [(ngModel)]="artikelDaten.Groesse"
                (change)="onChange($event)"
@@ -152,13 +156,14 @@
       </div>
     </div>
 
-    <div class="form-group">
-      <label for="Farbe" class="d-none">Farbe: </label>
+    <div *ngIf="formLabels.Farbe.isVisible" class="form-group">
+      <label for="Farbe" class="d-none">{{ formLabels.Farbe.label }}: </label>
       <div class="input-group mb-3">
         <div class="input-group-prepend">
-          <span class="input-group-text">Farbe</span>
+          <span class="input-group-text">{{ formLabels.Farbe.labelShort }}</span>
         </div>
-        <input id="Farbe" class="form-control" placeholder="Farbe"
+        <input id="Farbe" class="form-control"
+               [placeholder]="formLabels.Farbe.placeholder"
                name="Farbe"
                [(ngModel)]="artikelDaten.Farbe"
                (change)="onChange($event)"

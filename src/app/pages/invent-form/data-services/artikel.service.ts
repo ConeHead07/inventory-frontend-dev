@@ -100,11 +100,19 @@ export class ArtikelService {
               private baseData: BasedataService,
               private herstellerService: HerstellerService) {}
 
-  public async artikelBezeichnungExistsGlobal(bezeichnung: string): Promise<number> {
-    return await this.dexie.objektKatalogGlobal
+  public async artikelBezeichnungExistsGlobal(bezeichnung: string, jobid: number = 0): Promise<number> {
+    const globalItems = await this.dexie.objektKatalogGlobal
       .where('Bezeichnung')
       .equalsIgnoreCase( bezeichnung )
-      .count();
+      .toArray();
+    if (jobid !== 0 && globalItems && globalItems.length > 0) {
+      const gcuuids = globalItems.map( itm => itm.uuid );
+      return await this.dexie.objektKatalogMandant
+        .where('gcuuid').anyOf(gcuuids)
+        .and( itm => itm.for_jobid === jobid)
+        .count();
+    }
+    return globalItems.length;
   }
 
   public async ___DEL__artikelExistsMandant(mid: number, gcid: number): Promise<boolean> {
@@ -284,6 +292,7 @@ export class ArtikelService {
       mid: daten.mid || defaultMid,
       gcid: daten.gcid,
       gcuuid: daten.gcuuid,
+      for_jobid: jobid,
       uuid,
       code: uuid,
       created_at: new Date(),

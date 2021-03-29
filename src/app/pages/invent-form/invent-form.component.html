@@ -125,7 +125,7 @@
     <input id="raumCode" readonly #raumBarcode type="text"
            class="form-control" [value]="formInventar.RaumBarcode" (input)="onRaumBarcodeInput( $event )" placeholder="Raum-Barcode" aria-label="Raumcode">
     <div class="input-group-append">
-      <button class="btn btn-outline-success" type="button" (click)="openScanner(raumBarcode)"><fa-icon [icon]="faCamera"></fa-icon></button>
+      <button class="btn btn-outline-success" type="button" (click)="openScanner(raumBarcode)"><fa-icon [icon]="faBarcode"></fa-icon></button>
     </div>
   </div>
 </div>
@@ -159,6 +159,52 @@
   </div>
 </div>
 
+<div class="form-group row">
+  <div class="col input-group mb-1">
+    <div class="btn-group input-group" role="group" aria-label="First group">
+      <div class="input-group-prepend">
+        <span class="input-group-text">Bild</span>
+      </div>
+      <div class="input-group-append">
+        <button type="button" class="btn btn-success" (click)="openCreateRaumImage()"><fa-icon [icon]="faCamera"></fa-icon>
+          <span class="d-none d-md-inline"> anlegen </span>
+        </button>
+        <div *ngIf="raumBilder.length > 0" #raumBilderDrop="ngbDropdown" class="btn btn-light" ngbDropdown style="display: inline-block">
+          <button
+            ngbDropdownToggle
+            id="dropdownRaumbilder"
+            class="btn btn-sm dropdown-toggle"
+            type="button" data-toggle="dropdown" aria-haspopup="true"
+            aria-expanded="false"> {{ raumBilder.length }} Fotos
+          </button>
+          <div class="dropdown-menu dropdown-menu-right" [style.width]="'200px'" ngbDropdownMenu aria-labelledby="dropdownRaumbilder">
+            <button *ngFor="let img of raumBilder; let idx = index"
+                    (click)="openRaumbild(idx)"
+                    class="dropdown-item" ngbDropdownItem>{{ img.name }}</button>
+          </div>
+        </div>
+
+        <div *ngIf="raumPlaene.length > 0" #raumPlaeneDrop="ngbDropdown" class="btn btn-light"
+             ngbDropdown
+             style="display: inline-block">
+          <button
+            ngbDropdownToggle
+            id="dropdownRaumplaene"
+            class="btn btn-sm dropdown-toggle"
+            type="button" data-toggle="dropdown" aria-haspopup="true"
+            aria-expanded="false"> {{ raumPlaene.length }} Pläne
+          </button>
+          <div class="dropdown-menu dropdown-menu-right" ngbDropdownMenu aria-labelledby="dropdownRaumplaene">
+            <button *ngFor="let img of raumPlaene; let idx = index"
+                    (click)="openRaumplan(idx)"
+                    class="dropdown-item" ngbDropdownItem>{{ img.name }}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="row mt-4">
   <label for="raumCode" class="col"><strong>Inventar-Daten</strong></label>
 </div>
@@ -175,7 +221,7 @@
                [placeholder]="!waitingForNewInventarBarcode ? 'Inventar-Barcode ...' : 'Warte auf Inventar-Barcode ...'">
         <div class="input-group-append">
           <button class="btn btn-outline-success" type="button" (click)="openScanner(invBarcode)">
-            <fa-icon [icon]="faCamera"></fa-icon>
+            <fa-icon [icon]="faBarcode"></fa-icon>
           </button>
         </div>
       </div>
@@ -186,6 +232,7 @@
   <ngb-alert *ngIf="waitingForNewInventarBarcode" type="danger">
     Warte auf neuen Inventar-Barcode für {{ formInventar.Bezeichnung }}
   </ngb-alert>
+
   <div class="form-group row">
       <div class="col input-group mb-1">
         <div class="input-group-prepend">
@@ -199,6 +246,7 @@
         </div>
       </div>
   </div>
+
   <div class="form-group row">
     <div class="col input-group mb-1">
       <div class="input-group-prepend">
@@ -214,23 +262,33 @@
   </div>
 
   <div class="form-group row">
-  <!-- label for="elmArtTyp" class="col-2 col-sm-2 col-md-2 col-lg-2 d-none">Bild</label -->
-  <div class="col input-group mb-1">
-    <div class="input-group-prepend">
-      <span class="input-group-text">Bild</span>
-    </div>
-  <!-- div class="col">
-    <div class="btn-group btn-group-lg" role="group" aria-label="Large button group" -->
-    <div class="input-group-append">
-      <button type="button" class="btn btn-info" *ngIf="artikelImageExists" (click)="openShowArtikelImage()"><fa-icon [icon]="faImage"></fa-icon> anzeigen</button>
-      <button type="button" class="btn btn-success" *ngIf="artikelImageExists" [disabled]="!formInventar.gcuuid" (click)="openEditArtikelImage()"><fa-icon [icon]="faCamera"></fa-icon> bearbeiten </button>
-      <button type="button" class="btn btn-success" *ngIf="!artikelImageExists" [disabled]="!formInventar.gcuuid" (click)="openCreateArtikelImage()"><fa-icon [icon]="faCamera"></fa-icon> anlegen </button>
+    <!-- label for="elmArtTyp" class="col-2 col-sm-2 col-md-2 col-lg-2 d-none">Bild</label -->
+    <div class="col mb-1">
 
+      <div class="btn-toolbar justify-content-between w-100" role="toolbar" aria-label="Toolbar with button groups">
+        <div class="btn-group input-group" role="group" aria-label="First group">
+          <div class="input-group-prepend">
+            <span class="input-group-text">Bild</span>
+          </div>
+          <div class="input-group-append">
+            <button type="button" class="btn btn-info"    *ngIf="artikelImageExists" (click)="openShowArtikelImage()"><fa-icon [icon]="faImage"></fa-icon> anzeigen</button>
+            <button type="button" class="btn btn-success" *ngIf="artikelImageExists" [disabled]="!formInventar.gcuuid" (click)="openEditArtikelImage()"><fa-icon [icon]="faCamera"></fa-icon> bearbeiten </button>
+            <button type="button" class="btn btn-success" *ngIf="!artikelImageExists" [disabled]="!formInventar.gcuuid" (click)="openCreateArtikelImage()"><fa-icon [icon]="faCamera"></fa-icon> anlegen </button>
+          </div>
+        </div>
+
+        <div class="btn-group input-group">
+          <div class="input-group-prepend">
+            <div class="input-group-text" id="btnGroupAddon2">Kunst</div>
+          </div>
+          <div class="input-group-append">
+            <button type="button" class="btn btn-dark" (click)="createKunstwerk()">anlegen</button>
+          </div>
+        </div>
+      </div>
     </div>
-    <!-- /div>
-  </div -->
+
   </div>
-</div>
 </ng-container>
 <ng-template #MissingRaum>
   <ngb-alert [type]="'danger'" [dismissible]="false">

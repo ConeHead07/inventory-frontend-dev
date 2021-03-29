@@ -140,7 +140,14 @@ export class AuthService {
     const logUserData = { user: this.user, userDataString};
     console.log('#137 getUserData', { logUserData });
     if (userDataString) {
-      return JSON.parse(userDataString);
+      const userData = JSON.parse(userDataString);
+      if (userData
+        && ('uTokenExpirationDate' in userData)
+        && typeof userData.uTokenExpirationDate === 'string') {
+          const sDate = userData.uTokenExpirationDate;
+          userData.uTokenExpirationDate = new Date(sDate);
+      }
+      return userData;
     }
     return null;
   }
@@ -160,6 +167,9 @@ export class AuthService {
     }
 
     const userData = JSON.parse( localStorage.getItem('userData') );
+    if (userData && ('uTokenExpirationDate' in userData)) {
+      userData.uTokenExpirationDate = new Date(userData.uTokenExpirationDate);
+    }
     console.log('getUser', { userData: {...userData}});
 
     if (userData &&
@@ -183,7 +193,9 @@ export class AuthService {
 
   public isLoggedIn(): boolean {
     const user = this.getUser();
-    return (user && (user instanceof User) && user.hasValidUiSession);
+    const isLoggedIn = (user && (user instanceof User) && user.hasValidUiSession);
+    console.log('app.pages.auth.auth.service.ts #187', 'user', user);
+    return isLoggedIn;
   }
 
   public isAuthenticated(): boolean {

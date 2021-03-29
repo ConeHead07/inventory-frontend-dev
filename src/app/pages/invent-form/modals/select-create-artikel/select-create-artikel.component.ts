@@ -15,6 +15,7 @@ import {HerstellerService, HerstellerWithId} from '../../data-services/herstelle
 import {BasedataService} from '../../../../shared/services/basedata.service';
 import {DataService} from '../../../../shared/services/data.service';
 import {ArtikelOption} from '../select-search-artikel/select-search-artikel.component';
+import {IndexableType} from 'dexie';
 
 
 const states: HerstellerWithId[] = [];
@@ -25,6 +26,28 @@ const artikelTypen: string[] = [];
 const artikelGroessen: string[] = [];
 const artikelFarben: string[] = [];
 const gruppenKategorien: { gruppe: string, kategorien: string[]}[] = [];
+
+export enum ArtikelFormType {
+  Inventar,
+  Kunst
+}
+
+interface FormControlOptions {
+  isVisible: boolean;
+  label: string;
+  labelShort: string;
+  placeholder: string;
+}
+
+interface ArtikelFormLabels {
+  Hersteller: FormControlOptions; // string; // = 'Hersteller';
+  Gruppe: FormControlOptions; // string; // = 'Gruppe';
+  Kategorie: FormControlOptions; // string; // = 'Kategorie';
+  Bezeichnung: FormControlOptions; // string; // = 'Bezeichnung';
+  Typ: FormControlOptions; // string; // = 'Typ';
+  Groesse: FormControlOptions; // string; // = 'Groesse';
+  Farbe: FormControlOptions; // string; // = 'Farbe';
+}
 
 interface SimilarityStat {
   term: string;
@@ -137,6 +160,58 @@ export class SelectCreateArtikelComponent implements OnInit {
   @Output() inputChanging = new EventEmitter();
   @Output() inputChanged = new EventEmitter<Event>();
 
+  formTitle = 'Neuen Artikel anlegen';
+
+  formType: ArtikelFormType = ArtikelFormType.Inventar;
+  formTypeInventar = ArtikelFormType.Inventar;
+  formTypeKunst = ArtikelFormType.Kunst;
+
+  formLabels: ArtikelFormLabels = {
+    Hersteller: {
+      isVisible: true,
+      label: 'Hersteller',
+      labelShort: 'HST',
+      placeholder: 'Hersteller'
+    },
+    Gruppe: {
+      isVisible: true,
+      label: 'Gruppe',
+      labelShort: 'GRP',
+      placeholder: 'Gruppe'
+    },
+    Kategorie: {
+      isVisible: true,
+      label: 'Kategorie',
+      labelShort: 'KTG',
+      placeholder: 'Kategorie'
+    },
+    Bezeichnung: {
+      isVisible: true,
+      label: 'Bezeichnung',
+      labelShort: 'BEZ',
+      placeholder: 'Artikel-Bezeichnung'
+    },
+    Typ: {
+      isVisible: true,
+      label: 'Typ',
+      labelShort: 'TYP',
+      placeholder: 'Artikel-Typ'
+    },
+    Groesse : {
+      isVisible: true,
+      label: 'Groesse',
+      labelShort: 'Größe',
+      placeholder: 'Größe / Abmessungen'
+    },
+    Farbe: {
+      isVisible: true,
+      label: 'Farbe',
+      labelShort: 'Farbe',
+      placeholder: 'Artikelfarbe'
+    }
+  };
+  formLabelsInventar: ArtikelFormLabels = this.formLabels;
+
   constructor(
     // private modalService: NgbModal,
     public activeModal: NgbActiveModal,
@@ -206,9 +281,53 @@ export class SelectCreateArtikelComponent implements OnInit {
 
     this.inputChanged.subscribe(() => {
       // this.checkIfArtikelExistsGlobal();
-      this.checkIfArtikelExistsMandant();
+      // this.checkIfArtikelExistsMandant();
       this.delegateListArticleMatches(500);
     });
+  }
+
+  setFormType(type: ArtikelFormType) {
+    this.formType = type;
+    if (type === ArtikelFormType.Inventar) {
+      this.formTitle = 'Neuen Artikel anlegen';
+      this.setInventarFormLabels();
+    } else if (type === ArtikelFormType.Kunst) {
+      this.formTitle = 'Neues Kunstobjekt anlegen';
+      this.setKunstForm({ Kategorie: 'Kunst' });
+    }
+  }
+
+  setInventarFormLabels() {
+    for (const lbl in Object.keys(this.formLabelsInventar)) {
+      if (this.formLabelsInventar.hasOwnProperty(lbl)) {
+        this.formLabels[lbl].isVisible = this.formLabelsInventar[lbl].isVisible;
+        this.formLabels[lbl].label = this.formLabelsInventar[lbl].label;
+        this.formLabels[lbl].labelShort = this.formLabelsInventar[lbl].labelShort;
+      }
+    }
+  }
+
+  setKunstForm(vals?: ArtikelBasisDaten) {
+    this.setKunstFormLabels();
+    if (vals) {
+      this.setFormValues(vals);
+    }
+  }
+
+  setKunstFormLabels() {
+    this.formLabels.Bezeichnung.label = 'Titel';
+    this.formLabels.Bezeichnung.labelShort = 'Titel';
+    this.formLabels.Typ.label = 'Künstler';
+    this.formLabels.Typ.labelShort = 'Künstler';
+    this.artikelDaten.Kategorie = 'Kunst';
+  }
+
+  setFormValues(vals: ArtikelBasisDaten) {
+    for (const fld in vals) {
+      if (vals.hasOwnProperty(fld) && this.artikelDaten[fld]) {
+        this.artikelDaten[fld] = vals[fld];
+      }
+    }
   }
 
   getWhereInputsOf(artikelProperties: string[]): any {
@@ -393,8 +512,11 @@ export class SelectCreateArtikelComponent implements OnInit {
   formatter = (state: string) => state;
 
   search = (text$: Observable<string>) => {
+    const isPopupOpen = (typeof this.instance === 'object' && this.instance instanceof NgbTypeahead)
+      ? this.instance.isPopupOpen()
+      : false;
     const debouncedText$ = text$.pipe(debounceTime(200), distinctUntilChanged());
-    const clicksWithClosedPopup$ = this.click$.pipe(filter(() => !this.instance.isPopupOpen()));
+    const clicksWithClosedPopup$ = this.click$.pipe(filter(() => !isPopupOpen));
     const inputFocus$ = this.focus$;
 
     return merge(debouncedText$, inputFocus$, clicksWithClosedPopup$).pipe(
@@ -404,8 +526,11 @@ export class SelectCreateArtikelComponent implements OnInit {
   }
 
   searchGruppen = (text$: Observable<string>) => {
+    const isPopupOpen = (typeof this.instanceGrp === 'object' && this.instanceGrp instanceof NgbTypeahead)
+      ? this.instanceGrp.isPopupOpen()
+      : false;
     const debouncedText$ = text$.pipe(debounceTime(200), distinctUntilChanged());
-    const clicksWithClosedPopup$ = this.clickGrp$.pipe(filter(() => !this.instanceGrp.isPopupOpen()));
+    const clicksWithClosedPopup$ = this.clickGrp$.pipe(filter(() => !isPopupOpen));
     const inputFocus$ = this.focusGrp$;
 
     return merge(debouncedText$, inputFocus$, clicksWithClosedPopup$).pipe(
@@ -415,8 +540,11 @@ export class SelectCreateArtikelComponent implements OnInit {
   }
 
   searchKategorien = (text$: Observable<string>) => {
+    const isPopupOpen = (typeof this.instanceKtg === 'object' && this.instanceKtg instanceof NgbTypeahead)
+      ? this.instanceKtg.isPopupOpen()
+      : false;
     const debouncedText$ = text$.pipe(debounceTime(200), distinctUntilChanged());
-    const clicksWithClosedPopup$ = this.clickKtg$.pipe(filter(() => !this.instanceKtg.isPopupOpen()));
+    const clicksWithClosedPopup$ = this.clickKtg$.pipe(filter(() => !isPopupOpen));
     const inputFocus$ = this.focusKtg$;
 
     return merge(debouncedText$, inputFocus$, clicksWithClosedPopup$).pipe(
@@ -426,8 +554,11 @@ export class SelectCreateArtikelComponent implements OnInit {
   }
 
   searchTypen = (text$: Observable<string>) => {
+    const isPopupOpen = (typeof this.instanceTyp === 'object' && this.instanceTyp instanceof NgbTypeahead)
+      ? this.instanceTyp.isPopupOpen()
+      : false;
     const debouncedText$ = text$.pipe(debounceTime(200), distinctUntilChanged());
-    const clicksWithClosedPopup$ = this.clickTyp$.pipe(filter(() => !this.instanceTyp.isPopupOpen()));
+    const clicksWithClosedPopup$ = this.clickTyp$.pipe(filter(() => !isPopupOpen));
     const inputFocus$ = this.focusTyp$;
 
     return merge(debouncedText$, inputFocus$, clicksWithClosedPopup$).pipe(
@@ -437,8 +568,11 @@ export class SelectCreateArtikelComponent implements OnInit {
   }
 
   searchGroessen = (text$: Observable<string>) => {
+    const isPopupOpen = (typeof this.instanceGrs === 'object' && this.instanceGrs instanceof NgbTypeahead)
+      ? this.instanceGrs.isPopupOpen()
+      : false;
     const debouncedText$ = text$.pipe(debounceTime(200), distinctUntilChanged());
-    const clicksWithClosedPopup$ = this.clickGrs$.pipe(filter(() => !this.instanceGrs.isPopupOpen()));
+    const clicksWithClosedPopup$ = this.clickGrs$.pipe(filter(() => !isPopupOpen));
     const inputFocus$ = this.focusGrs$;
 
     return merge(debouncedText$, inputFocus$, clicksWithClosedPopup$).pipe(
@@ -448,8 +582,11 @@ export class SelectCreateArtikelComponent implements OnInit {
   }
 
   searchFarben = (text$: Observable<string>) => {
+    const isPopupOpen = (typeof this.instanceFa === 'object' && this.instanceFa instanceof NgbTypeahead)
+      ? this.instanceFa.isPopupOpen()
+      : false;
     const debouncedText$ = text$.pipe(debounceTime(200), distinctUntilChanged());
-    const clicksWithClosedPopup$ = this.clickFa$.pipe(filter(() => !this.instanceFa.isPopupOpen()));
+    const clicksWithClosedPopup$ = this.clickFa$.pipe(filter(() => !isPopupOpen));
     const inputFocus$ = this.focusFa$;
 
     return merge(debouncedText$, inputFocus$, clicksWithClosedPopup$).pipe(
@@ -560,20 +697,16 @@ export class SelectCreateArtikelComponent implements OnInit {
   }
 
   async checkIfABezeichnungExistsGlobal(): Promise<number> {
-    console.log('check if Artikel exists');
     this.delegateListArticleMatches();
     this.numBezeichnungExists = -1;
-    let NumBezgenExists = 0;
-    await this.artikelService
-      .artikelBezeichnungExistsGlobal( this.artikelDaten.Bezeichnung )
-      .then( numExists => {
-        this.numBezeichnungExists = numExists;
-        NumBezgenExists = numExists;
-      });
+    const jobid = this.baseData.getCurrentJobid();
+    const numExists = await this.artikelService
+      .artikelBezeichnungExistsGlobal( this.artikelDaten.Bezeichnung, jobid );
+    this.numBezeichnungExists = numExists;
     this.formValidate();
-    console.log('check if Artikel exists: ', NumBezgenExists);
+    console.log('check if Artikel exists: ', numExists, 'this.numBezeichnungExists', this.numBezeichnungExists);
     this.listArticleMatches();
-    return NumBezgenExists;
+    return numExists;
   }
 
   async checkIfArtikelExistsMandant(): Promise<boolean> {
@@ -588,14 +721,19 @@ export class SelectCreateArtikelComponent implements OnInit {
       });
 
     if (globalArtikelUuids.length === 0) {
+      this.numBezeichnungExists = 0;
       return false;
     }
 
-    return 0 < await this.artikelService
+    const numExistsByMandant = await this.artikelService
       .artikelMcuuidByGcuuids( this.mid, globalArtikelUuids )
       .then( items => {
         return items.length;
       });
+
+    this.numBezeichnungExists = numExistsByMandant;
+
+    return numExistsByMandant > 0;
   }
 
   async save(): Promise<boolean> {

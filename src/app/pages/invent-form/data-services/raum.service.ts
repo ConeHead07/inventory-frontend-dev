@@ -1,5 +1,10 @@
 import {EventEmitter, Injectable} from '@angular/core';
-import {DBDIRaeume, DBDIRaumEditStatus} from '../../../shared/interfaces/dexie.interfaces';
+import {
+  DBDIImages,
+  DBDIObjektKatalogImages,
+  DBDIRaeume,
+  DBDIRaumEditStatus
+} from '../../../shared/interfaces/dexie.interfaces';
 import { DexieService } from '../../../shared/services/dexie.service';
 import {Guid} from 'guid-typescript';
 import {AuthService} from '../../auth/auth.service';
@@ -13,6 +18,18 @@ export interface RaumBasisDaten {
   Raumbezeichnung?: string;
   Etage?: string;
   code?: string;
+}
+
+export interface RaumImages {
+  uuid: string;
+  name: string;
+  type: string;
+  size: number;
+  width: number;
+  height: number;
+  Kategorie: string;
+  RaumUuid: string;
+  desc: string;
 }
 
 export interface DBInsertRaumResult extends DbInsertResult {
@@ -240,6 +257,76 @@ export class RaumService {
       item: savedData,
       data: raum
     };
+  }
+
+  public async getRaumPlaene(ruuid: string): Promise<RaumImages[]> {
+    const totalImages = await this.dexie.objektKatalogImages.where({
+      RefTable: 'Raeume',
+      RefUuid: ruuid
+    }).toArray();
+    const imgWithUuids = await this.dexie.objektKatalogImages.where({
+      RefTable: 'Raeume',
+      RefUuid: ruuid,
+      Kategorie: 'Plan'
+    }).toArray();
+
+    const imgUuids = imgWithUuids.map( (row) => row.ImgUuid );
+
+    console.log('RaumService.getRaumPlaene, ruuid: ', ruuid, 'totalImages', totalImages, 'imgUuids', imgUuids);
+    if (imgUuids.length === 0) {
+      return [];
+    }
+
+    return this.dexie.images
+      .where( 'uuid').anyOf(imgUuids)
+      .toArray()
+      .then( (images) => {
+        return images.map((img) => ({
+          uuid: img.uuid,
+          name: img.name,
+          type: img.type,
+          size: img.size,
+          width: img.width,
+          height: img.height,
+          desc: img.desc || '',
+          Kategorie: 'Plan',
+          RaumUuid: ruuid
+        }));
+      });
+  }
+
+  public async getRaumBilder(ruuid: string): Promise<RaumImages[]> {
+    const totalImages = await this.dexie.objektKatalogImages.where({
+      RefTable: 'Raeume',
+      RefUuid: ruuid
+    }).toArray();
+    const imgUuids = await this.dexie.objektKatalogImages.where({
+      RefTable: 'Raeume',
+      RefUuid: ruuid,
+      Kategorie: 'Bild'
+    }).toArray().then( (rows) => rows.map( (row) => row.ImgUuid) );
+
+    console.log('RaumService.getRaumBilder, ruuid: ', ruuid, 'totalImages', totalImages, 'imgUuids.length', imgUuids.length);
+    if (imgUuids.length === 0) {
+      return [];
+    }
+
+    return this.dexie.images
+      .where( 'uuid').anyOf(imgUuids)
+      .toArray()
+      .then( (images) => {
+        return images.map((img) => ({
+          uuid: img.uuid,
+          name: img.name,
+          type: img.type,
+          size: img.size,
+          width: img.width,
+          height: img.height,
+          desc: img.desc || '',
+          Kategorie: 'Bild',
+          RaumUuid: ruuid
+        }));
+      });
   }
 
   public async getEtagenByGidInInventur(jobid: number, gid: number): Promise<string[]> {

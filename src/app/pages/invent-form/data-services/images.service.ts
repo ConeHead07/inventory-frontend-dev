@@ -106,6 +106,11 @@ export class ImagesService {
     return uuid;
   }
 
+  async putRaumImage(image: ImageBaseData, ruuid: string, useJobid?: number): Promise<string> {
+
+    return this.insertRaumImage(image, ruuid, useJobid);
+  }
+
   async putArtikelImage(image: ImageBaseData, useJobid?: number): Promise<string> {
 
     await this.dexie.images.where({ gcuuid: image.gcuuid }).delete();
@@ -127,9 +132,67 @@ export class ImagesService {
     return this.dexie.images.where({ gcuuid }).first();
   }
 
+  async getImageByUuid(uuid: string): Promise<DBDIImages> {
+    console.log('called ImageService.getImageByUuid:', uuid);
+    return this.dexie.images.where({uuid}).first()
+      .then( img => img, err => null);
+  }
+
   async imageExistsOfGcuuid(gcuuid: string): Promise<boolean> {
     return this.dexie.images.where({ gcuuid}).count()
       .then( nr => nr > 0)
       .catch( err => { console.error(err); return false; });
+  }
+
+  async insertRaumImage(image: ImageBaseData, ruuid: string, useJobid?: number): Promise<string> {
+    const jobid = useJobid || this.baseData.getCurrentJobid();
+    const uid = this.baseData.getCurrentUid();
+
+    const numExists = await this.dexie.images.where({for_jobid: image.for_jobid, name: image.name}).count();
+    if (numExists) {
+      let inc = 1;
+      let incExists = 0;
+      let incName = '';
+      do {
+        ++inc;
+        incName = image.name + '(' + inc + ')';
+        incExists = await this.dexie.images.where({for_jobid: image.for_jobid, name: incName}).count();
+      } while (incExists > 0);
+      image.name = incName;
+    }
+
+    const item: DBDIImages = {
+      uuid: Guid.create().toString(),
+      name: image.name,
+      desc: image.desc,
+      size: image.size,
+      width: image.width,
+      height: image.height,
+      type: image.type,
+      for_jobid: image.for_jobid,
+      mcuuid: '',
+      gcuuid: '',
+      url: image.url || '',
+      data_binary: image.data_binary || null,
+      data_url: image.data_url || null,
+      revnr: 1,
+      created_at: image.created_at || new Date(),
+      created_uid: image.created_uid || uid,
+      created_jobid: image.created_jobid || jobid
+    };
+
+    const rs = await this.dexie.images.add(item).then( (imgUuid) => {
+      this.addImageKatalogRef({
+        for_jobid: image.for_jobid,
+        RefTable: 'Raeume',
+        RefUuid: ruuid,
+        ImgUuid: imgUuid,
+        RefText: image.desc || image.name,
+        Pos: 1,
+        Kategorie: 'Bild'
+      });
+      return imgUuid;
+    });
+    return rs;
   }
 }

@@ -137,7 +137,9 @@ export class VariablesService {
   }
 
   public async get(name: string, defaultValue: any = null): Promise<any> {
-    return this.variables.get( name ).then( item => item.value).catch( (err) => defaultValue );
+    return this.variables.get( name )
+      .then( item => item.value)
+      .catch( (err) => defaultValue );
   }
 
   public async has(name: string): Promise<boolean> {

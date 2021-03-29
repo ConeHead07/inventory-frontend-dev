@@ -1,0 +1,26 @@
+<div class="modal-body">
+  {{ titel }}
+  <ngb-alert [type]="'danger'" *ngIf="error" (close)="error = ''"></ngb-alert>
+
+  <div class="editor" *ngIf="imageUrl">
+    <div class="canvas">
+      <angular-cropper
+        #angularCropper
+        *ngIf="imageUrl"
+        [cropperOptions]="config"
+        [imageUrl]="imageUrl">
+      </angular-cropper>
+    </div>
+
+
+    <div class="toolbar-close">
+      <button class="btn btn-sm btn-danger btn-icon-cirular" (click)="close()"><fa-icon [icon]="faClose"></fa-icon></button>
+    </div>
+    <div class="toolbar btn-group btn-group-sm rounded">
+      <button class="btn btn-sm btn-light" (click)="zoomIn()"><fa-icon [icon]="faSearchPlus"></fa-icon></button>
+      <button class="btn btn-sm btn-light" (click)="zoomOut()"><fa-icon [icon]="faSearchMinus"></fa-icon></button>
+      <button class="btn btn-sm btn-light" (click)="rotateLeft()"><fa-icon [icon]="faRotateLeft"></fa-icon></button>
+      <button class="btn btn-sm btn-light" (click)="rotateRight()"><fa-icon [icon]="faRotateRight"></fa-icon></button>
+    </div>
+  </div>
+</div>

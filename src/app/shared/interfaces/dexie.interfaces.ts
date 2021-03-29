@@ -297,7 +297,7 @@ export interface DBDIImages {
   mcuuid?: string;
   mcid?: number;
   url?: string;
-  desc: string;
+  desc?: string;
   data_binary?: string;
   data_url?: string;
   revnr: number;

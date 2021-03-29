@@ -67,19 +67,25 @@ export class RaumListDoneComponent implements OnInit {
     return this.inventarService.getInventarListDoneByRaumUuid( ruuid, jobid )
       .then( list => {
         this.inventarDetailList = list;
+        console.log('loadInventarByRuuid #70 list: ', list);
         this.inventarListGrouped = this.inventarDetailList
           .sort(
             (a, b) => a.inventar.mcuuid > b.inventar.mcuuid ? -1
               : (a.inventar.mcuuid < b.inventar.mcuuid ? 1 : 0)
           )
           .reduce<RaumInventarDone[]>( (gList, item) => {
+            console.log('loadInventarByRuuid #70 reduce list, currentItem ', item);
+            if (!item) {
+              return gList;
+            }
             const l = gList.length;
             const i = l - 1;
+            const artikelData = item.artikelData || { Bezeichnung: '?[Fehlende Katalogdaten]', Typ: '' };
             if (!l || gList[i].mcuuid !== item.inventar.mcuuid) {
               gList[l] = {
                 mcuuid: item.inventar.mcuuid,
-                Bezeichnung: item.inventar.Bezeichnung || item.artikelData.Bezeichnung,
-                Typ: item.inventar.Typ || item.artikelData.Typ,
+                Bezeichnung: artikelData.Bezeichnung || '',
+                Typ: item.inventar.Typ || artikelData.Typ || '',
                 Menge: 1
               };
             } else {

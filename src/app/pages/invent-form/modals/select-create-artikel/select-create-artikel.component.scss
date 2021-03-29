@@ -2,6 +2,11 @@
 .card-footer {
   padding: 0.5rem;
 }
+
 .artikel-form .input-group-prepend .input-group-text {
   min-width:4rem;
+}
+
+.artikel-form.artikel-form-kunst .input-group-prepend .input-group-text {
+  min-width:5.5rem;
 }

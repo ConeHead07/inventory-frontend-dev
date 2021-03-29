@@ -1,0 +1,51 @@
+<div class="modal-header">
+  <h4 class="modal-title">{{ titel }}</h4>
+  <button type="button" class="close" aria-label="Close" (click)="activeModal.dismiss('Cross click')">
+    <span aria-hidden="true">&times;</span>
+  </button>
+</div>
+<div class="modal-body">
+  <div *ngIf="false">
+  numImages: {{ numImages }}
+  numImgFound: {{ numImgFound }}
+  numImgLoaded: {{ numImgLoaded }}
+  numImgFinished: {{ numImgFinished }}
+  finishedLoading: {{ finishedLoading | json }}
+  error: {{ error }}
+  </div>
+  <ng-template *ngIf="(!currImg || currImg === null || currImg.loadingStatus !== htmlImageLoadingStatus.Loaded); else ImageBox">
+    <div *ngIf="error">{{ error }}</div>
+    <div *ngIf="currImg">
+      <div *ngIf="currImg.loadingStatus === htmlImageLoadingStatus.Pending">Bild wird vorbereitet!</div>
+      <div *ngIf="currImg.loadingStatus === htmlImageLoadingStatus.Loading">Bild wird geladen!</div>
+      <div *ngIf="currImg.loadingStatus === htmlImageLoadingStatus.Aborted">Ladevorgang wurde abgebrochen!</div>
+      <div *ngIf="currImg.error">{{ currImg.error }}</div>
+    </div>
+  </ng-template>
+  <ng-template #ImageBox>
+    <h3>{{currImgIdx + 1 }}/{{numImages}} {{ currImg.name }}</h3>
+    <p *ngIf="currImg.desc">{{ currImg.desc }}</p>
+    <div style="position:relative;text-align:center">
+    <button class="btn btn-mini btn-light" style="position:absolute;left:10px;top:calc(50% - 1rem);" (click)="prev()" *ngIf="currImgIdx > 0"><fa-icon [icon]="faAngleLeft"></fa-icon></button>
+    <button class="btn btn-mini btn-light" style="position:absolute;right:10px;top:calc(50% - 1rem);" (click)="next()" *ngIf="currImgIdx < (numImages - 1)"><fa-icon [icon]="faAngleRight"></fa-icon></button>
+    <img [src]="currImg.img.src" style="max-width:99%;max-height:99%;margin-left:auto;margin-right:auto">
+      <div class="carousel-caption" style="position:absolute;bottom:2rem;text-align:center">
+      </div>
+    </div>
+
+
+    <ngb-carousel *ngIf="false && finishedLoading && numImgLoaded > 0">
+      <ng-template *ngFor="let item of images; let i = index" ngbSlide>
+        <ng-container *ngIf="item !== null && item.img && item.loadingStatus===htmlImageLoadingStatus.Loaded">
+          <div class="picsum-img-wrapper">
+            <img [src]="item.img.src" class="slide-img-by-dataurl" alt="Random first slide">
+          </div>
+          <div class="carousel-caption">
+            <h3>{{ item.name }}</h3>
+            <p *ngIf="item.desc">{{ item.desc }}}</p>
+          </div>
+        </ng-container>
+      </ng-template>
+    </ngb-carousel>
+  </ng-template>
+</div>

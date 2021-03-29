@@ -7,7 +7,7 @@ import {
   DBDIGebaeude,
   DBDIInventar, DBDIInventuren,
   DBDIJobLockStatus,
-  DBDIMandanten,
+  DBDIMandanten, DBDIObjektKatalogImages,
   DBDIRaeume,
   DBDIRaumEditStatus,
   DBDIRaumGebaeude,
@@ -16,6 +16,7 @@ import {
   LookupResultType
 } from '../../shared/interfaces/dexie.interfaces';
 import {
+  faBarcode,
   faBookReader,
   faCamera,
   faCheck,
@@ -30,6 +31,8 @@ import {
 import {InventoryProgress, InventoryProgressService} from '../../shared/inventory-progress/inventory-progress.service';
 
 import {ScanDetectData} from '../../shared/components/scannerdetection/scannerdetection.component';
+
+import {ArtikelFormType} from './modals/select-create-artikel/select-create-artikel.component';
 
 import {NgbModal, NgbModalRef} from '@ng-bootstrap/ng-bootstrap';
 // Dialogs
@@ -55,7 +58,7 @@ import {
 } from './data-services/inventar.service';
 import {ImagesService} from './data-services/images.service';
 import {BarcodeService} from './data-services/barcode.service';
-import {RaumIDAndStatus, RaumService} from './data-services/raum.service';
+import {RaumIDAndStatus, RaumImages, RaumService} from './data-services/raum.service';
 import {GesamtListRestComponent} from './modals/gesamt-list-rest/gesamt-list-rest.component';
 import {GesamtListDoneComponent} from './modals/gesamt-list-done/gesamt-list-done.component';
 import {SoundsService} from '../../shared/services/sounds.service';
@@ -64,7 +67,10 @@ import {Subscription} from 'rxjs';
 import {EditRaumComponent} from './modals/edit-raum/edit-raum.component';
 import {VariablesService} from '../../shared/services/variables.service';
 import {EditInventarComponent} from './modals/edit-inventar/edit-inventar.component';
-import {DBInsertArtikelResult} from "./data-services/artikel.service";
+import {DBInsertArtikelResult} from './data-services/artikel.service';
+import {ImageboxComponent} from './modals/imagebox/imagebox.component';
+import {ShowRaumImageComponent} from "./modals/show-raum-image/show-raum-image.component";
+import {CreateRaumImageComponent} from "./modals/create-raum-image/create-raum-image.component";
 
 interface ScannerConfiguration {
   minLength?: number; // 7
@@ -134,6 +140,7 @@ interface BCLookupResult {
 })
 export class InventFormComponent implements OnInit, OnDestroy {
 
+  faBarcode = faBarcode;
   faSearch = faSearch;
   faCamera = faCamera;
   faEdit = faEdit;
@@ -209,6 +216,9 @@ export class InventFormComponent implements OnInit, OnDestroy {
   numUnsynced = -1;
 
   raumEditStatus: DBDIRaumEditStatus;
+  raumBilder: RaumImages[] = [];
+  raumPlaene: RaumImages[] = [];
+
   jobLockStatus: DBDIJobLockStatus = DBDIJobLockStatus.Init;
 
   raumProgress: InventoryProgress = {
@@ -363,7 +373,19 @@ export class InventFormComponent implements OnInit, OnDestroy {
     this.formInventar.RaumBarcode = raum.code;
     this.clearFormInventar();
     this.raumEditStatus = this.raum.current_jobstatus;
+    this.raumBilder = [];
+    this.raumPlaene = [];
+    this.raumService.getRaumBilder(this.raum.uuid).then( (images) => {
+      console.log('InventFormComponent.raumService.getRaumBilder #376 images: ', images);
+      this.raumBilder = images;
+    });
+    this.raumService.getRaumPlaene(this.raum.uuid).then( (images) => {
+      console.log('InventFormComponent.raumService.getRaumPlaene #376 images: ', images);
+      this.raumPlaene = images;
+    });
     console.log('InventFormComponente #356  loadRaumByData refreshRaumProgress');
+
+
 
     this.refreshRaumProgress();
   }
@@ -606,7 +628,55 @@ export class InventFormComponent implements OnInit, OnDestroy {
     return this.raum ? this.raum.Raum : '';
   }
 
+  createKunstwerk() {
+    // YYYYMMDDHHMMSS
+    // Fantasy Barcode: 9{MID}{DEVID}
+    this.inventarDataService.getNewKunstBarcode().then( (kBarcode) => {
+      this.clearFormInventar();
+      this.formInventar.Barcode = kBarcode;
+      this.waitingForInventarData = true;
+      const modalCreateArtikel = this.openSelectCreateArtikel();
+      modalCreateArtikel.setFormType(ArtikelFormType.Kunst);
+    });
+  }
+
   get gebaeudeId() { return this.buildingID; }
+
+  openRaumbild(idx: number) {
+    if (false) {
+      const imgUuids = this.raumBilder.map( (itm) => itm.uuid);
+      const modalRef = this.modalService.open(ShowRaumImageComponent, {size: 'xl'});
+      console.log('openRaumplan', { raumBilder: this.raumBilder, imgUuids, idx });
+      this.modalWatch(modalRef, 'ShowRaumImage');
+      modalRef.componentInstance.setTitel('Raumbilder');
+      modalRef.componentInstance.setImageUuid(imgUuids[idx]);
+    } else {
+      const imgUuids = this.raumBilder.map( (itm) => itm.uuid);
+      const modalRef = this.modalService.open(ImageboxComponent, {size: 'xl'});
+      console.log('openRaumplan', { raumBilder: this.raumBilder, imgUuids, idx });
+      this.modalWatch(modalRef, 'Imagebox');
+      modalRef.componentInstance.setTitel('Raumbilder');
+      modalRef.componentInstance.setImagesUuids(imgUuids, idx);
+    }
+  }
+
+  openRaumplan(idx: number) {
+    if (false) {
+      const imgUuids = this.raumPlaene.map((itm) => itm.uuid);
+      const modalRef = this.modalService.open(ShowRaumImageComponent, {size: 'xl'});
+      console.log('openRaumplan', {raumPlaene: this.raumPlaene, imgUuids, idx});
+      this.modalWatch(modalRef, 'ShowRaumImage');
+      modalRef.componentInstance.setTitel('Raumpläne');
+      modalRef.componentInstance.setImageUuid(imgUuids[idx]);
+    } else {
+      const imgUuids = this.raumPlaene.map( (itm) => itm.uuid);
+      const modalRef = this.modalService.open(ImageboxComponent, {size: 'xl'});
+      console.log('openRaumplan', { raumPlaene: this.raumPlaene, imgUuids, idx });
+      this.modalWatch(modalRef, 'Imagebox');
+      modalRef.componentInstance.setTitel('Raumpläne');
+      modalRef.componentInstance.setImagesUuids(imgUuids, idx);
+    }
+  }
 
   openCreateArtikelImage() {
     const modalRef = this.modalService.open(CreateArtikelImageComponent);
@@ -619,6 +689,31 @@ export class InventFormComponent implements OnInit, OnDestroy {
       gcuuid: this.formInventar.gcuuid,
       name: this.formInventar.Bezeichnung + (this.formInventar.Typ ? '-' + this.formInventar.Typ : ''),
       desc: this.formInventar.Bezeichnung + (this.formInventar.Typ ? ' / ' + this.formInventar.Typ : '')
+    });
+    modalRef.result.then( () => {
+      this.reloadImageExistsStatus();
+    });
+  }
+
+  openCreateRaumImage() {
+
+    const rb = this.formInventar.Raumbezeichnung;
+    const rm = this.formInventar.Raum;
+    let name = '';
+    if (rm) {
+      name = rm.split('/').join('.').split(' ').join('_');
+    } else {
+      name = rb.split('/').join('.').split(' ').join('_');
+    }
+    const modalRef = this.modalService.open(CreateRaumImageComponent);
+    this.modalWatch(modalRef, 'CreateArtikelImage');
+    modalRef.componentInstance.name = this.formInventar.Bezeichnung + '/' + this.formInventar.Typ;
+    modalRef.componentInstance.gcuuid = this.formInventar.gcuuid;
+    modalRef.componentInstance.setMetaData({
+      for_jobid: this.jobid,
+      ruuid: this.formInventar.ruuid,
+      name,
+      desc: rb
     });
     modalRef.result.then( () => {
       this.reloadImageExistsStatus();
@@ -687,13 +782,14 @@ export class InventFormComponent implements OnInit, OnDestroy {
     const mRef = modalRef;
     const mName = name;
     console.log('InventFormComponente #610 Opened Modal: ', name);
-    this.currentModal = {
+    const currModal = {
       modalRef,
       name,
       isOpen: true
     };
+    this.currentModal = currModal;
     this.currentModals = this.currentModals.filter( mod => undefined !== mod.modalRef.componentInstance);
-    this.currentModals.push( this.currentModal );
+    this.currentModals.push( currModal );
     console.log('InventFormComponente #618 After open Modal: ', this.currentModal, this.currentModals);
 
     modalRef.result.then( (result) => {
@@ -732,7 +828,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
       });
   }
 
-  openSelectCreateArtikel() {
+  openSelectCreateArtikel(settings: any = null): SelectCreateArtikelComponent {
     const modalRef = this.modalService.open(SelectCreateArtikelComponent);
     this.modalWatch(modalRef, 'SelectCreateArtikel');
     modalRef.componentInstance.name = 'World';
@@ -747,6 +843,8 @@ export class InventFormComponent implements OnInit, OnDestroy {
     modalRef.componentInstance.artikelSearching.subscribe( (raum: number) => {
       this.openSelectSearchArtikel();
     });
+
+    return modalRef.componentInstance;
   }
 
   openSelectSearchArtikel() {

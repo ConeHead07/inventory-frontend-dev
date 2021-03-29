@@ -40,8 +40,8 @@ export class AuthInterceptorService implements HttpInterceptor {
     if (error.status === 400) {
       // Show message
     } else if (error.status === 401 || error.status === 403) {
-      console.error('Login ist abgelaufen. Bitte neu einloggen!');
       if (this.router.url.indexOf('/auth') === -1) {
+        console.error('Login ist abgelaufen. Bitte neu einloggen! navigate to /auth');
         this.router.navigateByUrl('/auth');
       }
     }

@@ -14,7 +14,7 @@ import {NavigationEnd, Router} from '@angular/router';
 export class AppComponent {
   title = 'frontend';
   url = '';
-  isLoginPage = true;
+  isLoginPage = false;
   currentApplicationVersion = environment.appVersion;
   readonly VAPID_PUBLIC_KEY = 'BG2ymYfILNZzi183knEsp5PkW8jaGhsMR0u1iAriOfRUjKrLuAQLE6oZf_TguLnBPDksMDE900zi_qnoqmjOE3Y';
 
