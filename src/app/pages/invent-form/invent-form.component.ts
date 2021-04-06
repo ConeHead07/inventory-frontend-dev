@@ -69,8 +69,8 @@ import {VariablesService} from '../../shared/services/variables.service';
 import {EditInventarComponent} from './modals/edit-inventar/edit-inventar.component';
 import {DBInsertArtikelResult} from './data-services/artikel.service';
 import {ImageboxComponent} from './modals/imagebox/imagebox.component';
-import {ShowRaumImageComponent} from "./modals/show-raum-image/show-raum-image.component";
-import {CreateRaumImageComponent} from "./modals/create-raum-image/create-raum-image.component";
+import {ShowRaumImageComponent} from './modals/show-raum-image/show-raum-image.component';
+import {CreateRaumImageComponent} from './modals/create-raum-image/create-raum-image.component';
 
 interface ScannerConfiguration {
   minLength?: number; // 7

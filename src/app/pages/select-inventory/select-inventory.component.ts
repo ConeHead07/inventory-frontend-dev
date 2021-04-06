@@ -10,6 +10,7 @@ import { faSyncAlt } from '@fortawesome/free-solid-svg-icons';
 import {ConnectionService, ConnectionState} from '../../shared/services/connection-service.service';
 import {Subscription} from 'rxjs';
 import {DbsyncLogService, LoadingMetaData, LoadingMetaMessage} from '../../shared/services/dbsync-log.service';
+import {BarcodeService} from "../invent-form/data-services/barcode.service";
 
 enum StatusLoadingInventories {
   None,
@@ -103,7 +104,8 @@ export class SelectInventoryComponent implements OnInit, OnDestroy {
     private baseData: BasedataService,
     private progressService: InventoryProgressService,
     private connection: ConnectionService,
-    private dbsyncLogService: DbsyncLogService) {
+    private dbsyncLogService: DbsyncLogService,
+    private bcLookupService: BarcodeService) {
   }
 
   get progressAmount(): number {
@@ -440,6 +442,7 @@ export class SelectInventoryComponent implements OnInit, OnDestroy {
       && await this.dataService.hasAllInventurData(this.inventory.jobid)
     ) {
       console.log('SelectInventoryComponent #410 onSubmit gotoLastInventory');
+      await this.bcLookupService.rebuildOnRunningSystemByJobid(this.jobid);
       this.gotoLastInventory();
     } else {
       console.log('SelectInventoryComponent #414 onSubmit dataService.loadInventurDataByInventurId', this.inventory.jobid);

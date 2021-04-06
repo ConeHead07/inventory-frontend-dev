@@ -418,16 +418,16 @@ export class BarcodeService {
         .where( { table: tblName, for_jobid: jobid, updateHelper: 1 })
         .modify({ updateHelper: 2 })
         .then( () => {
+          console.log('rebuildTableOnRunningSystemByJobid(' + jobid + ') rebuild Barcode for table ' + table.name);
           table.where({for_jobid: jobid })
             .filter( (item) => !!item.code)
             .each ( (item) => {
-              const forJobid = ('for_jobid' in item) ? item.for_jobid : 0;
               count += 1;
               tblBarcodeLookup.put({...{
                 code: item.code,
                 table: tblName,
                 key: keyName,
-                for_jobid: forJobid,
+                for_jobid: jobid,
                 uuid: item.uuid,
                 updateHelper: 1
             }, ...{log: false}});
@@ -478,7 +478,8 @@ export class BarcodeService {
         .modify({updateHelper: 2})
         .then( () => {
           console.log('rebuildTableOnRunningSystem rebuild Barcode for table ' + table.name);
-          table.filter( (item) => !!item.code).each ( (item) => {
+          table.filter( (item) => !!item.code)
+            .each ( (item) => {
             const forJobid = ('for_jobid' in item) ? item.for_jobid : 0;
             tblBarcodeLookup.put({...{
               code: item.code,
