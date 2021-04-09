@@ -9,31 +9,45 @@
   </button>
 
   <div class="navbar-collapse" [class.collapse]="collapsed" id="navbarContent">
-    <ul *ngIf="!isLoginPage" class="navbar-nav ml-auto">
+    <ul *ngIf="!isLoginPage" class="navbar-nav rowed-inline ml-auto">
 
       <li *ngIf="false" routerLinkActive="active" class="nav-item">
-        <a class="nav-link" routerLink="/auth">Login</a>
+        <a class="nav-link" routerLink="/auth">
+          <fa-icon [icon]="faUser"></fa-icon>
+          <span class="d-ynone d-md-inline">Login</span></a>
       </li>
 
       <li routerLinkActive="active" class="nav-item">
-        <a class="nav-link" routerLink="/select-inventory">Select</a>
+        <a class="nav-link" routerLink="/select-inventory">
+          <fa-icon [icon]="faHome"></fa-icon>
+          <span class="d-ynone d-md-inline"> Start </span></a>
       </li>
 
       <li routerLinkActive="active" class="nav-item">
-        <a class="nav-link" (click)="continueLastInventory()">Inventarisieren</a>
+        <a class="nav-link" (click)="continueLastInventory()">
+          <fa-icon [icon]="faPlayCircle"></fa-icon>
+          <span class="d-ynone d-md-inline"> Inventarisieren </span></a>
       </li>
 
       <li routerLinkActive="active" class="nav-item">
-        <a class="nav-link" routerLink="/sync">Sync</a>
+        <a class="nav-link" routerLink="/sync">
+          <fa-icon [icon]="faSync"></fa-icon>
+          <span class="d-ynone d-md-inline"> Sync </span></a>
       </li>
 
       <li routerLinkActive="active" class="nav-item">
-        <a class="nav-link" routerLink="/settings"><fa-icon [icon]="faCog"></fa-icon></a>
+        <a class="nav-link" routerLink="/settings">
+          <fa-icon [icon]="faCog"></fa-icon>
+          <span class="d-ynone d-md-inline"> Settings </span>
+        </a>
       </li>
 
 
       <li routerLinkActive="active" class="nav-item">
-        <a class="nav-link" routerLink="/auth/logout">Logout</a>
+        <a class="nav-link" routerLink="/auth/logout">
+          <fa-icon [icon]="faPowerOff"></fa-icon>
+          <span class="d-ynone d-md-inline"> Logout </span>
+        </a>
       </li>
     </ul>
   </div>

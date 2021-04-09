@@ -1,3 +1,8 @@
+.modal-header.modal-header-with-links {
+  display: flex;
+  flex-direction: row-reverse;
+}
+
 .card-body,
 .card-footer {
   padding: 0.5rem;

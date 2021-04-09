@@ -1,7 +1,7 @@
 import {Component, EventEmitter, OnInit, Output } from '@angular/core';
 
 import { ModalDismissReasons, NgbActiveModal} from '@ng-bootstrap/ng-bootstrap';
-import { faSearch, faCamera, faSignOutAlt } from '@fortawesome/free-solid-svg-icons';
+import { faSearch, faCamera, faSignOutAlt, faExchangeAlt } from '@fortawesome/free-solid-svg-icons';
 import { DBDIRaeume} from '../../../../shared/interfaces/dexie.interfaces';
 import { RaumService, RaumBasisDaten } from '../../data-services/raum.service';
 

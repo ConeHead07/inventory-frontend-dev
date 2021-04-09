@@ -1,9 +1,9 @@
-<div class="modal-header p-0" style="padding:0.1rem">
-  <div class="btn-group row no-gutters w-100">
-    <button class="btn btn-primary col-10 text-left pl-3" (click)="showRaumDoneForm($event)">
-      <fa-icon [icon]="faSignOutAlt" class="mr-3"></fa-icon> Zeige zugewiesenes Inventar
+<div class="modal-header modal-header-fb-align-right p-0" style="padding:0.1rem">
+  <div class="btn-group">
+    <button class="btn btn-link pl-3" (click)="showRaumDoneForm($event)">
+      <fa-icon [icon]="faExchangeAlt"></fa-icon> Zeige zugewiesenes Inventar
     </button>
-    <button type="button" class="btn btn-danger col-2" (click)="activeModal.dismiss('Cross click')">
+    <button type="button" class="btn btn-danger" (click)="activeModal.dismiss('Cross click')">
       <span aria-hidden="true">&times;</span>
     </button>
   </div>

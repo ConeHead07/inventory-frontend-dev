@@ -1,9 +1,9 @@
-<div class="modal-header p-0" style="padding:0.1rem">
-  <div class="btn-group row no-gutters w-100">
-    <button class="btn btn-primary col-10 text-left pl-3" (click)="showCreateForm($event)">
-      <fa-icon [icon]="faSignOutAlt" class="mr-3"></fa-icon> <fa-icon [icon]="faPlus"></fa-icon> Neuen Raum anlegen
+<div class="modal-header modal-header-with-links p-0" style="padding:0.1rem">
+  <div class="btn-group">
+    <button class="btn btn-link pl-3" (click)="showCreateForm($event)">
+      <fa-icon [icon]="faPlus"></fa-icon> Neuen Raum anlegen
     </button>
-    <button type="button" class="btn btn-danger col-2" (click)="activeModal.dismiss('Cross click')">
+    <button type="button" class="btn btn-danger" (click)="activeModal.dismiss('Cross click')">
       <span aria-hidden="true">&times;</span>
     </button>
   </div>
@@ -26,7 +26,6 @@
          [editable]='false' />
   </div>
   <hr>
-  <pre>Model: {{ model | json }}</pre>
 
-  <p>select-search-raum works! {{ gebaeudeId }}</p>
+  <p class="d-none">select-search-raum works! {{ gebaeudeId }}</p>
 </div>

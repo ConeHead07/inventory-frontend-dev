@@ -271,9 +271,21 @@
             <span class="input-group-text">Bild</span>
           </div>
           <div class="input-group-append">
-            <button type="button" class="btn btn-info"    *ngIf="artikelImageExists" (click)="openShowArtikelImage()"><fa-icon [icon]="faImage"></fa-icon> anzeigen</button>
-            <button type="button" class="btn btn-success" *ngIf="artikelImageExists" [disabled]="!formInventar.gcuuid" (click)="openEditArtikelImage()"><fa-icon [icon]="faCamera"></fa-icon> bearbeiten </button>
-            <button type="button" class="btn btn-success" *ngIf="!artikelImageExists" [disabled]="!formInventar.gcuuid" (click)="openCreateArtikelImage()"><fa-icon [icon]="faCamera"></fa-icon> anlegen </button>
+            <button type="button" class="btn btn-info"
+                    *ngIf="artikelImageExists"
+                    (click)="openShowArtikelImage()"><fa-icon [icon]="faEye"></fa-icon>
+              <span class="d-none d-md-inline"> anzeigen </span>
+            </button>
+            <button type="button" class="btn btn-success"
+                    *ngIf="artikelImageExists"
+                    [disabled]="!formInventar.gcuuid" (click)="openEditArtikelImage()"><fa-icon [icon]="faEdit"></fa-icon>
+              <span class="d-none d-md-inline"> bearbeiten </span>
+            </button>
+            <button type="button" class="btn btn-success"
+                    *ngIf="!artikelImageExists"
+                    [disabled]="!formInventar.gcuuid" (click)="openCreateArtikelImage()"><fa-icon [icon]="faCamera"></fa-icon>
+              <span class="d-none d-md-inline"> anlegen </span>
+            </button>
           </div>
         </div>
 
@@ -282,7 +294,8 @@
             <div class="input-group-text" id="btnGroupAddon2">Kunst</div>
           </div>
           <div class="input-group-append">
-            <button type="button" class="btn btn-dark" (click)="createKunstwerk()">anlegen</button>
+            <button type="button" class="btn btn-dark" (click)="createKunstwerk()"><fa-icon [icon]="faPlus"></fa-icon>
+              <span class="d-none d-md-inline"> anlegen </span></button>
           </div>
         </div>
       </div>

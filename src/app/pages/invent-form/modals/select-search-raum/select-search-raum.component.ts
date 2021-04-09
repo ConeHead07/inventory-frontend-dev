@@ -2,7 +2,7 @@ import {AfterViewInit, Component, ElementRef, EventEmitter, OnInit, Output, View
 import { Observable } from 'rxjs';
 import { debounceTime, distinctUntilChanged, map, filter} from 'rxjs/operators';
 import { DataService } from '../../../../shared/services/data.service';
-import { faPlus, faSearch, faSearchLocation, faSignOutAlt } from '@fortawesome/free-solid-svg-icons';
+import { faPlus, faSearch, faSearchLocation, faSignOutAlt, faExchangeAlt } from '@fortawesome/free-solid-svg-icons';
 
 import { NgbActiveModal} from '@ng-bootstrap/ng-bootstrap';
 import { DBDIRaeume} from '../../../../shared/interfaces/dexie.interfaces';

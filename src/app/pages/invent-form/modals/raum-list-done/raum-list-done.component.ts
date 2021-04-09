@@ -5,7 +5,7 @@ import {InventarData} from '../../../../shared/services/data.service';
 import {NgbActiveModal} from '@ng-bootstrap/ng-bootstrap';
 import {BasedataService} from '../../../../shared/services/basedata.service';
 
-import { faSignOutAlt } from '@fortawesome/free-solid-svg-icons';
+import { faSignOutAlt, faExchangeAlt } from '@fortawesome/free-solid-svg-icons';
 
 interface RaumInventarDone {
   mcuuid?: string;
@@ -24,6 +24,7 @@ export class RaumListDoneComponent implements OnInit {
   @Output() requestRestList = new EventEmitter<DBDIRaeume>();
 
   faSignOutAlt = faSignOutAlt;
+  faExchangeAlt = faExchangeAlt;
 
   inventarListDone: RaumInventarDone[] = [];
   inventarListGrouped: RaumInventarDone[] = [];

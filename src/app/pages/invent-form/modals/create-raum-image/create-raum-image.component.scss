@@ -1,3 +1,8 @@
+.modal-header.modal-header-with-links {
+  display: flex;
+  flex-direction: row-reverse;
+}
+
 .editor {
   height: 60%;
   position:relative;
