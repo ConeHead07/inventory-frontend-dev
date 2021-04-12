@@ -318,18 +318,21 @@
 <div [hidden]="!manualBCInputEnabled">
   <h5>Barcode-Scanning Test</h5>
   <div class="row">
-  <div class="col">
-    <h6>Scanner Simulator</h6>
-    <textarea #inputSimulateBarcode></textarea><br>
-    <button (click)="simulateScanner()">Barcode senden</button><br>
+    <div class="col">
+      <h6>Scanner Simulator</h6>
+      <textarea #inputSimulateBarcode></textarea><br>
+      <button (click)="simulateScanner()">Barcode senden</button><br>
+    </div>
+    <div class="col">
+      <app-scannerdetection (scanned)="handleScanData($event)" [config]="scanDetectorConfig">
+        <h6>Scan-Detector Barcode</h6>
+        <textarea #input2 [ngClass]="lastScanDetectClass"></textarea><br>
+        (Zeit: {{ lastScanDetectTime | date:'hh:mm:ss' }})
+      </app-scannerdetection>
+    </div>
+    <div class="d-none">{{ formInventar | json }}</div>
   </div>
-  <div class="col">
-    <app-scannerdetection (scanned)="handleScanData($event)" [config]="scanDetectorConfig">
-      <h6>Scan-Detector Barcode</h6>
-      <textarea #input2 [ngClass]="lastScanDetectClass"></textarea><br>
-      (Zeit: {{ lastScanDetectTime | date:'hh:mm:ss' }})
-    </app-scannerdetection>
-  </div>
-  <div class="d-none">{{ formInventar | json }}</div>
 </div>
-</div>
+
+<audio *ngIf="beepSuccessSrc" id="beepSuccess" [src]="beepSuccessSrc" autoPlay muted></audio>
+<audio *ngIf="beepErrorSrc" id="beepError" [src]="beepErrorSrc" autoPlay muted></audio>

@@ -1,0 +1,86 @@
+<div class="modal-header">
+  <h6 class="modal-title">Barcodes-Batchverarbeitung</h6>
+  <button type="button" class="close" aria-label="Close" (click)="activeModal.dismiss('Cross click')">
+    <span aria-hidden="true">&times;</span>
+  </button>
+</div>
+<div class="modal-body">
+  <strong>Lade {{ loadingTotal }} Barcodes</strong>
+  <p *ngIf="loadingTotal">
+    <ngb-progressbar
+      [type]="loadingType"
+      [value]="loadingPercent"
+      [striped]="loadingAnimated"
+      [animated]="true"><i>
+    {{ loadingCurrent }} von {{ loadingTotal }}
+  </i></ngb-progressbar></p>
+
+  <div class="card">
+    <div class="card-body">
+      <h5 class="card-title">Raum {{ raum.Raum}} {{ raum.Raumbezeichnung }}</h5>
+      <p class="card-text" *ngIf="raum">
+        <app-progressbar [shortTitle]="'Raum'"  [title]="'Fortschrittsanzeige Raum'"
+                         [value]="raumProgress.done"
+                         [total]="raumProgress.total">
+        </app-progressbar>
+      </p>
+    </div>
+  </div>
+
+  <div class="card" *ngIf="scanResultFirst">
+    <div class="card-body">
+      <h5 class="card-title">{{ scanResultFirst.result.barcode }}</h5>
+
+      <div *ngIf="scanResultFirst.image && scanResultFirst.image.data_url" class="float-right">
+        <img [src]="scanResultFirst.image.data_url" style="max-width:200%;max-height:150px">
+      </div>
+
+      <p class="card-text">
+        <span class="font-weight-bold">{{ scanResultFirst.typToString }}:</span> {{ scanResultFirst.infos }}
+      </p>
+      <p *ngIf="false">{{ scanResultFirst | json }}</p>
+
+    </div>
+    <div class="btn-group w-100">
+      <button class="btn btn-success btn-sm col-6" (click)="applyResult(scanResultFirst)"><fa-icon [icon]="faCheck"></fa-icon></button>
+      <button class="col-6 btn btn-danger" ngbButton (click)="clearResult()"><fa-icon [icon]="faRemove"></fa-icon></button>
+    </div>
+
+  </div>
+
+  <div *ngIf="scanResultHistory.length > 0">
+    <hr class="mt-3">
+    <div class="w-100 text-right">
+      <button class="btn btn-secondary btn-sm" (click)="clearHistory()">clear history</button>
+    </div>
+
+    <div *ngFor="let item of scanResultHistory">
+      <div class="card mt-2">
+        <div class="card-body" style="padding:.5rem">
+          <h5 class="card-title">{{ item.result.barcode }}</h5>
+
+          <div *ngIf="item.image && item.image.data_url" class="float-right">
+            <img [src]="item.image.data_url" style="max-width:100%;max-height:50px">
+          </div>
+
+          <p class="card-text">
+            <span class="font-weight-bold">{{ item.typToString }}:</span>{{ item.infos }}
+          </p>
+          <p *ngIf="false">
+            {{ item | json }}
+          </p>
+
+        </div>
+
+        <div class="btn-group w-100">
+          <button class="btn btn-success btn-sm col-6" (click)="applyResult(item)"><fa-icon [icon]="faCheck"></fa-icon></button>
+          <button class="btn btn-danger btn-sm col-6" (click)="removeResult(item)"><fa-icon [icon]="faRemove"></fa-icon></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+<div class="modal-footer">
+  <button type="button" class="btn btn-outline-dark" (click)="activeModal.close('Close click')">Close</button>
+</div>

@@ -113,19 +113,20 @@ export class ScannerdetectionComponent implements OnInit {
     const isScanInput: boolean = diff > this.detectorConfig.scanTimeout;
     const key = 'key' in event ? event.key : '';
     const isShiftKey = event.shiftKey;
+    // const isEnterKey = event.metaKey;
 
     if (!isScanInput) {
       this.input = key;
-      console.log('#101 scannerDetection Start, input', this.input);
+      console.log('#101 scannerDetection Start, input', this.input, 'diff', diff);
     } else {
-      console.log('#109 scannerDetection isScanInput', { target, key, 'this.input': this.input, 'event.type': event.type, event});
+      console.log('#109 scannerDetection isScanInput', { diff, target, key, 'this.input': this.input, 'event.type': event.type, event});
       if (key.length === 1 ) {
         this.input += !isShiftKey ? key : key.toUpperCase();
         const barcode = this.input;
         console.log('#106 scannerDetection add Char to Barcode', { key, barcode });
       } else if (key === 'Tab' || key === 'Enter') {
         // Nothing
-        event.preventDefault();
+        // event.preventDefault();
       }
     }
 

@@ -122,6 +122,12 @@ export interface ServerChangesStatusInfo {
   errorMsg?: string;
 }
 
+interface ServerChangesStatusInfoCache {
+  jobid: number;
+  timestamp: number;
+  data: ServerChangesStatusInfo;
+}
+
 interface SyncIncompleteInventuren {
   jobid: number;
   changes: DBDIClientChangeLog[];
@@ -252,6 +258,9 @@ export class DBSyncClientService implements OnDestroy {
   private fullImportJobid = 0;
   private currentJobSyncStatus: CurrentJobSyncStatus;
   private subscriptionClientLogsChanged: Subscription;
+  private subscriptionNetworkChanged: Subscription;
+  private aLastServerChangesByJobid: ServerChangesStatusInfoCache[] = [];
+  private serverChangesCacheLifetime = 60 * 1000;
 
   @Output() autoSyncChange = new EventEmitter<boolean>();
   @Output() updateStatusChanges = new EventEmitter<any>();
@@ -268,9 +277,19 @@ export class DBSyncClientService implements OnDestroy {
     private bcLookupService: BarcodeService) {
 
     this.subscriptionClientLogsChanged = this.dexieService.clientSyncAmountChanged.subscribe( (amount) => {
-      console.log('DBSyncClientService #245 clientSyncAmountChanged: ', { amount });
+      console.log('DBSyncClientService.constructor() subscribedEvent #271 clientSyncAmountChanged: ', { amount });
     });
-    this.autoSyncStart();
+    this.subscriptionNetworkChanged = this.networkService.monitor().subscribe( (state) => {
+      console.log('DBSyncClientService.constructor() connectionChanged #275', { state });
+      if (state.hasServerAccess) {
+        this.autoSyncStart(true);
+      } else {
+        this.autoSyncStop();
+      }
+    });
+    if (this.networkService.getCurrentState().hasServerAccess) {
+      this.autoSyncStart();
+    }
   }
 
   ngOnDestroy() {
@@ -326,6 +345,9 @@ export class DBSyncClientService implements OnDestroy {
   }
 
   async sync() {
+    if (!this.networkService.getCurrentState().hasServerAccess) {
+      return;
+    }
     const isDBSyncService = (this instanceof DBSyncClientService);
     console.log('#233 dbsync-client.service sync() this is DBSyncClientService', { isDBSyncService });
     if (!isDBSyncService) {
@@ -400,31 +422,50 @@ export class DBSyncClientService implements OnDestroy {
       });
   }
 
+  async refreshServerChangeCache(jobid, timestamp, data): Promise<void> {
+    const sc = this.aLastServerChangesByJobid.find( ch => ch.jobid === jobid);
+    if (sc) {
+      sc.timestamp = Date.now();
+      sc.data = data;
+    } else {
+      this.aLastServerChangesByJobid.unshift({
+        jobid,
+        timestamp: Date.now(),
+        data
+      });
+    }
+  }
+
+  async getLastServerChanges(jobid: number = 0, maxAge = 60 * 10 * 1000): Promise<ServerChangesStatusInfo> {
+    const sc = this.aLastServerChangesByJobid.find( ch => ch.jobid === jobid);
+    if (!sc || Date.now() - sc.timestamp > maxAge) {
+      return this.askServerForChanges(jobid);
+    }
+    return sc.data;
+  }
+
   async syncJob(jobid: number): Promise<SyncJobResult> {
-    console.log('[called DBSyncClientService syncJob()] call this.clearFinishedProcesses');
+    console.log('DBSyncClientService.syncJob(jobid:', jobid, ') #404');
     this.clearFinishedProcesses();
 
-    console.log('[called syncJob] call this.processes.find(proc => proc.jobid === ' + jobid + ')');
     const currJobProc = this.processes.find( proc => proc.jobid === jobid);
     const newJob = new SyncJobResult(jobid);
 
     if (currJobProc && !currJobProc.finished) {
-      console.log('Doppelter Sync-Aufruf. Sync für Job ' + jobid + ' läuft bereits!', { currJobProc});
+      console.log('DBSyncClientService.syncJob() #411. Sync für Job ', jobid, ' läuft bereits!');
       newJob.alreadyStartedProcess = currJobProc;
-      console.log('[called syncJob] call newJob.finish(AlreadyStarted)');
       return newJob.finish(SyncJobStatus.AlreadyStarted,
         'Sync-Process is already running. Duration: ' + currJobProc.durationFormatted
       );
     }
 
-    console.log('[called syncJob] call this.numUnsyncedChangeLogsByJobId(' + jobid + ')');
     const numChanges = await this.numUnsyncedChangeLogsByJobId(jobid);
     if (!numChanges) {
-      console.log('[called syncJob] numClientChanges: ' + numChanges);
+      console.log('DBSyncClientService.syncJob() #420. numClientChanges: ' + numChanges);
       // return newJob.finish(SyncJobStatus.AbortedEmptyChangeLogs);
     }
 
-    console.log('[called syncJob] call this.sendByJobId(' + jobid + ', [], newJob)');
+    console.log('DBSyncClientService.syncJob() #424. call this.sendByJobId(' + jobid + ', [], newJob)');
     this.sendByJobId(jobid, [], newJob);
     return newJob;
   }
@@ -440,7 +481,7 @@ export class DBSyncClientService implements OnDestroy {
   }
 
   async sendByJobId(useJobid: number, useLogs?: DBDIClientChangeLog[], useJobResult?: SyncJobResult): Promise<SyncJobResult> {
-    console.log('[called sendByJobId](' + useJobid + ', useLogs(', { useLogs, useJobResult });
+    console.log('DBSyncClientService.sendByJobId(useJobid:', useJobid, 'useLogs: ', typeof useJobResult, ') #440');
     this.clearFinishedProcesses();
     const jobid = useJobid;
     const syncJobResult = useJobResult || new SyncJobResult(jobid);
@@ -454,7 +495,6 @@ export class DBSyncClientService implements OnDestroy {
     }
 
     if (!this.networkService.hasServerAccess) {
-      console.error('#369 dbsync-client.service sendByJobId() Synchronisatioon wurde abgebrochen wegen fehlender Serververbindung!');
       return this.finishProcess(
         syncJobResult,
         SyncJobStatus.Offline,
@@ -462,6 +502,7 @@ export class DBSyncClientService implements OnDestroy {
       );
     }
 
+    console.log('DbsyncClientServer.sendByJobId(', useJobid, ') #475 call askServerForChanges', (new Date()).toString());
     const ServerInfo = await this.askServerForChanges();
 
     const devid = this.baseData.getCurrentDeviceId() || 0;
@@ -471,7 +512,7 @@ export class DBSyncClientService implements OnDestroy {
     const jobInProcess = this.processes.find(proc => proc.jobid === jobid);
 
     if (jobInProcess && !jobInProcess.finished) {
-      console.error('#369 dbsync-client.service sendByJobId() Synchronisatioon wurde abgebrochen. Sync läuft bereits');
+      console.log('DBSyncClientService.sendByJobId() #470. Abbruch. Sync läuft bereits');
       syncJobResult.alreadyStartedProcess = jobInProcess;
       return syncJobResult.finish(SyncJobStatus.AlreadyStarted);
     }
@@ -480,13 +521,13 @@ export class DBSyncClientService implements OnDestroy {
     this.processStarted.emit(syncJobResult);
 
     if (!useLogs || !useLogs.length) {
-      console.error('#395 dbsync-client.service sendByJobId() Keine Client-Änderungen!');
+      console.log('DBSyncClientService.sendByJobId() #479. Keine Client-Änderungen!');
       syncJobResult.setStatus(SyncJobStatus.QueryChangeLogs);
       useLogs = await this.getUnsyncedChangeLogsByJobId(useJobid);
     }
 
     if (!useLogs && !ServerInfo.NumChanges) {
-      console.error('#369 dbsync-client.service sendByJobId(); Synchronisatioon wurde abgebrochen. Keine Änderungen!');
+      console.log('DBSyncClientService.sendByJobId() #485; Abbruch. Keine Änderungen!');
       return this.finishProcess(syncJobResult, SyncJobStatus.AbortedEmptyChangeLogs);
     }
     let logs = useLogs;
@@ -495,7 +536,7 @@ export class DBSyncClientService implements OnDestroy {
     syncJobResult.committedIds = logs.map<number>((itm) => itm.id);
 
     // ASK for Server-Changes
-    console.log('#410 dbsync-client.service sendByJobId(); call this.processes.push(syncJobResult)');
+    console.log('DBSyncClientService.sendByJobId() #494');
     this.processingJobids.push(jobid);
     this.processes.push(syncJobResult);
 
@@ -524,7 +565,10 @@ export class DBSyncClientService implements OnDestroy {
         alert( err );
         return;
       }
-      console.log('#421 dbsync-client.service sendByJobId() Synchronisations-Loop!', { syncJobLoop, lastRevId, logs });
+      console.log(
+        'DBSyncClientService.sendByJobId() #523. Synchronisations-Loop!',
+        { syncJobLoop, lastRevId, 'logs.length': logs.length }
+      );
 
       syncLogMsg('Download Daten ...');
       syncJobResult.committed = logs.length;
@@ -594,7 +638,7 @@ export class DBSyncClientService implements OnDestroy {
             }
           }
 
-          console.log('Process serverRechanges');
+          console.log('DBSyncClientService.sendByJobId() #596. Process serverRechanges');
           if (data.serverRechanges && data.serverRechanges.length > 0) {
             syncLogMsg('Korrigiere Client-Ids nach Server-Antwort ...');
             syncJobResult.setStatus(SyncJobStatus.WriteServerReChanges);
@@ -605,7 +649,7 @@ export class DBSyncClientService implements OnDestroy {
             }));
           }
 
-          console.log('Process serverChanges');
+          console.log('DBSyncClientService.sendByJobId() #607. Process serverChanges');
 
           if (data.serverChanges.rows && data.serverChanges.rows.length > 0) {
             syncLogMsg('Import Server-Changes ...');
@@ -617,7 +661,6 @@ export class DBSyncClientService implements OnDestroy {
               if (currRevId < lastRevId) {
                 const err = '#501 SYNC-FEHLER: LastRevId ist größer als CurrRevID: ' + lastRevId + ' > ' + currRevId;
                 console.error(err);
-                alert(err);
                 return this.finishProcess(syncJobResult, SyncJobStatus.Aborted,
                   'Server-Aenderungen sind nicht streng nach RevId sortiert!');
               }
@@ -641,7 +684,7 @@ export class DBSyncClientService implements OnDestroy {
                 case 1: // Insert
                   tableLogs[chg.table].puts++;
                   const objInsertData = { ...(JSON.parse(chg.obj)), ...{ log: false }};
-                  console.log('#494 ' + ci + '/' + chgLen +
+                  console.log('DBSyncClientService.sendByJobId() INSERT #642. ' + ci + '/' + chgLen +
                     ' dbsync-client.service. await this.dexieService.table( ' + chg.table + ' ).put( objInsertData )', objInsertData);
                   await this.dexieService.table(chg.table).put(objInsertData);
                   break;
@@ -649,8 +692,8 @@ export class DBSyncClientService implements OnDestroy {
                 case 2: // Update
                   tableLogs[chg.table].modified++;
                   const objUpdateData = { ...(JSON.parse(chg.mods)), ...{ log: false }};
-                  console.log('#499 ' + ci + '/' + chgLen +
-                    ' dbsync-client.service. await this.dexieService.table( ' + chg.table + ' )' +
+                  console.log('DBSyncClientService.sendByJobId() UPDATE #650. ' + ci + '/' + chgLen +
+                    ' this.dexieService.table( ' + chg.table + ' )' +
                     '.where({uuid:' + chg.uuid + '}).modify( objUpdateData )', chg);
                   await this.dexieService.table(chg.table)
                     .where({uuid: chg.uuid})
@@ -659,8 +702,8 @@ export class DBSyncClientService implements OnDestroy {
 
                 case 3: // Delete
                   tableLogs[chg.table].deleted++;
-                  console.log('#329 ' + ci + '/' + chgLen +
-                    ' dbsync-client delete ' + chg.table + ' by uuid ' + chg.uuid );
+                  console.log('DBSyncClientService.sendByJobId() DELETE #650 ' + ci + '/' + chgLen +
+                    ' table ' + chg.table + ' by uuid ' + chg.uuid );
                   await this.dexieService.table(chg.table)
                     .where({uuid: chg.uuid})
                     .delete();
@@ -669,8 +712,8 @@ export class DBSyncClientService implements OnDestroy {
               executed++;
               tableLogs[chg.table].executed++;
               lastRevId = currRevId;
-              console.log('511 ' + ci + '/' + chgLen +
-                ' dbsync-client.service await this.settings.set(', lastRevIdVar, chg.revision_id, ')');
+              console.log('DBSyncClientService.sendByJobId() DELETE #670 ' + ci + '/' + chgLen +
+                ' this.settings.set(', lastRevIdVar, chg.revision_id, ')');
               await this.settings.setRevId(lastRevIdVar, chg.revision_id, 'LogRow ' + ci + '/' + chgLen + '; RevId ' + currRevId);
 
               if (executed === total || executed % 100 === 0) {
@@ -684,7 +727,7 @@ export class DBSyncClientService implements OnDestroy {
             }
           }
 
-          console.log('Process SyncResponse finished');
+          console.log('DBSyncClientService.sendByJobId() #685. Process SyncResponse finished');
           syncJobResult.revisionId = await this.settings.get(lastRevIdVar);
           syncJobResult.committed = logs ? logs.length : 0;
           syncJobResult.synced = data.aSyncedChangeIds ? data.aSyncedChangeIds.length : 0;
@@ -692,7 +735,7 @@ export class DBSyncClientService implements OnDestroy {
           syncJobResult.numServerRechanges = data.serverRechanges ? data.serverRechanges.length : 0;
           syncJobResult.numServerChanges = data.serverChanges ? data.serverChanges.rows.length : 0;
 
-          console.log('#508 dbsync-client.service, data.serverChanges.total:', data.serverChanges.total);
+          console.log('DBSyncClientService.sendByJobId() #693. data.serverChanges.total:', data.serverChanges.total);
 
           for (const logData of Object.values(tableLogs)) {
             syncLogData(logData);
@@ -700,20 +743,23 @@ export class DBSyncClientService implements OnDestroy {
           }
 
           if (data.serverChanges.rows.length < data.serverChanges.total) {
-            console.log('#511 keep SyncProcess(jobid: ' + syncJobResult.jobid + ') open');
+            console.log('DBSyncClientService.sendByJobId() #701. Keep SyncProcess(jobid: ' + syncJobResult.jobid + ') open');
             return syncJobResult;
           }
-          console.log('#514 finish SyncProcess(jobid: ' + syncJobResult.jobid + ')');
+          console.log('DBSyncClientService.sendByJobId() #704. Finish SyncProcess(jobid: ' + syncJobResult.jobid + ')');
           syncLogMsg('Aktuelle Synchronisation wurde abgeschlossen');
           return this.finishProcess(syncJobResult, SyncJobStatus.Finished);
         }
       );
     }
+    console.log('DBSyncClientService.sendByJobId() #710 FINISHED. tableLogs: ', tableLogs);
   }
 
   async addBarcodeToLookupTable(
-    code: DBDIBarcodeLookup['code'], table: DBDIBarcodeLookup['table'],
-    uuid: DBDIBarcodeLookup['uuid'], forJobid: DBDIBarcodeLookup['for_jobid'],
+    code: DBDIBarcodeLookup['code'],
+    table: DBDIBarcodeLookup['table'],
+    uuid: DBDIBarcodeLookup['uuid'],
+    forJobid: DBDIBarcodeLookup['for_jobid'],
     id?: DBDIBarcodeLookup['id']): Promise<boolean> {
 
     const tblBarcodeLookup = this.dexieService.barcodeLookup;
@@ -733,16 +779,8 @@ export class DBSyncClientService implements OnDestroy {
   }
 
   public clearFinishedProcesses() {
-    console.log('DBSyncClientService #668 processList before clearFinishedProcesses', { ...this.processes.map(p => p) });
-    this.processes = this.processes.filter( proc => {
-      const finished = !proc.finished;
-      if (finished) {
-        proc = null;
-      }
-      return !finished;
-    } );
+    this.processes = this.processes.filter(p => !p.finished );
     this.processingJobids = this.processes.map<number>( proc => proc.jobid );
-    console.log('DBSyncClientService #677 processList after clearFinishedProcesses', { ...this.processes.map(p => p) });
   }
 
   public getRunningProcesses(): SyncJobResult[] {
@@ -780,7 +818,6 @@ export class DBSyncClientService implements OnDestroy {
   }
 
   public async getUnsyncedChangeLogsByJobId(jobid: number): Promise<DBDIClientChangeLog[]> {
-    const tablePrio = [ 'inventar', 'objektKatalogMandant', 'objektKatalogGlobal', 'hersteller' ];
     const db = this.dexieService;
 
     return db.clientChangeLog
@@ -793,7 +830,7 @@ export class DBSyncClientService implements OnDestroy {
   }
 
   public sortAndFixChangeLogs(list: DBDIClientChangeLog[]): Promise<DBDIClientChangeLog[]> {
-    console.log('DbSyncClientService #866 sortAndFixChangeLogs', { ...list });
+    console.log('DbSyncClientService.sortAndFixChangeLogs(list(length):', list.length, ') #800');
     const tablePrio = [ 'inventar', 'objektKatalogMandant', 'objektKatalogGlobal', 'hersteller' ];
     const db = this.dexieService;
 
@@ -808,7 +845,7 @@ export class DBSyncClientService implements OnDestroy {
     return Promise.all(list.map( async (itm) => {
       if (itm.type === DatabaseChangeType.Update) {
         if (Object.keys(itm.mods).length === 0 || (Object.keys(itm.mods).length === 1 && 'modified_at' in itm.mods)) {
-          console.log('DbSyncClientService #881 Removing empty Entry from Change-Log', { itm });
+          console.log('DbSyncClientService.sortAndFixChangeLogs() #815 Removing empty Entry from Change-Log', { itm });
           db.clientChangeLog.delete(itm.id);
           return null;
         }
@@ -827,13 +864,17 @@ export class DBSyncClientService implements OnDestroy {
         if (itm.type === DatabaseChangeType.Update) {
           let isEmptyMod = false;
           if (itm.mods.mcid && !itm.mods.mcuuid) {
-            console.error('DBSyncClient Found Inventar-Update #872 without mcuuid-Field', {...itm});
+            console.error(
+              'DbSyncClientService.sortAndFixChangeLogs() #834.' +
+              'Found Inventar-Update #872 without mcuuid-Field', {...itm});
             const artikelRef = await db.objektKatalogMandant.where({mcid: itm.mods.mcid}).first();
             if (artikelRef) {
               itm.mods.mcuuid = artikelRef.uuid;
-              console.log('DBSyncClient Found Inventar-Update #875 added mcuuid-Field', {...itm});
+              console.log('DbSyncClientService.sortAndFixChangeLogs() #838.' +
+                ' Found Inventar-Update #875 added mcuuid-Field', {...itm});
             } else {
-              console.error('DBSyncClient Found Inventar-Update #875 but don t found ArtikelRef.mcuuid-Field', {...itm});
+              console.error('DbSyncClientService.sortAndFixChangeLogs() #840.' +
+                ' Found Inventar-Update #875 but don t found ArtikelRef.mcuuid-Field', {...itm});
             }
             delete itm.mods.mcid;
           }
@@ -844,15 +885,17 @@ export class DBSyncClientService implements OnDestroy {
             isEmptyMod = true;
           }
           if (isEmptyMod) {
-            console.log('DbSyncClientService #908 Removing empty Entry from Change-Log', { itm });
+            console.log('DbSyncClientService.sortAndFixChangeLogs() #855.' +
+              ' Removing empty Entry from Change-Log', { itm });
             db.clientChangeLog.delete(itm.id);
             itm = null;
           }
         } else if (itm.type === DatabaseChangeType.Create) {
           // Test und Korrektur falls GCUUID stat MCUUID in Inventar hinterlegt wurde
-          console.log('DBSyncClient #849 Test if inventar has gcuuid instead of mcuuid, itm.obj.mcuuid: ' + itm.obj.mcuuid);
+          console.log('DbSyncClientService.sortAndFixChangeLogs() #862.' +
+            ' Test if inventar has gcuuid instead of mcuuid, itm.obj.mcuuid: ' + itm.obj.mcuuid);
           await db.objektKatalogGlobal.where({uuid: itm.obj.mcuuid}).first().then( async (rslt) => {
-            console.log('DbSyncClientService #851 result of okm-Query by mcuuid', { rslt });
+            console.log('DbSyncClientService.sortAndFixChangeLogs() #865 result of okm-Query by mcuuid', { rslt });
             if (rslt) {
               const okgItm = rslt;
               await db.objektKatalogMandant.where({gcuuid: okgItm.uuid }).first().then( (okm) => {
@@ -869,27 +912,28 @@ export class DBSyncClientService implements OnDestroy {
             return rslt;
           })
             .catch( (reason) => {
-              console.error('DBSyncClient #865 Error on Querying for OKG by ' + itm.obj.mcuuid, {reason});
+              console.error('DbSyncClientService.sortAndFixChangeLogs() #882.' +
+                ' Error on Querying for OKG by ' + itm.obj.mcuuid, {reason});
             });
 
           if (itm.obj.mcid && itm.obj.mcuuid) {
-            console.log('DBSyncClient Found Inventar-Update #872 with mcuuid-Field', {...itm});
+            console.log('DbSyncClientService.sortAndFixChangeLogs() #887 Found Inventar-Update with mcuuid-Field', {...itm});
             delete itm.obj.mcid;
           }
           if (itm.obj.rid && !itm.obj.ruuid) {
-            console.error('DBSyncClient Found Inventar-Update #872 without ruuid-Field', {...itm});
+            console.error('DbSyncClientService.sortAndFixChangeLogs() #891 Inventar-Update without ruuid-Field', {...itm});
             const raum = await db.raeume.where({rid: itm.obj.rid}).first();
             if (raum) {
               itm.obj.ruuid = raum.uuid;
-              console.log('Fixed Missing ruuid-Field', {...itm});
+              console.log('DbSyncClientService.sortAndFixChangeLogs() #895 Fixed Missing ruuid-Field', {...itm});
             }
           }
           if (!itm.obj.ruuid || !itm.obj.mcuuid) {
-            console.error('DbSyncClientService #938 Removing incomplete Inventar + Entry from Change-Log', { itm });
-            db.clientChangeLog.delete(itm.id);
-            db.inventar.delete(itm.uuid);
+            console.error('DbSyncClientService.sortAndFixChangeLogs() #938 Removing incomplete Inventar + Entry from Change-Log', { itm });
+            await db.clientChangeLog.delete(itm.id);
+            await db.inventar.delete(itm.uuid);
             if (itm.obj.code && itm.obj.for_jobid && itm.uuid) {
-              db.barcodeLookup
+              await db.barcodeLookup
                 .where({code: itm.obj.code, for_jobid: itm.obj.for_jobid})
                 .filter((lkup) => lkup.uuid === itm.uuid)
                 .delete();
@@ -911,10 +955,10 @@ export class DBSyncClientService implements OnDestroy {
       .count();
 
     rslt.then( num => {
-      console.log('then numUnsyncedChangeLogsByJobId: ', { jobid, num });
+      console.log('DbSyncClientService.numUnsyncedChangeLogsByJobId() then #925: ', { jobid, num });
       return num;
     }).catch( err => {
-      console.error('then numUnsyncedChangeLogsByJobId: ', { jobid, err } );
+      console.error('DbSyncClientService.numUnsyncedChangeLogsByJobId() catch #928: ', { jobid, err } );
     });
     return rslt;
   }
@@ -998,28 +1042,28 @@ export class DBSyncClientService implements OnDestroy {
 
   async resyncServerErrors(jobid: number): Promise<any> {
     const db = this.dexieService;
-    console.log('DBSyncClientService resyncServerErrors #980');
+    console.log('DBSyncClientService.resyncServerErrors() #1012');
 
     const aErrors = await db.serverSyncErrors.where({jobid}).toArray();
 
     aErrors.map( async (err) => {
-      console.log('DBSyncClientService resyncServerErrors #983', { err });
+      console.log('DBSyncClientService.resyncServerErrors() #1017', { err });
       if (!('clientChangeLogId' in err) || !err.clientChangeLogId) {
-        console.error('DBSyncClientService resyncServerErrors #985 NO clientChangeLogId in err', { err });
+        console.error('DBSyncClientService.resyncServerErrors() #1019: NO clientChangeLogId in err', { err });
         return false;
       }
       const table = err.table;
       const uuid = err.uuid;
       const chId = err.clientChangeLogId;
-      console.log('DBSyncClientService resyncServerErrors #992 ', { id: chId, table, uuid });
+      console.log('DBSyncClientService.resyncServerErrors() #1025: ', { id: chId, table, uuid });
 
       const logItem = await db.clientChangeLog.get(chId);
 
       if (!logItem || logItem.table !== table || logItem.uuid !== uuid) {
-        console.error('logItem by id ', chId, ' not found', { table, uuid });
+        console.error('DBSyncClientService.resyncServerErrors() #1030: logItem by id ', chId, ' not found', { table, uuid });
       }
 
-      console.log('DBSyncClientService resyncServerErrors #998 ', {
+      console.log('DBSyncClientService.resyncServerErrors() #1033: ', {
         logItem,
         id: chId,
         table,
@@ -1032,7 +1076,7 @@ export class DBSyncClientService implements OnDestroy {
 
       switch (err.error_code) {
         case 'ITEM_NOT_FOUND':
-          console.log('DBSyncClientService resyncServerErrors #1009 clientChangeLog.delete ', { chId });
+          console.log('DBSyncClientService.resyncServerErrors() #1046: clientChangeLog.delete ', { chId });
           await db.clientChangeLog.delete(chId);
           if (data) {
             const chgLogData: DBDIClientChangeLog = {
@@ -1048,13 +1092,13 @@ export class DBSyncClientService implements OnDestroy {
               uid: logItem.uid,
               uuid: logItem.uuid
             };
-            console.log('DBSyncClientService resyncServerErrors #1025 clientChangeLog.add ', { chgLogData });
+            console.log('DBSyncClientService.resyncServerErrors() #1062: clientChangeLog.add ', { chgLogData });
             db.clientChangeLog.add(chgLogData);
           }
           break;
 
         case 'NEWER_VERSION_ON_SERVER':
-          console.log('DBSyncClientService resyncServerErrors #1031 clientChangeLog.delete ', { chId });
+          console.log('DBSyncClientService.resyncServerErrors() #1068 clientChangeLog.delete ', { chId });
           await db.clientChangeLog.delete(chId);
           break;
       }

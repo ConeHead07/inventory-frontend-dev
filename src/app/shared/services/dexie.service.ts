@@ -82,7 +82,7 @@ export class DexieService extends Dexie {
     Dexie.Syncable.registerSyncProtocol('inventorySync', this.syncClient );
     this.nextDbVersion = this.dbVersion + 1;
 
-    this.version(12).stores({
+    this.version(this.dbVersion).stores({
       barcodeLookup:
         '&[code+for_jobid],table,for_jobid,[table+for_jobid],updateHelper,[table+updateHelper]',
       clientChangeLog:
@@ -116,7 +116,7 @@ export class DexieService extends Dexie {
       objektKatalogMandant:
        '$$uuid,mcid,gcid,gcuuid,code,mid,for_jobid,created_jobid',
       objektKatalogImages:
-      '$$uuid,id,for_jobid,RefTable,RefUuid,ImgUuid,Kategorie',
+      '$$uuid,id,for_jobid,RefTable,RefUuid,ImgUuid,Kategorie,[RefTable+RefUuid+Kategorie]',
       raeume:
        '$$uuid,rid,gid,[rid+gid],for_jobid,code,raumid,Raum,Raumbezeichnung,Etage,current_jobid,current_jobstatus',
       serverSyncErrors:
@@ -229,6 +229,23 @@ export class DexieService extends Dexie {
       this.version(v9).stores({
         images:
           '$$uuid,id,name,type,size,width,height,gcuuid,mcuuid,url,for_jobid',
+      });
+      this.nextDbVersion += 1;
+    }
+
+    if (1) {
+      const v10 = this.nextDbVersion;
+      this.version(v10).stores({
+        barcodeLookup:
+          '&[code+for_jobid],table,for_jobid,[table+for_jobid],[table+for_jobid+updateHelper],updateHelper,[table+updateHelper]',
+      });
+      this.nextDbVersion += 1;
+    }
+    if (1) {
+      const v11 = this.nextDbVersion;
+      this.version(v11).stores({
+        objektKatalogImages:
+          '$$uuid,id,for_jobid,RefTable,RefUuid,ImgUuid,Kategorie,[RefTable+RefUuid+Kategorie]',
       });
       this.nextDbVersion += 1;
     }

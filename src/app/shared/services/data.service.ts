@@ -26,7 +26,7 @@ import Dexie, {IndexableType } from 'dexie';
 import {DBSyncClientService, SyncJobResult} from './dbsync-client.service';
 import {BarcodeService} from '../../pages/invent-form/data-services/barcode.service';
 import {DbsyncLogService} from './dbsync-log.service';
-import {Subscription} from "rxjs";
+import {Subscription} from 'rxjs';
 
 export interface LoadApiDataResult {
   success: boolean;
@@ -405,7 +405,7 @@ export class DataService implements OnDestroy {
   }
 
   async loadInventurDataByInventurId(jobid: number, reset: boolean = false): Promise<LoadApiDataResult[]> {
-    console.log('#324 called loadInventurDataByInventurId(', jobid, reset, ')');
+    console.log('#408 called loadInventurDataByInventurId(', jobid, reset, ')');
     this.setLoadingStarted( jobid );
     const syncLogMsg = this.dbSyncLogService.message.bind(this.dbSyncLogService, [jobid]);
     const syncLogErr = this.dbSyncLogService.error.bind(this.dbSyncLogService, [jobid]);
@@ -421,6 +421,7 @@ export class DataService implements OnDestroy {
       objektKatalogImages: 'pending',
       objektbuchBarcodesLookup: 'pending'
     };
+    console.log('DataService.loadInventurDataByInventurId(', jobid, reset, ')  #424');
 
     const tablesLoadingStatus: TablesLoadingStatus = {};
     for (const t in tables) {
@@ -437,6 +438,7 @@ export class DataService implements OnDestroy {
         finished: null
       };
     }
+    console.log('DataService.loadInventurDataByInventurId(', jobid, reset, ')  #441');
 
     const tblStatus = (table, statKey: string|object, value?: string|number|Date) => {
       console.log('#441 tblStatus', { table, statKey, value, tables, tablesLoadingStatus });
@@ -460,6 +462,7 @@ export class DataService implements OnDestroy {
 
     const inventurAlreadyStartedRevId = +(await this.settingsService.get('jobid-' + jobid + '-revision-id', 0));
     console.log('#388 loadInventurDataByInventurId, inventurAlreadyStartedRevId: ', inventurAlreadyStartedRevId);
+    console.log('DataService.loadInventurDataByInventurId(', jobid, reset, ')  #465');
 
     const hasAllInventurData = await this.hasAllInventurData(jobid);
 
@@ -467,7 +470,7 @@ export class DataService implements OnDestroy {
       && !isNaN(inventurAlreadyStartedRevId) && inventurAlreadyStartedRevId > 0
       && hasAllInventurData
     ) {
-      console.log('#338 loadInventurDataByInventurId');
+      console.log('DataService.loadInventurDataByInventurId(', jobid, reset, ')  #473');
       const numUnsyncedClientChanges = await this.DbSyncService.numUnsyncedChangeLogsByJobId(jobid);
       console.log('#340 loadInventurDataByInventurId', {numUnsyncedClientChanges});
       if (numUnsyncedClientChanges) {
@@ -495,11 +498,12 @@ export class DataService implements OnDestroy {
 
     // await this.DbSyncService
 
+    console.log('DataService.loadInventurDataByInventurId(', jobid, reset, ')  #501');
     this.dbSyncLogService.start(jobid, inventurAlreadyStartedRevId);
     this.dexie.stopChangeLogForImport( true );
     if (reset) {
       syncLogMsg( 'Reset: Daten werden für kompletten Neu-Import zurückgesetzt!');
-      console.log('#352 loadInventurDataByInventurId');
+      console.log('DataService.loadInventurDataByInventurId(', jobid, reset, ')  #506');
       const numRaeume = await this.dexie.raeume.where( { for_jobid: jobid}).count().catch( (reason) => {
         console.error('#354 ', { reason });
       });
@@ -529,21 +533,7 @@ export class DataService implements OnDestroy {
           .where( { for_jobid: jobid}).delete()
           .finally(() => {
             syncLogMsg('Finished Reset Katalogdaten (Mandant)');
-            console.log('#367 finished cleanup okg');
-
-            this.dexie.objektKatalogGlobal
-              .where( { created_jobid: jobid})
-              .each( (itm) => {
-                this.dexie.objektKatalogMandant.where({gcuuid: itm.uuid}).count().then( (num) => {
-                  if (num === 0) {
-                    this.dexie.objektKatalogGlobal.delete(itm.uuid);
-                  }
-                });
-              })
-              .finally(() => {
-                syncLogMsg('Finished Reset Mandanten-Spezifische Katalogdaten (Global)');
-                console.log('#463 finished cleanup okm');
-              });
+            console.log('#536 finished cleanup okm');
           })
         ,
         this.dexie.objektKatalogImages.where( { created_jobid: jobid}).delete()
@@ -557,6 +547,20 @@ export class DataService implements OnDestroy {
             console.log('#464 finished cleanup clientchangelog');
           })
       ]);
+      await this.dexie.objektKatalogGlobal
+        .where( { created_jobid: jobid})
+        .each( (itm) => {
+          this.dexie.objektKatalogMandant.where({gcuuid: itm.uuid}).count().then( (num) => {
+            if (num === 0) {
+              this.dexie.objektKatalogGlobal.delete(itm.uuid);
+            }
+          });
+        })
+        .finally(() => {
+          syncLogMsg('Finished Reset Mandanten-Spezifische Katalogdaten (Global)');
+          console.log('#561 finished cleanup okg');
+        });
+
       syncLogMsg( 'Reset: Daten wurden zurückgesetzt!');
       console.log('#373 After cleanup');
       const resetCmt = 'data.service.tx loadInventurDataByInventurId() reset';

@@ -3,11 +3,13 @@ import {ActivatedRoute} from '@angular/router';
 import {Location} from '@angular/common';
 import {DataService, InventarData} from '../../shared/services/data.service';
 import {
+  BarcodeLookupSimpleResult,
   DBDIArtikel,
   DBDIGebaeude,
-  DBDIInventar, DBDIInventuren,
+  DBDIInventar,
+  DBDIInventuren,
   DBDIJobLockStatus,
-  DBDIMandanten, DBDIObjektKatalogImages,
+  DBDIMandanten,
   DBDIRaeume,
   DBDIRaumEditStatus,
   DBDIRaumGebaeude,
@@ -25,8 +27,8 @@ import {
   faEdit,
   faEye,
   faImage,
-  faPlus,
   faLock,
+  faPlus,
   faSearch,
   faUnlockAlt
 } from '@fortawesome/free-solid-svg-icons';
@@ -34,14 +36,16 @@ import {InventoryProgress, InventoryProgressService} from '../../shared/inventor
 
 import {ScanDetectData} from '../../shared/components/scannerdetection/scannerdetection.component';
 
-import {ArtikelFormType} from './modals/select-create-artikel/select-create-artikel.component';
+import {
+  ArtikelFormType,
+  SelectCreateArtikelComponent
+} from './modals/select-create-artikel/select-create-artikel.component';
 
 import {NgbModal, NgbModalRef} from '@ng-bootstrap/ng-bootstrap';
 // Dialogs
 import {ScannerBarcodeData, ScannerComponent} from './modals/scanner/scanner.component';
 import {CreateArtikelImageComponent} from './modals/create-artikel-image/create-artikel-image.component';
 import {ShowArtikelImageComponent} from './modals/show-artikel-image/show-artikel-image.component';
-import {SelectCreateArtikelComponent} from './modals/select-create-artikel/select-create-artikel.component';
 import {
   ArtikelOption,
   SelectSearchArtikelComponent
@@ -73,6 +77,7 @@ import {DBInsertArtikelResult} from './data-services/artikel.service';
 import {ImageboxComponent} from './modals/imagebox/imagebox.component';
 import {ShowRaumImageComponent} from './modals/show-raum-image/show-raum-image.component';
 import {CreateRaumImageComponent} from './modals/create-raum-image/create-raum-image.component';
+import {BatchBarcodesComponent, LookupResultItem} from "./modals/batch-barcodes/batch-barcodes.component";
 
 interface ScannerConfiguration {
   minLength?: number; // 7
@@ -229,6 +234,8 @@ export class InventFormComponent implements OnInit, OnDestroy {
     total: 0,
     done: 0,
   };
+  beepSuccessSrc = '';
+  beepErrorSrc = '';
 
   private currentModal: CurrentModal = {
     modalRef: null,
@@ -262,6 +269,8 @@ export class InventFormComponent implements OnInit, OnDestroy {
     private sounds: SoundsService,
     private variables: VariablesService,
     private toastr: ToastrService) {
+    this.beepSuccessSrc = this.sounds.getSuccessSrc();
+    this.beepErrorSrc = this.sounds.getErrorSrc();
   }
 
   showBlobAlertSuccess() {
@@ -289,6 +298,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
+
     this.inventoryProgress.getCurrentInventurLockStatus().then( (status) => {
       this.jobLockStatus = status;
     });
@@ -771,6 +781,74 @@ export class InventFormComponent implements OnInit, OnDestroy {
       console.log('InventFormComponente #588 call handleScanData', { data, scan });
       this.handleScanData( scan );
     });
+    modalRef.result.then( () => {
+      sub.unsubscribe();
+    });
+  }
+
+  openBatchScans(barcodes: string[], inputElm?: HTMLElement): void {
+    console.log('InventFormComponent.openBatchScans(', barcodes, ') #778', { barcodes, inputElm });
+    const modalRef = this.modalService.open( BatchBarcodesComponent, { size: 'xl', scrollable: true } );
+    this.modalWatch(modalRef, 'BatchBarcodes');
+    if (!modalRef.componentInstance.jobid) {
+      modalRef.componentInstance.setJobid(this.jobid);
+    }
+    modalRef.componentInstance.setRaum(this.raum);
+    modalRef.componentInstance.setBarcodes(barcodes);
+    const sub = modalRef.componentInstance.onScan.subscribe((data: ScannerBarcodeData) => {
+      console.log('InventFormComponent.openBatchScans subscribe response #785', { data });
+      const scan: ScanDetectData = {
+        barcode: data.barcode,
+        length: data.length,
+        valid: data.valid,
+        target: inputElm
+      };
+      modalRef.close();
+      console.log('InventFormComponente #588 call handleScanData', { data, scan });
+      this.handleScanData( scan );
+    });
+    const sub2 = modalRef.componentInstance.onLookupResultApply.subscribe( (data: LookupResultItem) => {
+      /*
+      inventarData: {
+        inventar: DBDIInventar;
+        artikelRef: DBDIObjektKatalogMandant;
+        artikelData: DBDIObjektKatalogGlobal;
+      }
+       */
+      if (data.ModalRaumUuid !== this.raum.uuid) {
+        modalRef.close();
+        alert('Fehler: Raumangabe in Hauptfenster und Dialog stimmen nicht mehr überein!\n' +
+        'ModalRaumUuid: ' + data.ModalRaumUuid + '\n' +
+        'Main-Raum-UUID: ' + this.raum.uuid);
+        return;
+      }
+
+      if (modalRef.componentInstance.closeOnApplyBarcode) {
+        modalRef.close();
+      }
+
+      if (data.result.lookupResultTable === LookupResultTable.Inventar) {
+
+        const inventarData: InventarData = {
+          inventar: data.result.inventar,
+          artikelRef: data.result.artikelRef,
+          artikelData: data.result.artikelData
+        };
+        this.assignInventarToRaum(inventarData)
+          .then( () => {
+            this.playSuccess();
+          })
+          .catch( (reason) => {
+            this.playError();
+          });
+      }
+    });
+
+
+    modalRef.result.then( () => {
+      sub.unsubscribe();
+      sub2.unsubscribe();
+    });
   }
 
   getModalRefByName(name: string): NgbModalRef {
@@ -1045,6 +1123,14 @@ export class InventFormComponent implements OnInit, OnDestroy {
     this.openRaumListRest();
   }
 
+  bcTrimZero(barcode: string) {
+    barcode = barcode.trim();
+    while (barcode.charAt(0) === '0') {
+      barcode = barcode.substr(1).trim();
+    }
+    return barcode;
+  }
+
   onBarcodeInput(): void {}
 
   async handleScanData(event: ScanDetectData) {
@@ -1052,6 +1138,18 @@ export class InventFormComponent implements OnInit, OnDestroy {
       waitingForNewInventarBarcode: this.waitingForNewInventarBarcode,
       event
     });
+    if (event.barcode.indexOf('\n') > -1) {
+      const barcodes = event.barcode.split('\n').map( (c) => {
+        let bc = this.bcTrimZero( c.trim() );
+        if (this.kunde.mid === 5 && bc.length > 10) {
+          bc = bc.substr(0, 10);
+        }
+        return bc;
+      });
+      return this.openBatchScans(barcodes, event.target);
+    }
+
+    event.barcode = this.bcTrimZero(event.barcode);
     if (this.kunde.mid === 5 && event.barcode.length > 10) {
       event.barcode = event.barcode.substr(0, 10);
     }

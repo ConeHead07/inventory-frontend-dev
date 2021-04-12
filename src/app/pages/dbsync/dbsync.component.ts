@@ -245,8 +245,9 @@ export class DbsyncComponent implements OnInit, OnDestroy {
       this.syncInProcess = false;
     }
 
-    this.dbsyncClient.askServerForChanges(this.jobid).then( (infos) => {
-      console.log( 'callback of async askServerForChange for jobid ' + this.jobid, { infos });
+    console.log('DbsyncComponent.refreshStatusInfos() #248 call askServerForChanges', (new Date()).toString());
+    this.dbsyncClient.getLastServerChanges(this.jobid, 15 * 1000).then( (infos) => {
+      console.log( 'DbsyncComponent.refreshStatusInfos() #250 callback of async askServerForChange for jobid ' + this.jobid, { infos });
       if (infos.success) {
         this.serverRevisionId = infos.MaxRevisionId;
         this.numServerChanges = infos.NumChanges;
@@ -283,11 +284,12 @@ export class DbsyncComponent implements OnInit, OnDestroy {
     }
   }
 
-  resetCurrJob() {
-    console.log('#106 dbsync called resetCurrJob()');
+  async resetCurrJob() {
+    console.log('#287 dbsync called resetCurrJob() this.syncJobid: ', this.syncJobid);
     this.syncInProcess = true;
     this.dataService.loadInventurDataByInventurId(this.syncJobid, true).finally( () => {
       this.syncInProcess = false;
+      console.log('#291 dbsync finished resetCurrJob()');
     });
   }
 

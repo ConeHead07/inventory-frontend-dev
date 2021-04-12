@@ -8,11 +8,16 @@ export interface InventoryProgress {
   done: number;
 }
 
+export interface RaumInventoryProgress extends InventoryProgress {
+  uuid: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
 export class InventoryProgressService {
   @Output() inventurLockStatusChanged = new EventEmitter<DBDIJobLockStatus>();
+  @Output() raumProgressChanged = new EventEmitter<RaumInventoryProgress>();
 
   constructor(private dexieService: DexieService, private baseData: BasedataService) { }
 
@@ -189,7 +194,10 @@ export class InventoryProgressService {
     const jobid = this.baseData.getCurrentJobid();
     console.log('getCurrentRaumProgress calls getRaumProgressByRidAndJobid', { uuid, jobid });
 
-    return this.getRaumProgressByUuidAndJobid(uuid, jobid);
+    return this.getRaumProgressByUuidAndJobid(uuid, jobid).then( (progress) => {
+      this.raumProgressChanged.emit({uuid, ...progress});
+      return progress;
+    });
   }
 
   async getRaumProgressByUuidAndJobid(uuid: string, jobid: number): Promise<InventoryProgress> {
