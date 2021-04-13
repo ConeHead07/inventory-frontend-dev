@@ -423,10 +423,13 @@ export class BarcodeService {
   async rebuildOnRunningSystemByJobid(jobid: number) {
     return Promise.all([
       this.rebuildTableOnRunningSystemByJobid<DBDIInventar>(this.db.inventar, jobid)
+        .then( () => true).catch( () => false)
         .finally(() => console.log(`BarcodeService.rebuildOnRunningSystemByJobid(${jobid}) #413 Finished Inventar`)),
       this.rebuildTableOnRunningSystemByJobid<DBDIRaeume>(this.db.raeume, jobid)
+        .then( () => true).catch( () => false)
         .finally(() => console.log(`BarcodeService.rebuildOnRunningSystemByJobid(${jobid}) #415 Finished Raeume!`)),
       this.rebuildTableOnRunningSystemByJobid<DBDIObjektKatalogMandant>(this.db.objektKatalogMandant, jobid)
+        .then( () => true).catch( () => false)
         .finally(() => console.log(`BarcodeService.rebuildOnRunningSystemByJobid(${jobid}) #417 Finished objektKatalogMandant!`))
     ]).then( (results) => {
       const numErrors = results.filter( re => !re).length;
