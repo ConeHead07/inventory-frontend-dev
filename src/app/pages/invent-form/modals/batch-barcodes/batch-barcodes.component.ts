@@ -64,8 +64,14 @@ export class BatchBarcodesComponent implements OnInit, OnDestroy {
   batchBarcodes: string[] = [];
   uniqBatchBarcodes: string[] = [];
   scanResultHistory: LookupResultItem[] = [];
-  scanResultFirst?: LookupResultItem;
+  scanResultAssigned: LookupResultItem[] = [];
 
+  blobAlert?: string;
+  private blobAlertTimer = null;
+  useOverlay = 0;
+
+  loadingTimer = null;
+  loadingShow = false;
   loadingType = 'warning';
   loadingAnimated = true;
   loadingPercent = 0;
@@ -110,13 +116,52 @@ export class BatchBarcodesComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.subRaumChanged.unsubscribe();
   }
+  showBlobAlertSuccess() {
+    this.showBlobAlert('success');
+  }
+
+  showBlobAlertError() {
+    this.showBlobAlert('danger');
+  }
+
+  showBlobAlert(alertType: string) {
+    this.useOverlay = this.useOverlay < 2 ? this.useOverlay + 1 : 1;
+    this.blobAlert = null;
+    if (this.blobAlertTimer) {
+      clearTimeout( this.blobAlertTimer );
+    }
+    this.blobAlert = alertType;
+    this.blobAlertTimer = setTimeout(
+      () => {
+        this.blobAlert = null;
+        this.useOverlay = 0;
+      },
+      1200
+    );
+  }
+
+  setAssignedInventar(barcode: string) {
+    const result = this.scanResultHistory.find( (r) =>  r.barcode === barcode);
+    if (result) {
+      this.removeResult(result);
+      this.scanResultAssigned.unshift(result);
+    }
+  }
 
   async setLoadingIndicator(current: number, total: number): Promise<void> {
+    this.loadingShow = true;
     if (current === 0 || current > this.loadingCurrent) {
       this.loadingPercent = (current > 0) ? current * 100 / total : 100;
       this.loadingCurrent = current;
       this.loadingType = (current > 0) ? 'success' : 'warning';
       this.loadingAnimated = current !== total;
+      if (current === 0 && total > 0 && this.loadingTimer) {
+        clearTimeout(this.loadingTimer);
+        this.loadingTimer = null;
+      }
+      if (current > 0 && current === total) {
+        this.loadingTimer = setTimeout(() => { this.loadingShow = false; }, 4000);
+      }
     }
     this.loadingTotal = total;
   }
@@ -164,7 +209,7 @@ export class BatchBarcodesComponent implements OnInit, OnDestroy {
   }
 
   clearResult(): void {
-    this.scanResultFirst = null;
+    this.scanResultHistory.length = 0;
   }
 
   showResult(result: BarcodeLookupSimpleResult): void {
@@ -279,9 +324,7 @@ export class BatchBarcodesComponent implements OnInit, OnDestroy {
         });
     }
 
-    const newHistoryItem = (this.scanResultFirst) ? { ...this.scanResultFirst } : null;
-
-    this.scanResultFirst = {
+    const lastResult = {
       typ: bcObjectType,
       typToString: bcLookupTyp[ bcObjectType ],
       barcode: result.barcode,
@@ -289,22 +332,16 @@ export class BatchBarcodesComponent implements OnInit, OnDestroy {
       image: result.image,
       result
     };
-    const lastResult = this.scanResultFirst;
+    this.addHistoryResult(lastResult);
 
     if (result.image && result.image.mcuuid) {
       this.loadImageByMcuuid(result.image.mcuuid).then(img => {
-        if (this.scanResultFirst === lastResult) {
-          this.scanResultFirst.image.data_url = img.data_url;
-        } else {
-          const lastResultFound = this.scanResultHistory.find( r => r === lastResult);
-          if (lastResultFound) {
-            lastResultFound.image.data_url = img.data_url;
-          }
+        const lastResultFound = this.scanResultHistory.find( r => r === lastResult);
+        if (lastResultFound) {
+          lastResultFound.image.data_url = img.data_url;
         }
       });
     }
-
-    this.addHistoryResult(newHistoryItem );
   }
 
   addHistoryResult(result: LookupResultItem): number {

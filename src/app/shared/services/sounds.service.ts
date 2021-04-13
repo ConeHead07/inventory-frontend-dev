@@ -118,15 +118,15 @@ export class SoundsService {
 
   constructor() {
     this.success = new Audio();
-    this.success.src = '../assets/googlesounds/notification_simple-01.mp3';
-    this.success.autoplay = true;
     this.success.muted = true;
+    this.success.autoplay = true;
+    this.success.src = '../assets/googlesounds/notification_simple-01.mp3';
     this.success.load();
 
     this.error = new Audio();
-    this.error.src = '../assets/googlesounds/alert_error-01.mp3';
-    this.error.autoplay = true;
     this.error.muted = true;
+    this.error.autoplay = true;
+    this.error.src = '../assets/googlesounds/alert_error-01.mp3';
     this.error.load();
   }
 

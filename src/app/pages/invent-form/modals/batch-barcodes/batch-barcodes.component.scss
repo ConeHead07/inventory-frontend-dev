@@ -3,36 +3,9 @@ input.bg-danger::placeholder {
   color: #ffffff;
 }
 
-.scanner-view-port {
-  position:relative;
-  height:auto;
-  overflow-y:hidden;
-  width:100%;
-}
-
-zxing-scanner::ng-deep video {
-  height:5rem;
-  width:100%;
-}
-
-#ScannerFocusRedLine {
-  position:absolute;
-  left:5%;
-  width:90%;
-  top:50%;
-  border:0;
-  border-top:1rem solid rgba(255,0,0,.5);
-  margin-top:-0.5rem
-}
-
-#barcodeChangedPart {
-  color:blue;
-}
-
 .with-pulse-effect {
   animation: enter-animation 2s ease;
 }
-
 
 @keyframes enter-animation {
   0% {

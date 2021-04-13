@@ -808,15 +808,10 @@ export class InventFormComponent implements OnInit, OnDestroy {
       this.handleScanData( scan );
     });
     const sub2 = modalRef.componentInstance.onLookupResultApply.subscribe( (data: LookupResultItem) => {
-      /*
-      inventarData: {
-        inventar: DBDIInventar;
-        artikelRef: DBDIObjektKatalogMandant;
-        artikelData: DBDIObjektKatalogGlobal;
-      }
-       */
+      let modalIsClosed = false;
       if (data.ModalRaumUuid !== this.raum.uuid) {
         modalRef.close();
+        modalIsClosed = true;
         alert('Fehler: Raumangabe in Hauptfenster und Dialog stimmen nicht mehr überein!\n' +
         'ModalRaumUuid: ' + data.ModalRaumUuid + '\n' +
         'Main-Raum-UUID: ' + this.raum.uuid);
@@ -825,6 +820,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
 
       if (modalRef.componentInstance.closeOnApplyBarcode) {
         modalRef.close();
+        modalIsClosed = true;
       }
 
       if (data.result.lookupResultTable === LookupResultTable.Inventar) {
@@ -837,9 +833,16 @@ export class InventFormComponent implements OnInit, OnDestroy {
         this.assignInventarToRaum(inventarData)
           .then( () => {
             this.playSuccess();
+            if (!modalIsClosed && modalRef && modalRef.componentInstance) {
+              modalRef.componentInstance.showBlobAlertSuccess();
+              modalRef.componentInstance.setAssignedInventar(data.barcode);
+            }
           })
           .catch( (reason) => {
             this.playError();
+            if (!modalIsClosed && modalRef && modalRef.componentInstance) {
+              modalRef.componentInstance.showBlobAlertError();
+            }
           });
       }
     });

@@ -334,5 +334,5 @@
   </div>
 </div>
 
-<audio *ngIf="beepSuccessSrc" id="beepSuccess" [src]="beepSuccessSrc" autoPlay muted></audio>
-<audio *ngIf="beepErrorSrc" id="beepError" [src]="beepErrorSrc" autoPlay muted></audio>
+<audio *ngIf="beepSuccessSrc" id="beepSuccess" [src]="beepSuccessSrc" autoPlay="autoplay" [muted]="'muted'"></audio>
+<audio *ngIf="beepErrorSrc" id="beepError" [src]="beepErrorSrc" autoPlay="autoplay" [muted]="'muted'"></audio>
