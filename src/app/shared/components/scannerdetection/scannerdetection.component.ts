@@ -4,6 +4,8 @@ export interface ScanDetectData {
   barcode: string;
   length: number;
   valid: boolean;
+  rawInput?: string;
+  debugData?: any;
   target?: HTMLElement;
 }
 
@@ -27,6 +29,8 @@ export interface ScanDetectConfig {
 export class ScannerdetectionComponent implements OnInit {
 
   private input = '';
+  private rawInput = '';
+  private keyDownEvents: KeyboardEvent[] = [];
   private lastKeyEventTime = 0;
   private lastTimer = null;
   private lastTimerTime = null;
@@ -117,8 +121,10 @@ export class ScannerdetectionComponent implements OnInit {
 
     if (!isScanInput) {
       this.input = key;
+      this.rawInput = '|' + key;
       console.log('#101 scannerDetection Start, input', this.input, 'diff', diff);
     } else {
+      this.rawInput = '|' + key;
       console.log('#109 scannerDetection isScanInput', { diff, target, key, 'this.input': this.input, 'event.type': event.type, event});
       if (key.length === 1 ) {
         this.input += !isShiftKey ? key : key.toUpperCase();
@@ -145,6 +151,7 @@ export class ScannerdetectionComponent implements OnInit {
       if (barcode.length >= 5) {
         this.scanned.emit({
           barcode,
+          rawInput: this.rawInput,
           length: barcode.length,
           valid: true
         });

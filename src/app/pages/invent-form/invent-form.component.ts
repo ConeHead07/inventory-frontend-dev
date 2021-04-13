@@ -77,7 +77,7 @@ import {DBInsertArtikelResult} from './data-services/artikel.service';
 import {ImageboxComponent} from './modals/imagebox/imagebox.component';
 import {ShowRaumImageComponent} from './modals/show-raum-image/show-raum-image.component';
 import {CreateRaumImageComponent} from './modals/create-raum-image/create-raum-image.component';
-import {BatchBarcodesComponent, LookupResultItem} from "./modals/batch-barcodes/batch-barcodes.component";
+import {BatchBarcodesComponent, LookupResultItem} from './modals/batch-barcodes/batch-barcodes.component';
 
 interface ScannerConfiguration {
   minLength?: number; // 7
@@ -162,7 +162,8 @@ export class InventFormComponent implements OnInit, OnDestroy {
   faUnlockAlt = faUnlockAlt;
 
   @ViewChild('input2', { static: true }) input2: ElementRef;
-  @ViewChild('inputSimulateBarcode', { static: true }) inputSimulateBarcode: ElementRef;
+  @ViewChild('inputSimulateBarcode', { static: true }) inputSimulateBarcode: ElementRef
+  @ViewChild('rawInputBarcodes', { static: true }) rawInputBarcodes: ElementRef;
 
   scanDetectorConfig: ScannerConfiguration = {
     minLength: 5,
@@ -1141,6 +1142,9 @@ export class InventFormComponent implements OnInit, OnDestroy {
       waitingForNewInventarBarcode: this.waitingForNewInventarBarcode,
       event
     });
+    if (event.rawInput) {
+      this.rawInputBarcodes.nativeElement.value = event.rawInput;
+    }
     if (event.barcode.indexOf('\n') > -1) {
       const barcodes = event.barcode.split('\n').map( (c) => {
         let bc = this.bcTrimZero( c.trim() );

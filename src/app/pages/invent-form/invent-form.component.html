@@ -332,6 +332,11 @@
     </div>
     <div class="d-none">{{ formInventar | json }}</div>
   </div>
+  <div class="row">
+    <div class="col-12">
+      <textarea style="height:90vh;width:90vw" class="bcRawInput" #rawInputBarcodes></textarea><br>
+    </div>
+  </div>
 </div>
 
 <audio *ngIf="beepSuccessSrc" id="beepSuccess" [src]="beepSuccessSrc" autoPlay="autoplay" [muted]="'muted'"></audio>
