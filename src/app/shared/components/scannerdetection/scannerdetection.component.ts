@@ -30,10 +30,11 @@ export class ScannerdetectionComponent implements OnInit {
 
   private input = '';
   private rawInput = '';
-  private keyDownEvents: KeyboardEvent[] = [];
+  private keyDownEvents: any[] = [];
   private lastKeyEventTime = 0;
   private lastTimer = null;
   private lastTimerTime = null;
+  private isInDebugMode = false;
 
   private detectorConfig: ScanDetectConfig = {
     minLength: 5,
@@ -43,7 +44,7 @@ export class ScannerdetectionComponent implements OnInit {
     scanTimeout: 100,
     ignoreChars: '',
     ignoreEndsWith: true,
-    ignoreOverElements: [], // [ 'INPUT' ],
+    ignoreOverElements: ['.scanner-detect-ignore'], // [ 'INPUT' ],
     barcodeType: 'code128'
   };
 
@@ -56,7 +57,9 @@ export class ScannerdetectionComponent implements OnInit {
 
   @HostListener('window:keydown', ['$event', '$event.target'])
   onKeyDown(event: KeyboardEvent, useTarget?: HTMLElement) {
-    console.log('#55 scannerDetection Key-Down-Event', { event, useTarget });
+    if (this.isInDebugMode) {
+      console.log('#55 scannerDetection Key-Down-Event', { event, useTarget });
+    }
 
     const target: HTMLElement = useTarget;
     const targetTagName = target.tagName;
@@ -101,7 +104,7 @@ export class ScannerdetectionComponent implements OnInit {
       emitScanData = false;
     }
 
-    if (!emitScanData) {
+    if (!emitScanData && this.isInDebugMode) {
       console.log('#89 scannerDetection target is not our target: ', {
         useTarget,
         isEditableTextInput,
@@ -117,20 +120,43 @@ export class ScannerdetectionComponent implements OnInit {
     const isScanInput: boolean = diff > this.detectorConfig.scanTimeout;
     const key = 'key' in event ? event.key : '';
     const isShiftKey = event.shiftKey;
+    const dbgEvt = {
+      isTrusted: true,
+      key: event.key,
+      altKey: event.altKey,
+      code: event.code,
+      ctrlKey: event.ctrlKey,
+      shiftKey: event.shiftKey,
+      metaKey: event.metaKey
+    };
+
     // const isEnterKey = event.metaKey;
 
     if (!isScanInput) {
       this.input = key;
-      this.rawInput = '|' + key;
-      console.log('#101 scannerDetection Start, input', this.input, 'diff', diff);
+      this.rawInput = key;
+      this.keyDownEvents = [ dbgEvt ];
+      if (this.isInDebugMode) {
+        console.log('#101 scannerDetection Start, input', this.input, 'diff', diff);
+      }
     } else {
-      this.rawInput = '|' + key;
-      console.log('#109 scannerDetection isScanInput', { diff, target, key, 'this.input': this.input, 'event.type': event.type, event});
+      this.rawInput += '|' + key;
+      this.keyDownEvents.push(dbgEvt);
+      if (this.isInDebugMode) {
+        console.log('#109 scannerDetection isScanInput', { diff, target, key, 'this.input': this.input, 'event.type': event.type, event});
+      }
       if (key.length === 1 ) {
         this.input += !isShiftKey ? key : key.toUpperCase();
         const barcode = this.input;
-        console.log('#106 scannerDetection add Char to Barcode', { key, barcode });
-      } else if (key === 'Tab' || key === 'Enter') {
+        if (this.isInDebugMode) {
+          console.log('#106 scannerDetection add Char to Barcode', { key, barcode });
+        }
+      } else if (key === 'Tab') {
+        this.input += '\t';
+        // Nothing
+        // event.preventDefault();
+      } else if (key === 'Enter') {
+        this.input += '\n';
         // Nothing
         // event.preventDefault();
       }
@@ -146,18 +172,26 @@ export class ScannerdetectionComponent implements OnInit {
         input = input.split('ß').join('-');
       }
       const barcode = input;
-      console.log('#138 scannerDetection Emit After Timeout', { key, barcode });
+      const rawInput = this.rawInput;
+      const keyDownEvents = this.keyDownEvents;
+      if (this.isInDebugMode) {
+        console.log('#138 scannerDetection Emit After Timeout', { key, barcode });
+      }
       this.input = '';
+      this.rawInput = '';
+      this.keyDownEvents = [];
       if (barcode.length >= 5) {
         this.scanned.emit({
           barcode,
-          rawInput: this.rawInput,
+          rawInput,
           length: barcode.length,
-          valid: true
+          valid: true,
+          debugData: {
+            keyDownEvents
+          }
         });
       }
     }, this.detectorConfig.scanTimeout);
-    console.log('#147 scannerDetection LAST-LINE');
   }
 
   constructor() { }

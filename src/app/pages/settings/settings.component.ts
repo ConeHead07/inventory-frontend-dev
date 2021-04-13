@@ -6,6 +6,8 @@ import {DBDIVariables} from '../../shared/interfaces/dexie.interfaces';
 import {DexieService} from '../../shared/services/dexie.service';
 import {SoundsService} from '../../shared/services/sounds.service';
 import {ScanDetectData} from '../../shared/components/scannerdetection/scannerdetection.component';
+import Dexie from "dexie";
+import {Router} from "@angular/router";
 
 @Component({
   selector: 'app-settings',
@@ -18,6 +20,8 @@ export class SettingsComponent implements OnInit {
   enableManualBCInput: boolean;
   useOverlay = 0;
   blobAlert?: string;
+  dbName: string;
+  dbVersion: number;
   private blobAlertTimer = null;
 
   @Output() changedManualBCInput = new EventEmitter<boolean>();
@@ -27,7 +31,10 @@ export class SettingsComponent implements OnInit {
     private variables: VariablesService,
     private baseData: BasedataService,
     private barcodeLookup: BarcodeService,
-    private sounds: SoundsService) {
+    private sounds: SoundsService,
+    private router: Router) {
+    this.dbName = this.dexieService.name;
+    this.dbVersion = this.dexieService.verno;
   }
 
   ngOnInit() {
@@ -49,11 +56,21 @@ export class SettingsComponent implements OnInit {
   }
 
   async dbClear() {
-    await this.dexieService.clearDB();
     this.baseData.setCurrentInventur(null);
     this.baseData.setCurrentRaum(null);
     this.baseData.setCurrentGebaeude(null);
     this.baseData.setCurrentRaum(null);
+    await this.dexieService.clearDB();
+    this.router.navigate(['/select-inventory']);
+  }
+
+  async dbDelete() {
+    this.baseData.setCurrentInventur(null);
+    this.baseData.setCurrentRaum(null);
+    this.baseData.setCurrentGebaeude(null);
+    this.baseData.setCurrentRaum(null);
+    await this.dexieService.deleteDB();
+    this.router.navigate(['/select-inventory']);
   }
 
   async reIndexBarcodeLookup() {

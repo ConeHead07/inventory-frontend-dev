@@ -22,6 +22,7 @@ export class BarcodeService {
   lastErrors: any[] = [];
   lkup: Dexie.Table<DBDIBarcodeLookup, [string, number]>;
   rebuildProcesses: RebuildProcess[] = [];
+  private isInDebugMode = false;
 
   constructor(private db: DexieService) {
     this.lkup = this.db.barcodeLookup;
@@ -52,7 +53,9 @@ export class BarcodeService {
   async indexLookup(barcode: string, jobid: number): Promise<BarcodeLookupSimpleResult> {
     barcode = this.bcTrimZero(barcode);
     const found = await this.lkup.get( { code: barcode, for_jobid: jobid } );
-    console.log('BarcodeService #47 indexLookup(', { barcode, jobid}, ')', { found });
+    if (this.isInDebugMode) {
+      console.log('BarcodeService.indexLookup(', { barcode, jobid}, ') #57', { found });
+    }
 
     const result: BarcodeLookupSimpleResult = {
       barcode,
@@ -65,8 +68,10 @@ export class BarcodeService {
     if (found && found.uuid) {
       const searchKey = { uuid: found.uuid };
       const item = await this.db.table( found.table ).get( searchKey );
-      console.log('BarcodeService #68 indexLookup item = this.db.table(', found.table, ').get(', searchKey, ')',
-        { item });
+      if (this.isInDebugMode) {
+        console.log('BarcodeService #68 indexLookup item = this.db.table(', found.table, ').get(', searchKey, ')',
+          { item });
+      }
 
       if (item) {
         result.success = true;
@@ -98,7 +103,9 @@ export class BarcodeService {
         }
       }
     }
-    console.log('BarcodeService #99 indexLookup(', { result, barcode, jobid}, ')', { found });
+    if (this.isInDebugMode) {
+      console.log('BarcodeService #99 indexLookup(', { result, barcode, jobid}, ')', { found });
+    }
 
     return result;
   }
@@ -219,16 +226,22 @@ export class BarcodeService {
     barcode = this.bcTrimZero(barcode);
     const simpleResult = await this.simpleLookup(barcode, jobid);
     const lookupResultTableText = LookupResultTable[simpleResult.lookupResultTable];
-    console.log(`#146 fullLookup for ${barcode} found ${lookupResultTableText}`, { simpleResult });
+    if (this.isInDebugMode) {
+      console.log(`BarcodeService.fullLookup() #230 for ${barcode} found ${lookupResultTableText}`, { simpleResult });
+    }
 
     if (!simpleResult.success || simpleResult.lookupResultTable === LookupResultTable.ObjektKatalogGlobal) {
-      console.log(`#150 fullLookup for ${barcode} return ${lookupResultTableText}`);
+      if (this.isInDebugMode) {
+        console.log(`BarcodeService.fullLookup() #235 for ${barcode} return ${lookupResultTableText}`);
+      }
       return simpleResult;
     }
 
     switch (simpleResult.lookupResultTable) {
       case LookupResultTable.ObjektKatalogMandant:
-        console.log(`#156 fullLookup for ${barcode} fetch global Data for ${lookupResultTableText}`);
+        if (this.isInDebugMode) {
+          console.log(`BarcodeService.fullLookup() #243 for ${barcode} fetch global Data for ${lookupResultTableText}`);
+        }
         simpleResult.artikelData = await this.db.objektKatalogGlobal.get({uuid: simpleResult.artikelRef.gcuuid });
         simpleResult.image = await this.db.images.get({gcuuid: simpleResult.artikelRef.gcuuid });
         if (simpleResult.image) {
@@ -238,20 +251,29 @@ export class BarcodeService {
         break;
 
       case LookupResultTable.Raeume:
-        console.log(`#166 fullLookup for ${barcode} fetch gebaeude Data for ${lookupResultTableText}`);
+        if (this.isInDebugMode) {
+          console.log(`BarcodeService.fullLookup() #255 for ${barcode} fetch gebaeude Data for ${lookupResultTableText}`);
+        }
         simpleResult.gebaeude = await this.db.gebaeude.get( simpleResult.raum.gid );
         break;
 
       case LookupResultTable.Inventar:
-        console.log(`#245 fullLookup for ${barcode} fetch artikelRef/global/image/raum Data for ${lookupResultTableText}`,
-          { mcuuid: simpleResult.inventar.mcuuid }
+        if (this.isInDebugMode) {
+          console.log('BarcodeService.fullLookup() #262' +
+            ` for ${barcode} fetch artikelRef/global/image/raum Data for ${lookupResultTableText}`,
+            { mcuuid: simpleResult.inventar.mcuuid }
           );
+        }
 
         simpleResult.artikelRef = await this.db.objektKatalogMandant.get( { uuid: simpleResult.inventar.mcuuid });
         if (simpleResult.artikelRef) {
-          console.log('#252 ', { gcuuid: simpleResult.artikelRef.gcuuid });
+          if (this.isInDebugMode) {
+            console.log('BarcodeService.fullLookup() #271 ', { gcuuid: simpleResult.artikelRef.gcuuid });
+          }
           simpleResult.artikelData = await this.db.objektKatalogGlobal.get({ uuid: simpleResult.artikelRef.gcuuid });
-          console.log('#254 ');
+          if (this.isInDebugMode) {
+            console.log('BarcodeService.fullLookup() #254 ');
+          }
           simpleResult.image = await this.db.images.filter((img) => {
             return ('mcuuid' in img) && (img.mcuuid === simpleResult.artikelRef.uuid);
           }).first();
@@ -263,7 +285,9 @@ export class BarcodeService {
             simpleResult.image.data_binary = null;
           }
         }
-        console.log('#261 ');
+        if (this.isInDebugMode) {
+          console.log('BarcodeService.fullLookup() #261 ');
+        }
         simpleResult.raum = await this.db.raeume.get( { uuid: simpleResult.inventar.ruuid });
         break;
 
@@ -271,7 +295,9 @@ export class BarcodeService {
         // Nothing, Should not happen
 
     }
-    console.log(`#166 fullLookup for ${barcode} return data for ${lookupResultTableText}`, { simpleResult });
+    if (this.isInDebugMode) {
+      console.log(`BarcodeService.fullLookup() #166 fullLookup for ${barcode} return data for ${lookupResultTableText}`, { simpleResult });
+    }
     return simpleResult;
   }
 
@@ -294,7 +320,7 @@ export class BarcodeService {
     this.rebuildProcesses.push( { jobid: 0, table: table.name });
     const keyName: string = table.schema.primKey.keyPath.toString();
     const tblName = table.name;
-    console.log('#212 barcode.service rebuildTable delete barcodeLookup for table ', tblName);
+    console.log('BarcodeService.rebuildTable() #323 delete index for table ', tblName);
     await this.db.barcodeLookup.where( 'table').equals(tblName).delete();
 
     return this.db
@@ -317,7 +343,7 @@ export class BarcodeService {
   }
 
   async rebuildByJobid(jobid: number) {
-    console.log('#235 barcode.service.ts rebuildByJobid', { jobid });
+    console.log('BarcodeService.rebuildByJobid(' + jobid + ') #346');
     return Promise.all([
       this.rebuildTableByJobid<DBDIInventar>(this.db.inventar, jobid),
       this.rebuildTableByJobid<DBDIRaeume>(this.db.raeume, jobid),
@@ -331,16 +357,22 @@ export class BarcodeService {
 
   async rebuildTableByJobid<I extends DBDITableWithBarcode>(table: Dexie.Table<I, string|number>, jobid: number): Promise<boolean> {
     if (this.rebuildProcesses.find( p => (p.jobid === 0 || p.jobid === jobid) && p.table === table.name) ) {
-      console.error('Abort barcode rebuild, it is already running');
+      console.error(`BarcodeService.rebuildTableByJobid(${table.name}, ${jobid}) #360 Abort rebuild, is already running`);
       return false;
     }
+    console.log(`BarcodeService.rebuildTableByJobid(${table.name}, ${jobid}) #363 processing rebuild`);
 
     this.rebuildProcesses.push( { jobid, table: table.name} );
     const keyName: string = table.schema.primKey.keyPath.toString();
     const tblName = table.name;
-    console.log('#253.. barcode.service rebuildTableByJobid delete barcodeLookup for table ', tblName, jobid);
+    if (this.isInDebugMode) {
+      console.log('BarcodeService.rebuildTableByJobid(' + jobid + ', ' + table + ') #253.' +
+        ' barcode.service rebuildTableByJobid delete barcodeLookup for table ', tblName, jobid);
+    }
     await this.db.barcodeLookup.where( { table: tblName, for_jobid: jobid }).delete();
-    console.log('#255 barcode.service rebuildTableByJobid processing for table ', tblName, jobid);
+    if (this.isInDebugMode) {
+      console.log(`BarcodeService.rebuildTableByJobid(${table.name}, ${jobid}) #255`);
+    }
     let count = 0;
     return this.db
       .transaction( 'rw', [table, this.db.barcodeLookup], () => {
@@ -357,11 +389,11 @@ export class BarcodeService {
         });
       })
       .then( () => {
-        console.log('#270 barcode.serve rebuildTableByJobid finished successful', { tblName, jobid, count });
+        console.log(`BarcodeService.rebuildTableByJobid(${table.name}, ${jobid}) #270 finished`, { count });
         return  true;
       })
       .catch( () => {
-        console.log('#274 barcode.serve rebuildTableByJobid finished with Errors', tblName, jobid);
+        console.error(`BarcodeService.rebuildTableByJobid(${table.name}, ${jobid}) #274 finished with Errors`);
         return false;
       })
       .finally( () => {
@@ -370,12 +402,14 @@ export class BarcodeService {
   }
 
   async importObjektbuchBarcodesLookup(): Promise<boolean> {
-    console.log('called importObjektbuchBarcodesLookup');
+    console.log('BarcodeService.importObjektbuchBarcodesLookup() #405');
     this.lkup.where({updateHelper: 11}).modify({updateHelper: 12});
     const list = await this.db.objektbuchBarcodesLookup.toArray();
     await list.forEach( item => {
       item.updateHelper = 11;
-      console.log('called importObjektbuchBarcodesLookup import ', { item });
+      if (this.isInDebugMode) {
+        console.log('BarcodeService.importObjektbuchBarcodesLookup() #3411 import ', { item });
+      }
       this.lkup.put({...item, ...{log: false}} ).then( (r) => {
         // console.log('#229 result of put', item, r);
       }).catch( (err) => {
@@ -389,17 +423,21 @@ export class BarcodeService {
   async rebuildOnRunningSystemByJobid(jobid: number) {
     return Promise.all([
       this.rebuildTableOnRunningSystemByJobid<DBDIInventar>(this.db.inventar, jobid)
-        .finally(() => console.log('#261 barcode.service Finished BC-Rebuild Inventar')),
+        .finally(() => console.log(`BarcodeService.rebuildOnRunningSystemByJobid(${jobid}) #413 Finished Inventar`)),
       this.rebuildTableOnRunningSystemByJobid<DBDIRaeume>(this.db.raeume, jobid)
-        .finally(() => console.log('#263 barcode.service Finished BC-Rebuild Raeume!')),
+        .finally(() => console.log(`BarcodeService.rebuildOnRunningSystemByJobid(${jobid}) #415 Finished Raeume!`)),
       this.rebuildTableOnRunningSystemByJobid<DBDIObjektKatalogMandant>(this.db.objektKatalogMandant, jobid)
-        .finally(() => console.log('#267 barcode.service Finished BC-Rebuild objektKatalogMandant!'))
+        .finally(() => console.log(`BarcodeService.rebuildOnRunningSystemByJobid(${jobid}) #417 Finished objektKatalogMandant!`))
     ]).then( (results) => {
       const numErrors = results.filter( re => !re).length;
-      this.addError( 'Beim Rebuild des Lookup-Indexes sind ' + numErrors + ' aufgetreten!');
+      if (numErrors) {
+        this.addError(`Beim Rebuild des Lookup-Indexes sind ${numErrors} Fehler aufgetreten!`);
+        console.error(`BarcodeService.rebuildOnRunningSystemByJobid(${jobid})
+        Beim Rebuild des Lookup-Indexes sind ${numErrors} Fehler aufgetreten!`);
+      }
       return numErrors === 0;
     }).catch( (err) => {
-      console.error('Fehler beim Barcode-Lookup-Aufbau: ', { err });
+      console.error(`BarcodeService.rebuildOnRunningSystemByJobid(${jobid}) #423. Fehler beim Barcode-Lookup-Aufbau: `, { err });
     });
   }
 
@@ -413,12 +451,12 @@ export class BarcodeService {
     const tblBarcodeLookup = this.db.barcodeLookup;
     let count = 0;
 
+    console.log(`BarcodeService.rebuildTableOnRunningSystemByJobid(${table.name}, ${jobid}) #453 running`);
     await this.db.transaction('rw', [tblBarcodeLookup, table], () => {
       tblBarcodeLookup
         .where( { table: tblName, for_jobid: jobid, updateHelper: 1 })
         .modify({ updateHelper: 2 })
         .then( () => {
-          console.log('rebuildTableOnRunningSystemByJobid(' + jobid + ') rebuild Barcode for table ' + table.name);
           table.where({for_jobid: jobid })
             .filter( (item) => !!item.code)
             .each ( (item) => {
@@ -437,8 +475,8 @@ export class BarcodeService {
 
     const numDeletes = await tblBarcodeLookup.where( {table: tblName, for_jobid: jobid, updateHelper: 2}).delete();
 
-    console.log('#356 barcode.service.ts rebuildTableOnRunningSystemByJobid finished', {
-      jobid, table: table.name, count, numDeletes
+    console.log(`BarcodeService.rebuildTableOnRunningSystemByJobid(${table.name}, ${jobid}) #477 finished`, {
+      count, numDeletes
     });
     // Clear Finished Process from ProcessList
     this.rebuildProcesses = this.rebuildProcesses.filter( p => p.jobid !== jobid && p.table !== tblName);
@@ -447,17 +485,20 @@ export class BarcodeService {
   async rebuildOnRunningSystem() {
     return Promise.all([
       this.rebuildTableOnRunningSystem<DBDIInventar>(this.db.inventar)
-        .finally(() => console.log('#261 barcode.service Finished BC-Rebuild Inventar')),
+        .finally(() => console.log('BarcodeService.rebuildOnRunningSystem() #487 Finished Inventar')),
       this.rebuildTableOnRunningSystem<DBDIRaeume>(this.db.raeume)
-        .finally(() => console.log('#263 barcode.service Finished BC-Rebuild Raeume!')),
+        .finally(() => console.log('BarcodeService.rebuildOnRunningSystem() #489 Finished Raeume!')),
       this.rebuildTableOnRunningSystem<DBDIObjektKatalogMandant>(this.db.objektKatalogMandant)
-        .finally(() => console.log('#267 barcode.service Finished BC-Rebuild objektKatalogMandant!'))
+        .finally(() => console.log('BarcodeService.rebuildOnRunningSystem() #491 Finished objektKatalogMandant!'))
     ]).then( (results) => {
       const numErrors = results.filter( re => !re).length;
-      this.addError( 'Beim Rebuild des Lookup-Indexes sind ' + numErrors + ' aufgetreten!');
+      if (numErrors > 0) {
+        console.error(`BarcodeService.rebuildOnRunningSystem() #495 Es sind ${numErrors} Fehler aufgetreten!`);
+        this.addError(`Beim Rebuild des Lookup-Indexes sind ${numErrors} Fehler aufgetreten!`);
+      }
       return numErrors === 0;
     }).catch( (err) => {
-      console.error('Fehler beim Barcode-Lookup-Aufbau: ', { err });
+      console.error('BarcodeService.rebuildOnRunningSystem() #500. Fehler beim Barcode-Lookup-Aufbau: ', { err });
     });
   }
 
@@ -470,14 +511,18 @@ export class BarcodeService {
     const tblName = table.name;
     const tblBarcodeLookup = this.db.barcodeLookup;
 
-    console.log('rebuildTableOnRunningSystem Start Transaction Barcode-Indexing for table ' + table.name);
+    console.log(`BarcodeService.rebuildTableOnRunningSystem(${table.name}) #513 Start Transaction Re-Indexing`);
     await this.db.transaction('rw', [tblBarcodeLookup, table], () => {
-      console.log('rebuildTableOnRunningSystem Set Flag updateHelper=2 for table ' + table.name);
+      if (this.isInDebugMode) {
+        console.log(`BarcodeService.rebuildTableOnRunningSystem(${table.name}) #515 Set Flag updateHelper=2`);
+      }
       tblBarcodeLookup
         .where( {table: tblName, updateHelper: 1})
         .modify({updateHelper: 2})
         .then( () => {
-          console.log('rebuildTableOnRunningSystem rebuild Barcode for table ' + table.name);
+          if (this.isInDebugMode) {
+            console.log(`BarcodeService.rebuildTableOnRunningSystem(${table.name}) #520 rebuild Index`);
+          }
           table.filter( (item) => !!item.code)
             .each ( (item) => {
             const forJobid = ('for_jobid' in item) ? item.for_jobid : 0;
@@ -493,7 +538,9 @@ export class BarcodeService {
         });
     } );
 
-    console.log('rebuildTableOnRunningSystem delete Barcodes for no more existing entries in ' + table.name);
+    if (this.isInDebugMode) {
+      console.log(`BarcodeService.rebuildTableOnRunningSystem(${table.name}) #536 delete no more existing entries`);
+    }
     await tblBarcodeLookup.where( {table: tblName, updateHelper: 2}).delete();
     // Clear Finished Process from ProcessList
     this.rebuildProcesses = this.rebuildProcesses.filter( p => p.table !== tblName);

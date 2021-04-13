@@ -70,19 +70,38 @@ export class DexieService extends Dexie {
     console.log('clear db');
     return Promise.all(this.tables.map( (t) => t.clear() ))
       .then( () => {
-        console.log('clear db finished');
+        console.log('Datenbank wurde geleert!');
         return true;
       }).catch( (r) => {
+        console.log('clear db finished');
         console.error(r);
         return false;
       });
+  }
+
+  async deleteDB(): Promise<boolean> {
+    const dbName = this.name;
+    console.log('delete db ' + dbName);
+    return Dexie.delete(dbName).then( () => {
+      alert('Browser-Datenbank ' + dbName + ' wurde gelöscht!\n' +
+        'Die Seite wird für den Neu-Aufbau neu geladen\n' +
+        ' und muss nötigenfalls auch händisch wiederholt neu geladen werden!');
+      document.location.href = '/';
+      return true;
+    }).catch( (reason) => {
+      alert('Beim Löschen sind Fehler aufgetreten\n' +
+        'Die Seite wird neu geladen\n' +
+        ' und muss nötigenfalls auch händisch wiederholt neu geladen werden!');
+      document.location.href = '/';
+      return false;
+    });
   }
 
   init() {
     Dexie.Syncable.registerSyncProtocol('inventorySync', this.syncClient );
     this.nextDbVersion = this.dbVersion + 1;
 
-    this.version(this.dbVersion).stores({
+    this.version(12).stores({
       barcodeLookup:
         '&[code+for_jobid],table,for_jobid,[table+for_jobid],updateHelper,[table+updateHelper]',
       clientChangeLog:
@@ -116,7 +135,7 @@ export class DexieService extends Dexie {
       objektKatalogMandant:
        '$$uuid,mcid,gcid,gcuuid,code,mid,for_jobid,created_jobid',
       objektKatalogImages:
-      '$$uuid,id,for_jobid,RefTable,RefUuid,ImgUuid,Kategorie,[RefTable+RefUuid+Kategorie]',
+      '$$uuid,id,for_jobid,RefTable,RefUuid,ImgUuid,Kategorie',
       raeume:
        '$$uuid,rid,gid,[rid+gid],for_jobid,code,raumid,Raum,Raumbezeichnung,Etage,current_jobid,current_jobstatus',
       serverSyncErrors:
@@ -233,7 +252,7 @@ export class DexieService extends Dexie {
       this.nextDbVersion += 1;
     }
 
-    if (1) {
+    if (true) {
       const v10 = this.nextDbVersion;
       this.version(v10).stores({
         barcodeLookup:
@@ -241,11 +260,19 @@ export class DexieService extends Dexie {
       });
       this.nextDbVersion += 1;
     }
-    if (1) {
+    if (true) {
       const v11 = this.nextDbVersion;
       this.version(v11).stores({
         objektKatalogImages:
           '$$uuid,id,for_jobid,RefTable,RefUuid,ImgUuid,Kategorie,[RefTable+RefUuid+Kategorie]',
+      });
+      this.nextDbVersion += 1;
+    }
+    if (true) {
+      const v12 = this.nextDbVersion;
+      this.version(v12).stores({
+        objektKatalogImages:
+          '$$uuid,id,for_jobid,RefTable,RefUuid,ImgUuid,Kategorie,[RefTable+RefUuid+Kategorie],[RefTable+RefUuid]',
       });
       this.nextDbVersion += 1;
     }

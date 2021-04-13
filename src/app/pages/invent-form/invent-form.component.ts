@@ -852,7 +852,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
     modalRef.result.then( () => {
       sub.unsubscribe();
       sub2.unsubscribe();
-    });
+    }, () => {});
   }
 
   getModalRefByName(name: string): NgbModalRef {
@@ -1142,9 +1142,14 @@ export class InventFormComponent implements OnInit, OnDestroy {
       waitingForNewInventarBarcode: this.waitingForNewInventarBarcode,
       event
     });
+    this.rawInputBarcodes.nativeElement.value = '';
     if (event.rawInput) {
       this.rawInputBarcodes.nativeElement.value = event.rawInput;
+      if (event.debugData && event.debugData.keyDownEvents) {
+        this.rawInputBarcodes.nativeElement.value += '\n\nkeyDownEvents:\n' + JSON.stringify(event.debugData.keyDownEvents);
+      }
     }
+
     if (event.barcode.indexOf('\n') > -1) {
       const barcodes = event.barcode.split('\n').map( (c) => {
         let bc = this.bcTrimZero( c.trim() );
@@ -1381,17 +1386,31 @@ export class InventFormComponent implements OnInit, OnDestroy {
   // dummy
   simulateScanner() {
 
-    if (!this.inputSimulateBarcode.nativeElement.value) {
-      this.inputSimulateBarcode.nativeElement.value = 'A-1-3-1-78eae45';
+    if (!this.inputSimulateBarcode
+      || !this.inputSimulateBarcode.nativeElement
+      || !this.inputSimulateBarcode.nativeElement.value
+      || !(typeof this.inputSimulateBarcode.nativeElement.value === 'string')
+    ) {
+      return;
     }
-    const s = this.inputSimulateBarcode.nativeElement.value;
+    const input = this.inputSimulateBarcode.nativeElement.value;
+    const s = input.replace('\r\n', '\n').replace('\r', '\n');
     for (const character of s) {
-    // for (let i = 0; i < s.length; i++) {
-      const shiftKey = (s !== s.toLowerCase() && s === s.toUpperCase());
-      if (shiftKey) {
-        const shift = new KeyboardEvent('keydown', {bubbles : true, cancelable : true,
+      let key = character;
+      let shiftKey = false;
+
+      if (character === '\t') {
+        key = 'Tab';
+
+      } else if (character === '\n') {
+        key = 'Enter';
+
+      } else if (character !== character.toLowerCase() && character === character.toUpperCase()) {
+        shiftKey = true;
+        const shiftEvent = new KeyboardEvent('keydown', {bubbles : true, cancelable : true,
           key : 'Shift', code: 'ShiftLeft', shiftKey });
-        document.dispatchEvent( shift );
+        document.dispatchEvent( shiftEvent );
+
       }
       const e = new KeyboardEvent('keydown', {bubbles : true, cancelable : true, key : character, shiftKey });
       setTimeout(() => document.dispatchEvent(e));
