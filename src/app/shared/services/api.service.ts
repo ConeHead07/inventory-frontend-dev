@@ -42,6 +42,10 @@ export class ApiService {
         defaultUrl = 'https://' + hostName.replace('-app.mertens.services', '-admin.mertens.services') + '/';
         break;
 
+      case 'dev-inventory-app.mertens.services':
+        defaultUrl = 'https://dev-inventory.mertens.services/';
+        break;
+
       case 'mertens-inventory.firebaseapp.com':
       case 'mertens-inventory.web.app':
       default:
