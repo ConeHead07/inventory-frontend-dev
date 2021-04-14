@@ -8,6 +8,7 @@ import {VariablesService} from './variables.service';
 import {DbsyncLogService, TableSyncProgress} from './dbsync-log.service';
 import {DatabaseChangeType} from 'dexie-observable/api';
 import {Subscription} from 'rxjs';
+import {BarcodeService} from '../../pages/invent-form/data-services/barcode.service';
 
 export interface TableSyncProgressList {
   [key: string]: TableSyncProgress;
@@ -263,7 +264,8 @@ export class DBSyncClientService implements OnDestroy {
     private baseData: BasedataService,
     private networkService: ConnectionService,
     private settings: VariablesService,
-    private dbSyncLogService: DbsyncLogService) {
+    private dbSyncLogService: DbsyncLogService,
+    private bcLookupService: BarcodeService) {
 
     this.subscriptionClientLogsChanged = this.dexieService.clientSyncAmountChanged.subscribe( (amount) => {
       console.log('DBSyncClientService #245 clientSyncAmountChanged: ', { amount });
@@ -433,6 +435,7 @@ export class DBSyncClientService implements OnDestroy {
     }
     this.clearFinishedProcesses();
     this.processFinished.emit( proc );
+    this.bcLookupService.rebuildOnRunningSystemByJobid(proc.jobid);
     return proc;
   }
 
@@ -615,7 +618,9 @@ export class DBSyncClientService implements OnDestroy {
                 const err = '#501 SYNC-FEHLER: LastRevId ist größer als CurrRevID: ' + lastRevId + ' > ' + currRevId;
                 console.error(err);
                 alert(err);
-                return;
+                return this.finishProcess(syncJobResult, SyncJobStatus.Aborted,
+                  'Server-Aenderungen sind nicht streng nach RevId sortiert!');
+
               }
 
               chg.table = chg.table[0].toLowerCase() + chg.table.substr(1);

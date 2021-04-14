@@ -147,12 +147,11 @@ export class BarcodeService {
 
   async bcAnalyzeLookup(barcode: string, jobid: number): Promise<BarcodeLookupSimpleResult> {
 
-    const matchesObjektbuchArtikel = barcode.match(/^(A)-(\d+)-/);
-    const matchesObjektbuchRaum = !matchesObjektbuchArtikel ? barcode.match(/^(R)-(\d+)-/) : false;
+    const matchesObjektbuchArtikel = barcode.match(/^(A)(\d+)-/);
+    const matchesObjektbuchRaum = !matchesObjektbuchArtikel ? barcode.match(/^(R)(\d+)-/) : false;
 
     let foundTable: string;
     let foundTableKey: string;
-    let foundTableId: number;
 
     const result: BarcodeLookupSimpleResult = {
       barcode,
@@ -163,13 +162,13 @@ export class BarcodeService {
     };
 
     if ( matchesObjektbuchArtikel ) {
-      const [, , sMcid ] = matchesObjektbuchArtikel;
       foundTable = 'objektKatalogMandant';
       foundTableKey = 'uuid';
     } else if ( matchesObjektbuchRaum) {
-      const [, , sRid ] = matchesObjektbuchRaum;
       foundTable = 'raeume';
       foundTableKey = 'uuid';
+    } else {
+      return result;
     }
 
     const objBookLkUp = await this.db.objektbuchBarcodesLookup.where({

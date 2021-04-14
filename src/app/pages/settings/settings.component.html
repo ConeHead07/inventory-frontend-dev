@@ -73,3 +73,19 @@
     <button class="btn btn-danger" [disabled]="buildBcLookup" (click)="dbClear()">Datenbank leeren</button>
   </div>
 </div>
+
+<div class="card">
+  <div class="card-body">
+    <h5 class="card-title">Browser(Handy)-Datenbank löschen</h5>
+    <p class="card-text">
+      Mit dieser Funktion wird die Browser/Handy-Datenbank gelöscht.<br>
+      Unsynchronisierte Änderungen gehen hierbei verloren!<br>
+      Die Datenbank-Struktur wird nach einem Seiten-Reload neu aufgebaut.<br>
+      Benutzen Sie diese Funktion nur wenn alle Daten bereits synchronisiert sind
+      oder schwerwiegende Fehler aufgetreten sind.<br>
+      Datenbank: {{ dbName }} Version {{ dbVersion }}
+    </p>
+    <button class="btn btn-danger" [disabled]="buildBcLookup" (click)="dbDelete()">Datenbank löschen</button>
+  </div>
+</div>
+

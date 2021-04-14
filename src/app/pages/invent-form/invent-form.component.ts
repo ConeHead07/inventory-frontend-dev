@@ -1040,7 +1040,10 @@ export class InventFormComponent implements OnInit, OnDestroy {
 
   async handleScanData(event: ScanDetectData) {
     if (this.kunde.mid === 5 && event.barcode.length > 10) {
-      event.barcode = event.barcode.substr(0, 10);
+      const bcFirstChr = event.barcode.substr(0, 1);
+      if (bcFirstChr !== 'A' && bcFirstChr !== 'R') {
+        event.barcode = event.barcode.substr(0, 10);
+      }
     }
     console.log('InventFormComponente #865 handleScanData', { waitingForNewInventarBarcode: this.waitingForNewInventarBarcode, event });
     const bcResult = await this.bcLookup.fullLookup(event.barcode, this.jobid);

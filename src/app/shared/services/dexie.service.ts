@@ -78,6 +78,25 @@ export class DexieService extends Dexie {
       });
   }
 
+  async deleteDB(): Promise<boolean> {
+    const dbName = this.name;
+    console.log('delete db ' + dbName);
+    return Dexie.delete(dbName).then( () => {
+      alert('Browser-Datenbank ' + dbName + ' wurde gelöscht!\n' +
+        'Die Seite wird für den Neu-Aufbau neu geladen\n' +
+        ' und muss nötigenfalls auch händisch wiederholt neu geladen werden!');
+      document.location.href = '/';
+      return true;
+    }).catch( (reason) => {
+      alert('Beim Löschen sind Fehler aufgetreten\n' +
+        'Die Seite wird neu geladen\n' +
+        ' und muss nötigenfalls auch händisch wiederholt neu geladen werden!');
+      document.location.href = '/';
+      return false;
+    });
+  }
+
+
   init() {
     Dexie.Syncable.registerSyncProtocol('inventorySync', this.syncClient );
     this.nextDbVersion = this.dbVersion + 1;
