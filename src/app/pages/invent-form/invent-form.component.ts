@@ -162,7 +162,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
   faUnlockAlt = faUnlockAlt;
 
   @ViewChild('input2', { static: true }) input2: ElementRef;
-  @ViewChild('inputSimulateBarcode', { static: true }) inputSimulateBarcode: ElementRef
+  @ViewChild('inputSimulateBarcode', { static: true }) inputSimulateBarcode: ElementRef;
   @ViewChild('rawInputBarcodes', { static: true }) rawInputBarcodes: ElementRef;
 
   scanDetectorConfig: ScannerConfiguration = {
@@ -898,14 +898,15 @@ export class InventFormComponent implements OnInit, OnDestroy {
           isOpen: false
         };
       }
-      console.log('InventFormComponente #635 After dismiss resolved: ', this.currentModal, this.currentModals);
     })
       .catch( (err) => {
         if (name === 'SelectCreateRaum') {
           this.openedCreateRaum = false;
         }
         this.currentModals = this.currentModals.filter( mod => undefined !== mod.modalRef.componentInstance);
-        console.error('InventFormComponente #642 Error on Closing Modal ', { mName, err} );
+        if (typeof err !== 'string' || err.indexOf('Cross click') === -1) {
+          console.error('InventFormComponente #902 Error on Closing Modal ', {mName, err});
+        }
         if (this.currentModals.length) {
           this.currentModal = this.currentModals[ this.currentModals.length - 1];
         } else {
@@ -1142,6 +1143,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
       waitingForNewInventarBarcode: this.waitingForNewInventarBarcode,
       event
     });
+    event.barcode = this.bcTrimZero(event.barcode);
     this.rawInputBarcodes.nativeElement.value = '';
     if (event.rawInput) {
       this.rawInputBarcodes.nativeElement.value = event.rawInput;
@@ -1153,7 +1155,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
     if (event.barcode.indexOf('\n') > -1) {
       const barcodes = event.barcode.split('\n').map( (c) => {
         let bc = this.bcTrimZero( c.trim() );
-        if (this.kunde.mid === 5 && bc.length > 10) {
+        if (this.kunde.mid === 5 && bc.length > 10 && !bc.startsWith('A') && !bc.startsWith('R')) {
           bc = bc.substr(0, 10);
         }
         return bc;
@@ -1161,9 +1163,10 @@ export class InventFormComponent implements OnInit, OnDestroy {
       return this.openBatchScans(barcodes, event.target);
     }
 
-    event.barcode = this.bcTrimZero(event.barcode);
     if (this.kunde.mid === 5 && event.barcode.length > 10) {
-      event.barcode = event.barcode.substr(0, 10);
+      if (!event.barcode.startsWith('A') && !event.barcode.startsWith('R')) {
+        event.barcode = event.barcode.substr(0, 10);
+      }
     }
 
     const bcResult = await this.bcLookup.fullLookup(event.barcode, this.jobid);
