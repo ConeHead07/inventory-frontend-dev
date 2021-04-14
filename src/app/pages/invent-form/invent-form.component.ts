@@ -872,7 +872,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
   modalWatch(modalRef: NgbModalRef, name: string) {
     const mRef = modalRef;
     const mName = name;
-    console.log('InventFormComponente #610 Opened Modal: ', name);
+    console.log('InventFormComponente #875 Opened Modal: ', name);
     const currModal = {
       modalRef,
       name,
