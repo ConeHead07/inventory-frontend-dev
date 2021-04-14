@@ -1,6 +1,6 @@
 {
   "name": "frontend",
-  "version": "1.0.83",
+  "version": "1.0.84",
   "scripts": {
     "ng": "ng",
     "start": "ng serve --aot --host 0.0.0.0 --disable-host-check",
