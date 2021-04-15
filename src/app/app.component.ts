@@ -68,6 +68,7 @@ export class AppComponent {
         });
  */
   setupUpdates() {
+    return;
     this.swUpdate.available.subscribe(event => {
       // Update wurde entdeckt
       console.log('current version is', event.current);
