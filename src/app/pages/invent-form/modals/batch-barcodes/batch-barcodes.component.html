@@ -71,9 +71,14 @@
 
         </div>
 
-        <div class="btn-group w-100">
+        <div class="btn-group w-100" *ngIf="item.typ === typeofLookupInventar;else elseNoInv">
           <button class="btn btn-success btn-sm col-6" (click)="applyResult(item)"><fa-icon [icon]="faCheck"></fa-icon></button>
           <button class="btn btn-danger btn-sm col-6" (click)="removeResult(item)"><fa-icon [icon]="faRemove"></fa-icon></button>
+        </div>
+        <div class="btn-group w-100" #elseNoInv>
+          <ngb-alert type="error">
+          Fehler: Dies ist kein existierender Inventar-Barcode!
+          </ngb-alert>
         </div>
       </div>
     </div>

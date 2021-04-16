@@ -1143,6 +1143,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
       waitingForNewInventarBarcode: this.waitingForNewInventarBarcode,
       event
     });
+
     event.barcode = this.bcTrimZero(event.barcode);
     this.rawInputBarcodes.nativeElement.value = '';
     if (event.rawInput) {
@@ -1153,6 +1154,21 @@ export class InventFormComponent implements OnInit, OnDestroy {
     }
 
     if (event.barcode.indexOf('\n') > -1) {
+      const numBatchCodes = event.barcode.split('\n').length;
+      let batchError = '';
+      if (!this.raum) {
+        batchError = 'Wählen Sie erst einen Raum aus!';
+      } else if (this.waitingForNewInventarBarcode) {
+        batchError = 'Aktueller Vorgang erwartet einzelnen neuen Inventar-Barcode!';
+      } else if (this.waitingForInventarData) {
+        batchError = 'Aktueller Vorgang erwartet einzelne Artikelzuweisung!';
+      }
+      if (batchError) {
+        alert(batchError + '\n' +
+          'Es wurden aber ' + numBatchCodes + ' Barcodes im Batchmodus übermittelt!'
+        );
+        return;
+      }
       const barcodes = event.barcode.split('\n').map( (c) => {
         let bc = this.bcTrimZero( c.trim() );
         if (this.kunde.mid === 5 && bc.length > 10 && !bc.startsWith('A') && !bc.startsWith('R')) {

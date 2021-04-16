@@ -55,6 +55,11 @@ export class BatchBarcodesComponent implements OnInit, OnDestroy {
   faCheck = faCheck;
   faRemove = faTrashAlt;
 
+  typeofLookupInventar = bcLookupTyp[bcLookupTyp.Inventar];
+  typeofLookupRaum = bcLookupTyp[bcLookupTyp.Raum];
+  typeofLookupArtikel = bcLookupTyp[bcLookupTyp.Artikel];
+  typeofLookupNeu = bcLookupTyp[bcLookupTyp.Neu];
+
   onScan = new EventEmitter<ScannerBarcodeData>();
   onLookupResultApply = new EventEmitter<LookupResultItem>();
 

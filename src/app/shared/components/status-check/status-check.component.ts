@@ -17,6 +17,7 @@ export class StatusCheckComponent implements OnInit, OnDestroy {
   unsyncedAmountChangeSubscription: Subscription;
   numUnsynced: number;
   currentApplicationVersion = environment.appVersion;
+  nextApplicationVersion = '';
 
   constructor(
     private connectionService: ConnectionService,

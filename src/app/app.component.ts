@@ -5,6 +5,7 @@ import {SwPush, SwUpdate} from '@angular/service-worker';
 import {ToastrService} from 'ngx-toastr';
 import {environment} from '../environments/environment';
 import {NavigationEnd, Router} from '@angular/router';
+import {AppService} from './app.service';
 
 @Component({
   selector: 'app-root',
@@ -25,7 +26,8 @@ export class AppComponent {
               private toastr: ToastrService,
               private router: Router,
               private swUpdate: SwUpdate,
-              private swPush: SwPush) {
+              private swPush: SwPush,
+              private appService: AppService) {
     this.heartBeatState = this.connectionService.options.enableHeartbeat;
 
     if (this.swUpdate.isEnabled) {
@@ -73,26 +75,26 @@ export class AppComponent {
       console.log('current version is', event.current);
       console.log('available version is', event.available);
 
-      const message = 'Aktuelle Version: ' + event.current + '<br>Aktuelle Version' + event.available;
-      const action = 'New Version is available!';
-
-      // Benutzer auf Update hinweisen und Seite neu laden
-      this.toastr.info(message, action).onAction.subscribe(
-        () => location.reload()
-      );
+      this.appService.setAvailableUpdate(event.available);
     });
 
     // Update herunterladen
     this.swUpdate.activateUpdate().then(e => {
       // Update wurde heruntergeladen
-
-      const message = 'Anwendung wurde aktualisert und wird neu geladen';
-      const action = 'Reload!';
-
-      // Benutzer auf Update hinweisen und Seite neu laden
-      this.toastr.info(message, action).onAction.subscribe(
-        () => location.reload()
+      return this.appService.setFoundUpdate(
+        'Ein Update wurde heruntergeladen und ist mit dem nächsten Reload aktiv'
       );
+
+      if (false) {
+        const message = 'Ein Update wurde heruntergeladen.';
+        const action = 'Klicken Sie für einen Restart';
+        // Benutzer auf Update hinweisen und Seite neu laden
+        this.toastr.info(message, action).onAction.subscribe(
+          () => {
+            location.reload();
+          }
+        );
+      }
     });
 
     // Auf Updates prüfen
