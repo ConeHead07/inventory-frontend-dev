@@ -2,7 +2,12 @@ import {EventEmitter, Injectable, OnDestroy, Output} from '@angular/core';
 import {ApiService} from './api.service';
 import {BasedataService} from './basedata.service';
 import {DexieService} from './dexie.service';
-import {DBDIBarcodeLookup, DBDIClientChangeLog, DBDIServerSyncErrors} from '../interfaces/dexie.interfaces';
+import {
+  DBDIBarcodeLookup, DBDIBarcodeLookupCompatibleItem,
+  DBDIClientChangeLog,
+  DBDIInventar, DBDIObjektKatalogMandant, DBDIRaeume,
+  DBDIServerSyncErrors
+} from '../interfaces/dexie.interfaces';
 import {ConnectionService} from './connection-service.service';
 import {VariablesService} from './variables.service';
 import {DbsyncLogService, TableSyncProgress} from './dbsync-log.service';
@@ -435,7 +440,6 @@ export class DBSyncClientService implements OnDestroy {
     }
     this.clearFinishedProcesses();
     this.processFinished.emit( proc );
-    this.bcLookupService.rebuildOnRunningSystemByJobid(proc.jobid);
     return proc;
   }
 
@@ -645,6 +649,17 @@ export class DBSyncClientService implements OnDestroy {
                   console.log('#494 ' + ci + '/' + chgLen +
                     ' dbsync-client.service. await this.dexieService.table( ' + chg.table + ' ).put( objInsertData )', objInsertData);
                   await this.dexieService.table(chg.table).put(objInsertData);
+                  if (['inventar', 'raeume', 'objektKatalogMandant'].indexOf(chg.table) > -1) {
+                    const newItem = objInsertData as DBDIBarcodeLookupCompatibleItem;
+
+                    this.bcLookupService.addBarcode({
+                      code: newItem.code,
+                      table: chg.table,
+                      key: 'uuid',
+                      for_jobid: newItem.for_jobid,
+                      uuid: newItem.uuid
+                    });
+                  }
                   break;
 
                 case 2: // Update
