@@ -7,6 +7,12 @@
       "hosting": {
         "frontend": [
           "mertens-inventory"
+        ],
+        "rc": [
+          "mertens-inventory-rc"
+        ],
+        "dev": [
+          "mertens-inventory-dev"
         ]
       }
     }
