@@ -2,13 +2,18 @@ import {EventEmitter, Injectable, OnDestroy, Output} from '@angular/core';
 import {ApiService} from './api.service';
 import {BasedataService} from './basedata.service';
 import {DexieService} from './dexie.service';
-import {DBDIBarcodeLookup, DBDIClientChangeLog, DBDIServerSyncErrors} from '../interfaces/dexie.interfaces';
+import {
+  DBDIBarcodeLookup, DBDIBarcodeLookupCompatibleItem,
+  DBDIClientChangeLog,
+  DBDIInventar, DBDIObjektKatalogMandant, DBDIRaeume,
+  DBDIServerSyncErrors
+} from '../interfaces/dexie.interfaces';
 import {ConnectionService} from './connection-service.service';
 import {VariablesService} from './variables.service';
 import {DbsyncLogService, TableSyncProgress} from './dbsync-log.service';
 import {DatabaseChangeType} from 'dexie-observable/api';
 import {Subscription} from 'rxjs';
-import {BarcodeService} from "../../pages/invent-form/data-services/barcode.service";
+import {BarcodeService} from '../../pages/invent-form/data-services/barcode.service';
 
 export interface TableSyncProgressList {
   [key: string]: TableSyncProgress;
@@ -495,7 +500,7 @@ export class DBSyncClientService implements OnDestroy {
     }
     this.clearFinishedProcesses();
     this.processFinished.emit( proc );
-    await this.bcLookupService.rebuildOnRunningSystemByJobid(proc.jobid);
+    // await this.bcLookupService.rebuildOnRunningSystemByJobid(proc.jobid);
     return proc;
   }
 
@@ -728,6 +733,17 @@ export class DBSyncClientService implements OnDestroy {
                       ' dbsync-client.service. await this.dexieService.table( ' + chg.table + ' ).put( objInsertData )', objInsertData);
                   }
                   await this.dexieService.table(chg.table).put(objInsertData);
+                  if (['inventar', 'raeume', 'objektKatalogMandant'].indexOf(chg.table) > -1) {
+                    const newItem = objInsertData as DBDIBarcodeLookupCompatibleItem;
+
+                    this.bcLookupService.addBarcode({
+                      code: newItem.code,
+                      table: chg.table,
+                      key: 'uuid',
+                      for_jobid: newItem.for_jobid,
+                      uuid: newItem.uuid
+                    });
+                  }
                   break;
 
                 case 2: // Update
@@ -741,6 +757,13 @@ export class DBSyncClientService implements OnDestroy {
                   await this.dexieService.table(chg.table)
                     .where({uuid: chg.uuid})
                     .modify(objUpdateData);
+                  if ('code' in objUpdateData && ['inventar', 'raeume', 'objektKatalogMandant'].indexOf(chg.table) > -1) {
+                    const chgItem = objUpdateData as DBDIBarcodeLookupCompatibleItem;
+
+                    this.bcLookupService.chgBarcode(
+                      chg.table, chgItem.for_jobid, chgItem.uuid, chgItem.code, false
+                    );
+                  }
                   break;
 
                 case 3: // Delete

@@ -555,6 +555,18 @@ export class BarcodeService {
     return this.db.barcodeLookup.add({...item, ...{log}}).then( (key) => key[0]);
   }
 
+  async chgBarcode(
+    table: DBDIBarcodeLookup['table'],
+    jobid: DBDIBarcodeLookup['for_jobid'],
+    uuid: DBDIBarcodeLookup['uuid'],
+    changedCode: DBDIBarcodeLookup['code'],
+    log: boolean = false): Promise<number> {
+    return this.db.barcodeLookup
+      .where({table, for_jobid: jobid})
+      .filter( (bcItem) => bcItem.uuid === uuid)
+      .modify({ code: changedCode, log });
+  }
+
   addError( err: any) {
     this.lastErrors.push( err );
     if (this.lastErrors.length > 20) {

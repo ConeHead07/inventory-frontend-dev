@@ -356,6 +356,14 @@ export interface DBDIVariables {
   value?: any;
 }
 
+export interface DBDIBarcodeLookupCompatibleItem {
+  code: string;
+  table: string;
+  key: string;
+  uuid: string;
+  for_jobid: number;
+}
+
 export interface DBDIBarcodeLookup {
   code: string;
   table: string;
