@@ -195,4 +195,22 @@ export class ImagesService {
     });
     return rs;
   }
+
+  async deleteByUuid(uuid: string): Promise<number> {
+    return this.dexie.images.where({uuid}).delete()
+      .then( (num) => {
+      return this.dexie.objektKatalogImages
+        .where({ImgUuid: uuid})
+        .delete()
+        .then( (numLinks) => num + numLinks)
+        .catch( () => {
+          console.error('ERROR: Can not delete links in objektKatalogImages for uuid: '  + uuid);
+          return num;
+        });
+    })
+      .catch( () => {
+        console.error('ERROR: Cannot Delete Image with uuid: ' + uuid);
+        return 0;
+      });
+  }
 }

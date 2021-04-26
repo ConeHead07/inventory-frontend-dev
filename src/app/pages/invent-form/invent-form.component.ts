@@ -1160,6 +1160,14 @@ export class InventFormComponent implements OnInit, OnDestroy {
     switch (bcResult.lookupResultTable) {
       case LookupResultTable.None:
         console.log('InventFormComponente #990 handleScanData LookupResultTable.None');
+        if (!bcResult.barcode.match(/^(\d{10}|L\d{9,10})$/) ) {
+          console.log('InventFormComponent.handleScanData() #1163', { bcResult });
+          if (!confirm(
+            'Der Barcode besteht nicht wie erwartet aus 10 Zahlen!\n' +
+            'Möchten Sie ihn dennoch für die Neuaufnahme verwenden?')) {
+            return;
+          }
+        }
         this.clearFormInventar();
         this.formInventar.Barcode = bcResult.barcode;
         this.waitingForInventarData = true;
@@ -1172,7 +1180,9 @@ export class InventFormComponent implements OnInit, OnDestroy {
         // User soll daraufhin einen Artikel zuweisen können
         this.toastr.warning(
           'Barcode: ' + barcode + '<br>' +
-          'Für eine Neuaufnahme weisen sie bitte einen Artikel zu!',
+          'Für eine Neuaufnahme weisen sie bitte einen Artikel zu!<br>\n' +
+          '<i>Oder nutzen Sie unter Einstellungen die Funktion reIndexBarcodeLookup, ' +
+          'falls neu aufgenommene Elemente nicht erkannt werden.</i>',
           'Unbekannter Barcode'
         );
         break;

@@ -1,10 +1,19 @@
 import {Component, ElementRef, OnInit, ViewChild} from '@angular/core';
-import { faArrowAltCircleLeft, faArrowAltCircleRight, faDotCircle, faAngleLeft, faAngleRight } from '@fortawesome/free-solid-svg-icons';
+import {
+  faArrowAltCircleLeft,
+  faArrowAltCircleRight,
+  faDotCircle,
+  faAngleLeft,
+  faAngleRight,
+  faTrashAlt
+} from '@fortawesome/free-solid-svg-icons';
 import {DBDIImages} from '../../../../shared/interfaces/dexie.interfaces';
 import {DexieService} from '../../../../shared/services/dexie.service';
 import {NgbActiveModal} from '@ng-bootstrap/ng-bootstrap';
 import {ImagesService} from '../../data-services/images.service';
 import {DomSanitizer, SafeUrl} from '@angular/platform-browser';
+import {VariablesService} from "../../../../shared/services/variables.service";
+import {ToastrService} from "ngx-toastr";
 
 enum HtmlImageLoadingStatus {
   Pending,
@@ -25,6 +34,8 @@ interface HtmlImageWithStatus {
   desc?: string;
   img?: HTMLImageElement;
   loadingStatus: HtmlImageLoadingStatus;
+  isDeletable: boolean;
+  isEditable: boolean;
   error?: string;
 }
 
@@ -43,6 +54,7 @@ export class ImageboxComponent implements OnInit {
   faArrowLeft = faArrowAltCircleLeft;
   faArrowRight = faArrowAltCircleRight;
   faDot = faDotCircle;
+  faTrashAlt = faTrashAlt;
 
   titel = '';
   htmlImageLoadingStatus = HtmlImageLoadingStatus;
@@ -60,8 +72,10 @@ export class ImageboxComponent implements OnInit {
   error = '';
 
   constructor(private dexie: DexieService,
+              private imgService: ImagesService,
               public activeModal: NgbActiveModal,
-              private domSanitizer: DomSanitizer) { }
+              private domSanitizer: DomSanitizer,
+              private toastr: ToastrService) { }
 
   ngOnInit(): void {
   }
@@ -149,7 +163,9 @@ export class ImageboxComponent implements OnInit {
               thisImages[idx] = {
                 uuid,
                 img: null,
-                loadingStatus: HtmlImageLoadingStatus.NotFound
+                loadingStatus: HtmlImageLoadingStatus.NotFound,
+                isDeletable: true,
+                isEditable: true
               };
               checkResolve();
               return;
@@ -173,6 +189,8 @@ export class ImageboxComponent implements OnInit {
               type: row.type,
               desc: row.desc,
               loadingStatus: HtmlImageLoadingStatus.Loading,
+              isDeletable: true,
+              isEditable: true,
               img: new Image()
             };
             thisImages[idx].img.onload = (ev) => {
@@ -216,6 +234,61 @@ export class ImageboxComponent implements OnInit {
     this.loadImage(this.currImgIdx + 1);
   }
 
+  async delete(imgUuid: string) {
+    // let delUuid = imgUuid;
+    console.log('ImageboxComponent.delete() #236 this.images.length:', this.images.length);
+    const idx = this.imageUuidList.indexOf(imgUuid);
+    let numDeleted = 0;
+
+    if (idx === -1) {
+      console.error('ImageboxComponent.delete(' + imgUuid + ') #230 Image not found');
+      // alert('Bild kann nicht gelöscht werden. Unbekannte Bild-ID: ' + imgUuid);
+      this.toastr.error('Fehler beim Löschen: Unbekannte Bild-ID ' + imgUuid);
+      return;
+    }
+
+    if (!confirm('Möchten Sie das Bild wirklich löschen?')) {
+      return false;
+    }
+
+    if (imgUuid) {
+      console.log( 'ImageboxComponent.delete call test() from ImagesServices: ' + this.imgService.test() );
+      numDeleted = await this.imgService.deleteByUuid(imgUuid);
+      if (numDeleted) {
+        this.toastr.success('Bild wurde gelöscht ' + imgUuid);
+      }
+    }
+
+    if (!numDeleted) {
+      console.error('ImageboxComponent.delete(' + imgUuid + ') #247 wurde nicht gelöscht');
+      this.toastr.error('Bild konnte nicht gelöscht werden. Bild-ID: ' + imgUuid, 'Fehler');
+      return;
+    }
+
+    const len = this.imageUuidList.length;
+    const newLen = len - 1;
+    for (let i = idx; i < len; ++i) {
+      if (i < newLen) {
+        this.imageUuidList[i] = this.imageUuidList[i + 1];
+        this.images[i] = this.images[i + 1];
+      }
+    }
+    this.imageUuidList.length = newLen;
+    this.images.length = newLen;
+    this.numImages = newLen;
+
+    if (idx < this.images.length && this.images[idx]) {
+      this.currImgIdx = idx;
+      this.currImg = this.images[idx];
+    } else if (this.images.length > 0) {
+      this.currImgIdx = this.images.length - 1;
+      this.currImg = this.images[ this.currImgIdx ];
+    } else {
+      this.currImg = null;
+      this.currImgIdx = 0;
+    }
+  }
+
   async loadImage(imgIdx: number): Promise<boolean> {
     console.log('ImageboxComponent.setImagesUuids #195 loadImage(', imgIdx, ')');
     return new Promise( (resolve, reject) => {
@@ -250,7 +323,9 @@ export class ImageboxComponent implements OnInit {
         this.images[imgIdx] = {
           uuid,
           img: null,
-          loadingStatus: HtmlImageLoadingStatus.Pending
+          loadingStatus: HtmlImageLoadingStatus.Pending,
+          isDeletable: true,
+          isEditable: true
         };
       } else {
         this.images[imgIdx].loadingStatus = HtmlImageLoadingStatus.Pending;
@@ -270,6 +345,8 @@ export class ImageboxComponent implements OnInit {
             type: row.type,
             desc: row.desc,
             loadingStatus: HtmlImageLoadingStatus.Loading,
+            isDeletable: true,
+            isEditable: true,
             img: new Image()
           };
           this.images[imgIdx].img.onload = (ev) => {
