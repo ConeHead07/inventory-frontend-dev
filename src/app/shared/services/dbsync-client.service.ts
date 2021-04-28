@@ -254,9 +254,11 @@ export class DBSyncClientService implements OnDestroy {
   public processStarted = new EventEmitter<SyncJobResult>();
   public processFinished = new EventEmitter<SyncJobResult>();
   private syncIntervalTimer = null;
+  private syncIntervalTime = 1 * 60 * 1000;
   private fullImportJobid = 0;
   private currentJobSyncStatus: CurrentJobSyncStatus;
   private subscriptionClientLogsChanged: Subscription;
+  private dbgLog = false;
 
   @Output() autoSyncChange = new EventEmitter<boolean>();
   @Output() updateStatusChanges = new EventEmitter<any>();
@@ -298,7 +300,7 @@ export class DBSyncClientService implements OnDestroy {
     return this.syncIntervalTimer !== null;
   }
 
-  setFullImportJobiId(jobid: number) {
+  setFullImportJobId(jobid: number) {
     this.fullImportJobid = jobid;
   }
 
@@ -307,15 +309,28 @@ export class DBSyncClientService implements OnDestroy {
   }
 
   autoSyncStart(startNow: boolean = false) {
+    const logTi = 'DbsyncClientService.autoSyncStart(' + (startNow ? 'true' : 'false') + ')';
     if (this.syncIntervalTimer) {
       this.autoSyncStop();
     }
 
     // Sync im 1-Minuten-Takt
-    this.syncIntervalTimer = setInterval( this.sync.bind(this), 1 * 60 * 1000);
+    if (this.dbgLog) {
+      console.log(logTi + (new Date()).toTimeString() + ' setInterval this.sync, ' + this.syncIntervalTime + 'ms');
+    }
+    const syncFunction = this.sync.bind(this);
+    this.syncIntervalTimer = setInterval( () => {
+      if (this.dbgLog) {
+        console.log(logTi + (new Date()).toTimeString() + ' interval execute this.sync.bind');
+      }
+      syncFunction();
+      }, this.syncIntervalTime);
     this.autoSyncChange.emit( true );
 
     if (startNow) {
+      if (this.dbgLog) {
+        console.log(logTi + (new Date()).toTimeString() + ' startNow before interval starts in ' + this.syncIntervalTime + 'ms');
+      }
       this.sync();
     }
   }
@@ -331,8 +346,9 @@ export class DBSyncClientService implements OnDestroy {
   }
 
   async sync() {
+    const logTi = 'DbsyncClientService.sync()';
     const isDBSyncService = (this instanceof DBSyncClientService);
-    console.log('#233 dbsync-client.service sync() this is DBSyncClientService', { isDBSyncService });
+    console.log(logTi + ' #355 this is DBSyncClientService', { isDBSyncService });
     if (!isDBSyncService) {
       console.error('#235 dbsync-client.service sync() this is not correct binded to Instance of DBSyncClientService');
       return;
@@ -341,7 +357,7 @@ export class DBSyncClientService implements OnDestroy {
     const currJobId = this.baseData.getCurrentJobid();
     console.log('#240 dbsync-client.service sync() currJobId:', currJobId);
     console.log('#241 dbsync-client.service sync() call getIncompleteInventuren()');
-    const incompleteInventurLogs = await this.getIncompleteInventuren();
+    let incompleteInventurLogs = await this.getIncompleteInventuren();
 
     const currJobIdx = incompleteInventurLogs.map( itm => itm.jobid ).indexOf( currJobId );
     console.log('#245 dbsync-client.service sync() currJobIdx: ', currJobIdx);
@@ -349,12 +365,15 @@ export class DBSyncClientService implements OnDestroy {
     if (currJobIdx !== -1) {
       console.log('#248 dbsync-client.service sync()');
       const currJob = incompleteInventurLogs[ currJobIdx ];
-      incompleteInventurLogs.slice( currJobIdx, 1);
+      incompleteInventurLogs = incompleteInventurLogs.slice( currJobIdx, 1);
       console.log('#251 dbsync-client.service sync(), call sendByJobId(', currJob.jobid, currJob.changes, ')');
       this.sendByJobId( currJob.jobid, currJob.changes);
     }
 
     for (const logs of incompleteInventurLogs) {
+      if (logs.jobid === currJobId) {
+        continue;
+      }
       console.log('#256 dbsync-client.service sync(), call sendByJobId(', logs.jobid, logs.changes, ')');
       this.sendByJobId( logs.jobid, logs.changes );
     }
@@ -444,12 +463,25 @@ export class DBSyncClientService implements OnDestroy {
   }
 
   async sendByJobId(useJobid: number, useLogs?: DBDIClientChangeLog[], useJobResult?: SyncJobResult): Promise<SyncJobResult> {
-    console.log('[called sendByJobId](' + useJobid + ', useLogs(', { useLogs, useJobResult });
+    const logTi = 'DbsyncClientService.sendByJobId(' + useJobid +
+      ', logs[' + (Array.isArray(useLogs) ? useLogs.length : 0) + '], ' +
+      (typeof useJobResult) + ')';
+    console.log(logTi + ' #448 at ', (new Date()).toLocaleTimeString());
     this.clearFinishedProcesses();
     const jobid = useJobid;
     const syncJobResult = useJobResult || new SyncJobResult(jobid);
+    const jobInProcess = this.processes.find(proc => proc.jobid === jobid);
+
+    if (jobInProcess && !jobInProcess.finished) {
+      console.error(logTi + ' #482 Synchronisatioon wurde abgebrochen. Sync läuft bereits');
+      syncJobResult.alreadyStartedProcess = jobInProcess;
+      return syncJobResult.finish(SyncJobStatus.AlreadyStarted);
+    }
+    this.processingJobids.push(jobid);
+    this.processes.push(syncJobResult);
 
     if (this.getFullImportJobId() === useJobid ) {
+      console.log(logTi + ' #456 abort, process already running');
       return this.finishProcess(
         syncJobResult,
         SyncJobStatus.AlreadyStarted,
@@ -458,7 +490,7 @@ export class DBSyncClientService implements OnDestroy {
     }
 
     if (!this.networkService.hasServerAccess) {
-      console.error('#369 dbsync-client.service sendByJobId() Synchronisatioon wurde abgebrochen wegen fehlender Serververbindung!');
+      console.error(logTi + ' #465  Synchronisatioon wurde abgebrochen wegen fehlender Serververbindung!');
       return this.finishProcess(
         syncJobResult,
         SyncJobStatus.Offline,
@@ -472,25 +504,18 @@ export class DBSyncClientService implements OnDestroy {
     const lastRevIdVar = `jobid-${jobid}-revision-id`;
 
     let lastRevId = (await this.settings.get(lastRevIdVar)) || 0;
-    const jobInProcess = this.processes.find(proc => proc.jobid === jobid);
-
-    if (jobInProcess && !jobInProcess.finished) {
-      console.error('#369 dbsync-client.service sendByJobId() Synchronisatioon wurde abgebrochen. Sync läuft bereits');
-      syncJobResult.alreadyStartedProcess = jobInProcess;
-      return syncJobResult.finish(SyncJobStatus.AlreadyStarted);
-    }
 
     syncJobResult.setStatus(SyncJobStatus.Pending);
     this.processStarted.emit(syncJobResult);
 
     if (!useLogs || !useLogs.length) {
-      console.error('#395 dbsync-client.service sendByJobId() Keine Client-Änderungen!');
+      console.error(logTi + ' #496 Keine Client-Änderungen!');
       syncJobResult.setStatus(SyncJobStatus.QueryChangeLogs);
       useLogs = await this.getUnsyncedChangeLogsByJobId(useJobid);
     }
 
-    if (!useLogs && !ServerInfo.NumChanges) {
-      console.error('#369 dbsync-client.service sendByJobId(); Synchronisatioon wurde abgebrochen. Keine Änderungen!');
+    if ( (!useLogs || !useLogs.length) && !ServerInfo.NumChanges) {
+      console.error(logTi + ' #502 Synchronisatioon wurde abgebrochen. Keine Client/Server Änderungen!');
       return this.finishProcess(syncJobResult, SyncJobStatus.AbortedEmptyChangeLogs);
     }
     let logs = useLogs;
@@ -499,10 +524,6 @@ export class DBSyncClientService implements OnDestroy {
     syncJobResult.committedIds = logs.map<number>((itm) => itm.id);
 
     // ASK for Server-Changes
-    console.log('#410 dbsync-client.service sendByJobId(); call this.processes.push(syncJobResult)');
-    this.processingJobids.push(jobid);
-    this.processes.push(syncJobResult);
-
     this.dbSyncLogService.start(jobid, lastRevId);
     const syncLogMsg = this.dbSyncLogService.message.bind(this.dbSyncLogService, [jobid]);
     const syncLogErr = this.dbSyncLogService.error.bind(this.dbSyncLogService, [jobid]);
@@ -528,7 +549,7 @@ export class DBSyncClientService implements OnDestroy {
         alert( err );
         return;
       }
-      console.log('#421 dbsync-client.service sendByJobId() Synchronisations-Loop!', { syncJobLoop, lastRevId, logs });
+      console.log(logTi + ' #535 Synchronisations-Loop!', { syncJobLoop, lastRevId, logs });
 
       syncLogMsg('Download Daten ...');
       syncJobResult.committed = logs.length;
@@ -547,7 +568,7 @@ export class DBSyncClientService implements OnDestroy {
           chunks++;
           if (('errorMsg' in data) && data.errorMsg) {
             syncJobResult.errorMsg = data.errorMsg;
-            console.error(data.errorMsg);
+            console.error(logTi + ' #552 ', data.errorMsg);
             syncLogErr('Download Fehler: ' + data.errorMsg);
             return this.finishProcess(syncJobResult, SyncJobStatus.ServerAnsweredWithErrors);
           }
@@ -565,14 +586,14 @@ export class DBSyncClientService implements OnDestroy {
           this.dbSyncLogService.jobSetChunks(jobid, chunks);
 
           syncLogMsg('Verarbeite Server-Antwort ...');
-          console.log('Changes wurden gesendet, verarbeite Response', {
+          console.log(logTi + ' #570 Changes wurden gesendet, verarbeite Response', {
             aSyncedChangeIds: data.aSyncedChangeIds ? data.aSyncedChangeIds.length : 0,
             aFailedChangeIds: data.aFailedChangeIds ? data.aFailedChangeIds.length : 0,
             serverRechanges: data.serverRechanges ? data.serverRechanges.length : 0,
             serverChanges: data.serverChanges.rows ? data.serverChanges.rows.length : 0
           });
 
-          console.log('Process sync_done');
+          console.log(logTi + ' #577 Process sync_done');
           if (data.aSyncedChangeIds && data.aSyncedChangeIds.length > 0) {
             syncLogMsg('Entferne vom Server bestätige Client-Logs ...');
             syncJobResult.setStatus(SyncJobStatus.WriteServerSyncedIds);
@@ -598,7 +619,7 @@ export class DBSyncClientService implements OnDestroy {
             }
           }
 
-          console.log('Process serverRechanges');
+          console.log(logTi + ' #603 Process serverRechanges');
           if (data.serverRechanges && data.serverRechanges.length > 0) {
             syncLogMsg('Korrigiere Client-Ids nach Server-Antwort ...');
             syncJobResult.setStatus(SyncJobStatus.WriteServerReChanges);
@@ -609,7 +630,7 @@ export class DBSyncClientService implements OnDestroy {
             }));
           }
 
-          console.log('Process serverChanges');
+          console.log(logTi + ' #614 Process serverChanges');
 
           if (data.serverChanges.rows && data.serverChanges.rows.length > 0) {
             syncLogMsg('Import Server-Changes ...');
@@ -646,8 +667,8 @@ export class DBSyncClientService implements OnDestroy {
                 case 1: // Insert
                   tableLogs[chg.table].puts++;
                   const objInsertData = { ...(JSON.parse(chg.obj)), ...{ log: false }};
-                  console.log('#494 ' + ci + '/' + chgLen +
-                    ' dbsync-client.service. await this.dexieService.table( ' + chg.table + ' ).put( objInsertData )', objInsertData);
+                  console.log(logTi + ' #651 ' + ci + '/' + chgLen +
+                    ' insert into ' + chg.table + ' ', objInsertData);
                   await this.dexieService.table(chg.table).put(objInsertData);
                   if (['inventar', 'raeume', 'objektKatalogMandant'].indexOf(chg.table) > -1) {
                     const newItem = objInsertData as DBDIBarcodeLookupCompatibleItem;
@@ -665,17 +686,37 @@ export class DBSyncClientService implements OnDestroy {
                 case 2: // Update
                   tableLogs[chg.table].modified++;
                   const objUpdateData = { ...(JSON.parse(chg.mods)), ...{ log: false }};
-                  console.log('#499 ' + ci + '/' + chgLen +
-                    ' dbsync-client.service. await this.dexieService.table( ' + chg.table + ' )' +
-                    '.where({uuid:' + chg.uuid + '}).modify( objUpdateData )', chg);
+                  const hasCodeMod = ('code' in objUpdateData);
+                  console.log(logTi + ' #671 ' + ci + '/' + chgLen + ' hasCodeMod: ',
+                    hasCodeMod,
+                    objUpdateData
+                  );
                   await this.dexieService.table(chg.table)
                     .where({uuid: chg.uuid})
                     .modify(objUpdateData);
+
+                  if (['inventar', 'raeume', 'objektKatalogMandant'].indexOf(chg.table) > -1
+                    && ('code' in objUpdateData)) {
+                    const updItem = objUpdateData as DBDIBarcodeLookupCompatibleItem;
+                    console.log(logTi + ' #682 Run Barcode-Update ', hasCodeMod, objUpdateData);
+                    const replaceSuccess = await this.bcLookupService.replaceBarcodeByUuid(chg.uuid, {
+                      code: updItem.code,
+                      for_jobid: jobid,
+                      key: 'uuid',
+                      table: chg.table,
+                      uuid: chg.uuid
+                    });
+                    console.log(logTi + ' #690', { replaceSuccess });
+                  } else {
+                    console.log(logTi + ' #692 No-Barcode-Update ', hasCodeMod,
+                      { chg, objUpdateData }
+                    );
+                  }
                   break;
 
                 case 3: // Delete
                   tableLogs[chg.table].deleted++;
-                  console.log('#329 ' + ci + '/' + chgLen +
+                  console.log(logTi + ' #700 ' + ci + '/' + chgLen +
                     ' dbsync-client delete ' + chg.table + ' by uuid ' + chg.uuid );
                   await this.dexieService.table(chg.table)
                     .where({uuid: chg.uuid})
@@ -685,8 +726,8 @@ export class DBSyncClientService implements OnDestroy {
               executed++;
               tableLogs[chg.table].executed++;
               lastRevId = currRevId;
-              console.log('511 ' + ci + '/' + chgLen +
-                ' dbsync-client.service await this.settings.set(', lastRevIdVar, chg.revision_id, ')');
+              console.log(logTi + ' #710 ' + ci + '/' + chgLen +
+                ' this.settings.set(', lastRevIdVar, chg.revision_id, ')');
               await this.settings.setRevId(lastRevIdVar, chg.revision_id, 'LogRow ' + ci + '/' + chgLen + '; RevId ' + currRevId);
 
               if (executed === total || executed % 100 === 0) {
@@ -700,7 +741,7 @@ export class DBSyncClientService implements OnDestroy {
             }
           }
 
-          console.log('Process SyncResponse finished');
+          console.log(logTi + ' #725 Process SyncResponse finished');
           syncJobResult.revisionId = await this.settings.get(lastRevIdVar);
           syncJobResult.committed = logs ? logs.length : 0;
           syncJobResult.synced = data.aSyncedChangeIds ? data.aSyncedChangeIds.length : 0;
@@ -708,7 +749,7 @@ export class DBSyncClientService implements OnDestroy {
           syncJobResult.numServerRechanges = data.serverRechanges ? data.serverRechanges.length : 0;
           syncJobResult.numServerChanges = data.serverChanges ? data.serverChanges.rows.length : 0;
 
-          console.log('#508 dbsync-client.service, data.serverChanges.total:', data.serverChanges.total);
+          console.log(logTi + ' #733 data.serverChanges.total:', data.serverChanges.total);
 
           for (const logData of Object.values(tableLogs)) {
             syncLogData(logData);
@@ -716,10 +757,10 @@ export class DBSyncClientService implements OnDestroy {
           }
 
           if (data.serverChanges.rows.length < data.serverChanges.total) {
-            console.log('#511 keep SyncProcess(jobid: ' + syncJobResult.jobid + ') open');
+            console.log(logTi + ' #741 keep SyncProcess(jobid: ' + syncJobResult.jobid + ') open');
             return syncJobResult;
           }
-          console.log('#514 finish SyncProcess(jobid: ' + syncJobResult.jobid + ')');
+          console.log(logTi + ' #744 finish SyncProcess(jobid: ' + syncJobResult.jobid + ')');
           syncLogMsg('Aktuelle Synchronisation wurde abgeschlossen');
           return this.finishProcess(syncJobResult, SyncJobStatus.Finished);
         }
@@ -750,13 +791,7 @@ export class DBSyncClientService implements OnDestroy {
 
   public clearFinishedProcesses() {
     console.log('DBSyncClientService #668 processList before clearFinishedProcesses', { ...this.processes.map(p => p) });
-    this.processes = this.processes.filter( proc => {
-      const finished = !proc.finished;
-      if (finished) {
-        proc = null;
-      }
-      return !finished;
-    } );
+    this.processes = this.processes.filter( proc => !proc.finished );
     this.processingJobids = this.processes.map<number>( proc => proc.jobid );
     console.log('DBSyncClientService #677 processList after clearFinishedProcesses', { ...this.processes.map(p => p) });
   }
@@ -1065,7 +1100,9 @@ export class DBSyncClientService implements OnDestroy {
               uuid: logItem.uuid
             };
             console.log('DBSyncClientService resyncServerErrors #1025 clientChangeLog.add ', { chgLogData });
-            db.clientChangeLog.add(chgLogData);
+            db.clientChangeLog.add(chgLogData).catch( reason => {
+              console.error(reason, 'DbsyncClientService.resyncServerErrors() #1108 clientChangeLog.add', { chgLogData });
+            });
           }
           break;
 

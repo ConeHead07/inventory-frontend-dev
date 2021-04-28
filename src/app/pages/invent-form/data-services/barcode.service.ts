@@ -2,7 +2,7 @@ import {Injectable} from '@angular/core';
 import {DexieService} from '../../../shared/services/dexie.service';
 import {
   BarcodeLookupSimpleResult,
-  DBDIBarcodeLookup,
+  DBDIBarcodeLookup, DBDIBarcodeLookupCompatibleItem,
   DBDIInventar,
   DBDIObjektKatalogMandant,
   DBDIRaeume,
@@ -330,37 +330,49 @@ export class BarcodeService {
 
   async rebuildTableByJobid<I extends DBDITableWithBarcode>(table: Dexie.Table<I, string|number>, jobid: number): Promise<boolean> {
     if (this.rebuildProcesses.find( p => (p.jobid === 0 || p.jobid === jobid) && p.table === table.name) ) {
-      console.error('Abort barcode rebuild, it is already running');
+      console.error(
+        'BarcodeService.rebuildTableByJobid(', table, ',', jobid, ') #333 ' +
+        'Abort barcode rebuild, it is already running');
       return false;
     }
 
     this.rebuildProcesses.push( { jobid, table: table.name} );
     const keyName: string = table.schema.primKey.keyPath.toString();
     const tblName = table.name;
-    console.log('#253.. barcode.service rebuildTableByJobid delete barcodeLookup for table ', tblName, jobid);
-    await this.db.barcodeLookup.where( { table: tblName, for_jobid: jobid }).delete();
-    console.log('#255 barcode.service rebuildTableByJobid processing for table ', tblName, jobid);
+    const numDeleted = await this.db.barcodeLookup.where( { table: tblName, for_jobid: jobid }).delete();
+    console.log('#343 barcode.service rebuildTableByJobid processing for table ', tblName, jobid, ' numDeleted:', numDeleted);
     let count = 0;
     return this.db
       .transaction( 'rw', [table, this.db.barcodeLookup], () => {
         table.where({ for_jobid: jobid }).each( (item) => {
           count += 1;
-          this.db.barcodeLookup.put({...{
-            code: item.code,
-            table: tblName,
-            for_jobid: item.for_jobid,
-            key: keyName,
-            uuid: item.uuid,
-            updateHelper: 1
-          }, ...{log: false}});
+          const putData = {...{
+              code: item.code,
+              table: tblName,
+              for_jobid: item.for_jobid,
+              key: keyName,
+              uuid: item.uuid,
+              updateHelper: 1
+            }, ...{log: false}};
+
+          if (!item.code) {
+            console.error('#359 BarcodeService.rebuildTableByJobid Missing Barcode', tblName, jobid, { putData });
+            return;
+          }
+
+          this.db.barcodeLookup.put(putData)
+            .catch( (argReason) => {
+            console.error('#365 barcode.serve rebuildTableByJobid put Errors', tblName, jobid, { argReason, putData });
+            return false;
+          });
         });
       })
       .then( () => {
-        console.log('#270 barcode.serve rebuildTableByJobid finished successful', { tblName, jobid, count });
+        console.log('#371 barcode.serve rebuildTableByJobid finished successful', { tblName, jobid, count });
         return  true;
       })
-      .catch( () => {
-        console.log('#274 barcode.serve rebuildTableByJobid finished with Errors', tblName, jobid);
+      .catch( (argReason) => {
+        console.error('#375 barcode.serve rebuildTableByJobid finished with Errors', tblName, jobid, { argReason });
         return false;
       })
       .finally( () => {
@@ -499,7 +511,43 @@ export class BarcodeService {
   }
 
   async addBarcode(item: DBDIBarcodeLookup, log: boolean = false): Promise<string> {
-    return this.db.barcodeLookup.add({...item, ...{log}}).then( (key) => key[0]);
+    return this.db.barcodeLookup.add({...item, ...{log}})
+      .then( (key) => key[0])
+      .catch( reason => {
+        console.error(reason, 'BarcodeService.addBarcode #517 add', { item });
+        return '';
+      });
+  }
+
+  async replaceBarcodeByUuid(uuid: string, item: DBDIBarcodeLookup, log: boolean = false): Promise<boolean> {
+    if ('code' in item) {
+      const updItem = item as DBDIBarcodeLookupCompatibleItem;
+      console.log('BarcodeService.updateBarcodeByuuid() #521 Run Barcode-Update ');
+
+      const bcFound = await this.db.barcodeLookup
+        .where({table: item.table, for_jobid: item.for_jobid })
+        .filter( ( oldBcItem ) => oldBcItem.uuid === item.uuid)
+        .first();
+
+      if (bcFound) {
+        const numDel = await this.db.barcodeLookup.where({
+          code: bcFound.code,
+          for_jobid: bcFound.for_jobid
+        }).delete();
+
+        await this.addBarcode({
+          code: updItem.code,
+          for_jobid: item.for_jobid,
+          key: 'uuid',
+          table: item.table,
+          uuid: item.uuid
+        }, log);
+        return true;
+      }
+    } else {
+      console.log('DbsyncClientService.sendByJobId() #701 No-Barcode-Update, Origin-Element not found ', { item });
+    }
+    return false;
   }
 
   addError( err: any) {

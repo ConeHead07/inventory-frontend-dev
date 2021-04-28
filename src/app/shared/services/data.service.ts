@@ -287,7 +287,12 @@ export class DataService implements OnDestroy {
         this.dbSyncLogService.metaMessage({ message: 'Bereinige Inventur-Auswahl'});
         const del = await db.inventurenUser.where('uid').equals(authUser.id).delete();
         await invUser.map((item: DBDIInventurenUser) => {
-          return db.inventurenUser.add(item);
+          return db.inventurenUser.add(item)
+            .then( id => id)
+            .catch( reason => {
+              console.error( reason, 'DataService.loadUserAssignedInventories() #293', { item });
+              return [0, 0];
+            });
         });
 
         this.dbSyncLogService.metaMessage({ message: 'Bereinige Gebäude-Auswahl'});
@@ -296,7 +301,7 @@ export class DataService implements OnDestroy {
 
         await invGebaeude.map((item: DBDIInventurenGebaeude) => db.inventurenGebaeude.add(item)
           .catch( (reason) => {
-          console.error('Cannot add GRef', { item, reason} );
+          console.error(reason, 'DataService..loadUserAssignedInventories() #304 inventurenGebaeude.add', { item } );
         }));
 
         this.dbSyncLogService.metaMessage({ message: 'Inventuren Meta-Daten wurden importiert'});
@@ -625,11 +630,11 @@ export class DataService implements OnDestroy {
   }
 
   setLoadingStarted(jobid: number) {
-    this.DbSyncService.setFullImportJobiId(jobid);
+    this.DbSyncService.setFullImportJobId(jobid);
   }
 
   setLoadingFinished() {
-    this.DbSyncService.setFullImportJobiId(0);
+    this.DbSyncService.setFullImportJobId(0);
   }
 
   getLoadingJobId() {

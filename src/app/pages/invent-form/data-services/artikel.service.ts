@@ -259,9 +259,10 @@ export class ArtikelService {
       },
       ...log
     } as DBDIObjektKatalogMandant;
-    const mcuuid = await artikelRef.add( insertData );
-
-    return artikelRef.get(mcuuid);
+    return artikelRef.add( insertData ).catch( (reason) => {
+      console.error(reason, 'ArtikelService.insertArtikelRefByGcidGcuuid #263 artikelRef.add', { insertData });
+      return null;
+    }).then( (mcuuid) => artikelRef.get(mcuuid));
   }
 
   public async insertArtikelRef(daten: ArtikelBasisDaten): Promise<DBDIObjektKatalogMandant> {
@@ -302,9 +303,12 @@ export class ArtikelService {
       modified_at: null,
       modified_uid: null
     };
-    const insertUuid = await artikelRef.add( {...insertData, ...log} );
-    console.log('ArtikelService insertArtikelRef() #295', { uuid, insertUuid });
-    return artikelRef.get({uuid: insertUuid});
+    return artikelRef.add( {...insertData, ...log} )
+      .then(insertUuid => artikelRef.get({uuid: insertUuid}))
+      .catch( reason => {
+        console.error(reason, 'ArtikelService #309 artikelRef.add', { insertData } );
+        return null;
+      });
   }
 
   public async insert(daten: ArtikelBasisDaten): Promise<DBInsertArtikelResult> {

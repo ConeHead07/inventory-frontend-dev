@@ -72,8 +72,6 @@ export class ScannerComponent implements OnInit {
   jobid: number;
   allowBarcodeInput = false;
   qrResultString: string;
-  scannedUnchangedPart: string;
-  scannedChangedPart: string;
   scannedBarcode?: string;
   scannedBarcodeInfos?: string;
   scannedBarcodeInfoImg?: DBDIImages;
@@ -315,42 +313,13 @@ export class ScannerComponent implements OnInit {
 
   onCodeResult(resultString: string) { // resultString: string
     // const resultString = '0000037536';
-    const oldBarcode: string = this.scannedBarcode || '';
+    // const oldBarcode: string = this.scannedBarcode || '';
     this.scannedBarcode = resultString;
     this.scannedBarcodeInfos = '';
     this.scannedBarcodeInfoImg = null;
     this.bcLookup.fullLookup(resultString, this.jobid).then( (result) => {
       this.showResult( result );
     });
-
-    const resultLength = resultString.length;
-    let numMatchingStart = 0;
-    const checkLength = Math.min(resultLength, oldBarcode.length);
-    if (oldBarcode !== resultString) {
-      for (let i = 1; i <= checkLength; i++) {
-        if (oldBarcode.substr(0, i) === resultString.substr(0, i)) {
-          numMatchingStart = i;
-        }
-        console.log('i', i, oldBarcode.substr(0, i), resultString.substr(0, i), numMatchingStart);
-      }
-
-      if (numMatchingStart) {
-        this.scannedUnchangedPart = resultString.substr(0, numMatchingStart);
-        this.scannedChangedPart = resultString.substr(numMatchingStart);
-      } else {
-        this.scannedUnchangedPart = '';
-        this.scannedChangedPart = resultString.substr(numMatchingStart);
-      }
-      const htmlChangedPart: HTMLElement = this.barcodeChangedPart.nativeElement;
-      htmlChangedPart.classList.remove('with-pulse-effect');
-      void htmlChangedPart.offsetWidth;
-      htmlChangedPart.classList.add('with-pulse-effect');
-
-      console.log({ oldBarcode, resultString, checkLength, resultLength, numMatchingStart,
-        scannedUnchangedPart: this.scannedUnchangedPart,
-        scannedChangedPart: this.scannedChangedPart
-      });
-    }
   }
 
   async loadImageByMcuuid(mcuuid: string): Promise<DBDIImages|null> {

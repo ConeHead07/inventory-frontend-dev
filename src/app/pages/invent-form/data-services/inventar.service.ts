@@ -232,7 +232,13 @@ export class InventarService {
     };
     const log = { log: true };
 
-    const insertUuid = await this.dexie.inventar.add( { ...item, ...log});
+    const insertUuid = await this.dexie.inventar
+      .add( { ...item, ...log})
+      .then( id => id)
+      .catch( reason => {
+        console.error( reason, 'InventarService.insertInventar() #239 inventar.add', { item });
+        return '';
+      });
     console.log('InventarService #207 insertInventar: ', { insertUuid, data: {...item, ...log} });
     const saved = await this.dexie.inventar.get(insertUuid);
     console.log('InventarService #207 insertInventar: ', { insertUuid, saved, data: {...item, ...log} });
@@ -244,6 +250,15 @@ export class InventarService {
         key: 'uuid',
         uuid: insertUuid,
         updateHelper: 11
+      }).catch( reason => {
+        console.error(reason, 'InventarService.insertInventar() barcodeLookup.add', {
+          code: saved.code,
+          for_jobid: jobid,
+          table: 'inventar',
+          key: 'uuid',
+          uuid: insertUuid,
+          updateHelper: 11
+        });
       });
       const lkupItem = await this.dexie.barcodeLookup.get({code: saved.code, for_jobid: jobid});
       console.log('InventarService #220 insertInventar: ', { insertUuid, saved, lkupItem, data: {...item, ...log} });

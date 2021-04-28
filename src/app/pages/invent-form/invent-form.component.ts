@@ -375,19 +375,23 @@ export class InventFormComponent implements OnInit, OnDestroy {
     this.raumEditStatus = this.raum.current_jobstatus;
     this.raumBilder = [];
     this.raumPlaene = [];
-    this.raumService.getRaumBilder(this.raum.uuid).then( (images) => {
-      console.log('InventFormComponent.raumService.getRaumBilder #376 images: ', images);
-      this.raumBilder = images;
-    });
-    this.raumService.getRaumPlaene(this.raum.uuid).then( (images) => {
-      console.log('InventFormComponent.raumService.getRaumPlaene #376 images: ', images);
-      this.raumPlaene = images;
-    });
-    console.log('InventFormComponente #356  loadRaumByData refreshRaumProgress');
-
-
-
+    this.loadRaumImages();
     this.refreshRaumProgress();
+  }
+
+  async loadRaumImages(): Promise<number> {
+    return Promise.all([
+      this.raumService.getRaumBilder(this.raum.uuid).then( (images) => {
+        console.log('InventFormComponent.raumService.getRaumBilder #376 images: ', images);
+        this.raumBilder = images;
+        return images.length;
+      }),
+      this.raumService.getRaumPlaene(this.raum.uuid).then( (images) => {
+        console.log('InventFormComponent.raumService.getRaumPlaene #376 images: ', images);
+        this.raumPlaene = images;
+        return images.length;
+      })
+    ]).then( results => results[0] + results[1]);
   }
 
   clearFormInventar() {
@@ -616,6 +620,10 @@ export class InventFormComponent implements OnInit, OnDestroy {
       .catch( () => false);
   }
 
+  async reloadRaumImageExistsStatus(): Promise<boolean> {
+    return this.loadRaumImages().then( numImgs => numImgs > 0);
+  }
+
   get kundeName(): string {
     return this.kunde ? this.kunde.Mandant : '';
   }
@@ -657,6 +665,9 @@ export class InventFormComponent implements OnInit, OnDestroy {
       this.modalWatch(modalRef, 'Imagebox');
       modalRef.componentInstance.setTitel('Raumbilder');
       modalRef.componentInstance.setImagesUuids(imgUuids, idx);
+      modalRef.result.finally( () => {
+        this.loadRaumImages();
+      });
     }
   }
 
@@ -715,8 +726,8 @@ export class InventFormComponent implements OnInit, OnDestroy {
       name,
       desc: rb
     });
-    modalRef.result.then( () => {
-      this.reloadImageExistsStatus();
+    modalRef.result.finally( () => {
+      this.reloadRaumImageExistsStatus();
     });
   }
 

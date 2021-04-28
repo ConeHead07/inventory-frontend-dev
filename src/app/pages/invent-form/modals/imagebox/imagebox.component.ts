@@ -252,7 +252,6 @@ export class ImageboxComponent implements OnInit {
     }
 
     if (imgUuid) {
-      console.log( 'ImageboxComponent.delete call test() from ImagesServices: ' + this.imgService.test() );
       numDeleted = await this.imgService.deleteByUuid(imgUuid);
       if (numDeleted) {
         this.toastr.success('Bild wurde gelöscht ' + imgUuid);

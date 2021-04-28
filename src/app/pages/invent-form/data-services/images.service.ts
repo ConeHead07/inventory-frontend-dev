@@ -71,7 +71,7 @@ export class ImagesService {
       created_jobid: image.created_jobid || jobid
     };
 
-    const rs = await this.dexie.images.add(item).then( (imgUuid) => {
+    return this.dexie.images.add(item).then( (imgUuid) => {
       this.addImageKatalogRef({
         for_jobid: image.for_jobid,
         RefTable: 'ObjektKatalogMandant',
@@ -82,15 +82,26 @@ export class ImagesService {
         Kategorie: ''
       });
       return imgUuid;
+    }).catch( reason => {
+      console.error(reason, 'ImageService.insertArtikelImage() #86 add ',
+        {
+          uuid: item.uuid,
+          mcuuid: item.mcuuid,
+          gcuuid: item.gcuuid,
+          name: item.name,
+          size: item.size,
+          width: item.width,
+          height: item.height
+        });
+      return null;
     });
-    return rs;
   }
 
   async addImageKatalogRef(data: ImageRefData): Promise<string> {
     const uid = this.baseData.getCurrentUid();
     const devID = this.baseData.getCurrentDeviceId();
     const jobid = this.baseData.getCurrentJobid();
-    const uuid = await this.dexie.objektKatalogImages.add({
+    const item = {
       for_jobid: data.for_jobid || jobid,
       RefTable: data.RefTable,
       RefUuid: data.RefUuid,
@@ -102,8 +113,13 @@ export class ImagesService {
       created_uid: uid,
       created_jobid: jobid,
       created_device_id: devID
-    });
-    return uuid;
+    };
+    return this.dexie.objektKatalogImages.add(item)
+      .then( uuid => uuid)
+      .catch( reason => {
+        console.error(reason, 'ImageService.addImageKatalogRef #119 ', { item });
+        return '';
+      });
   }
 
   async putRaumImage(image: ImageBaseData, ruuid: string, useJobid?: number): Promise<string> {
@@ -181,19 +197,29 @@ export class ImagesService {
       created_jobid: image.created_jobid || jobid
     };
 
-    const rs = await this.dexie.images.add(item).then( (imgUuid) => {
-      this.addImageKatalogRef({
-        for_jobid: image.for_jobid,
-        RefTable: 'Raeume',
-        RefUuid: ruuid,
-        ImgUuid: imgUuid,
-        RefText: image.desc || image.name,
-        Pos: 1,
-        Kategorie: 'Bild'
+    return this.dexie.images.add(item)
+      .then( (imgUuid) => {
+        this.addImageKatalogRef({
+          for_jobid: image.for_jobid,
+          RefTable: 'Raeume',
+          RefUuid: ruuid,
+          ImgUuid: imgUuid,
+          RefText: image.desc || image.name,
+          Pos: 1,
+          Kategorie: 'Bild'
+        });
+        return imgUuid;
+      })
+      .catch( reason => {
+        console.error( reason, 'ImagesService.insertRaumImage() #214 images.add', {
+          uuid: item.uuid,
+          name: item.name,
+          size: item.size,
+          width: item.width,
+          height: item.height
+        });
+        return null;
       });
-      return imgUuid;
-    });
-    return rs;
   }
 
   async deleteByUuid(uuid: string): Promise<number> {

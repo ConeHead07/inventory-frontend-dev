@@ -245,13 +245,17 @@ export class DbsyncComponent implements OnInit, OnDestroy {
       this.syncInProcess = false;
     }
 
-    this.dbsyncClient.askServerForChanges(this.jobid).then( (infos) => {
-      console.log( 'callback of async askServerForChange for jobid ' + this.jobid, { infos });
-      if (infos.success) {
-        this.serverRevisionId = infos.MaxRevisionId;
-        this.numServerChanges = infos.NumChanges;
-      }
-    });
+    this.dbsyncClient.askServerForChanges(this.jobid)
+      .then( (infos) => {
+        console.log( 'callback of async askServerForChange for jobid ' + this.jobid, { infos });
+        if (infos.success) {
+          this.serverRevisionId = infos.MaxRevisionId;
+          this.numServerChanges = infos.NumChanges;
+        }
+      })
+      .catch( (reason) => {
+        console.error('DbsyncComponent.refreshStatusInfos() #257', { reason });
+      });
 
     this.dbsyncClient.getCurrentClientRevId().then( (revid) => {
       this.clientRevisionId = revid;

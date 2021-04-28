@@ -17,6 +17,7 @@ import {
   DBDIRaeume, DBDIUploads, DBDIUsers, DBDIVariables, DBDIInventurenUserStatus
 } from '../interfaces/dexie.interfaces';
 import {Guid} from 'guid-typescript';
+import {log} from "util";
 
 const database = 'merTensIventory.1';
 
@@ -313,22 +314,27 @@ export class DexieService extends Dexie {
   }
 
   async addChangeLog(change: IDatabaseChange) {
-    const log = this.getChangeLogFlag(change);
+    const logFlag = this.getChangeLogFlag(change);
     // if (log === undefined || !log) {
     //   console.log('#152 addChangeLog Skip DB-Change-Logging - No Log-Flag', { change });
     //   return;
     // }
-    if (log !== undefined && log !== null && log === false) {
+    const logPrefix = 'DexieService.addChangeLog(change[' + change.table + ',' + change.type + ',' + change.key + '] ';
+    console.log(logPrefix + '#322');
+    if (logFlag !== undefined && logFlag !== null && logFlag === false) {
+      console.log(logPrefix + '#324 ABORT log:', logFlag, { change });
       return;
     }
     let uuid = this.getChangeLogUuid(change);
 
     if (change.type !== 3) {
+      console.log(logPrefix + '#330');
       const obj: any = await this.table( change.table ).get( change.key );
       uuid = ('uuid' in obj) ? obj.uuid : '';
 
       delete obj.log;
       await this.table( change.table ).put( obj, change.key);
+      console.log(logPrefix + '#336 put');
     }
 
     const chlog = {
@@ -376,6 +382,7 @@ export class DexieService extends Dexie {
         break;
 
       case DatabaseChangeType.Update:
+        console.log(logPrefix + '#384 update');
         const updateChange = change as IUpdateChange;
         chlog.mods = updateChange.mods;
         if ('log' in chlog.mods) {
@@ -418,7 +425,7 @@ export class DexieService extends Dexie {
         if (colNames.length === 0 || (colNames.length === 1 && colNames[0].startsWith('modified_'))) {
           return;
         }
-        console.log('#211  addChangeLog on changes: An object was updated: ', change.table, change.key, change.mods, { chlog } );
+        console.log(logPrefix + '#384 update', change.mods, { chlog });
         break;
 
       case DatabaseChangeType.Delete:
@@ -427,8 +434,13 @@ export class DexieService extends Dexie {
         break;
     }
 
-    this.clientChangeLog.add(chlog).catch( (e) => {
-      console.error('DexieService addChangeLog #400', { e });
+    console.log(logPrefix + '#436 add');
+    this.clientChangeLog.add(chlog)
+      .then( (n) => {
+        console.log(logPrefix + '#439 added number:', n);
+      })
+      .catch( reason => {
+      console.error(reason, logPrefix + ' #443 clientChangeLog.add', { chlog });
     });
   }
 
@@ -463,21 +475,26 @@ export class DexieService extends Dexie {
   getChangeLogFlag(change: IDatabaseChange): boolean|undefined {
     const ch = change as any;
     if ( typeof ch !== 'object') {
-      console.error('#192 dexie.service getChangeLog(change) change is not a object: ', change);
+      console.error('DexieService.getChangeLogFlag(change) #192 change is not a object: ', change);
       return false;
     }
+    const logPrefix = 'DexieService.getChangeLogFlag(change[' + ch.table + ',' + ch.type + ',' + ch.key + ']) ';
+    console.log(logPrefix + '#482 change', {...change});
 
     if ( (typeof ch.obj === 'object') && ('log' in ch.obj) ) {
+      console.log(logPrefix + '#485 return ch.obj.log ', ch.obj.log);
       return ch.obj.log;
       // return !!ch.obj.log;
     }
 
     if ( (typeof ch.mods === 'object') && ('log' in ch.mods)) {
+      console.log(logPrefix + '#491 return ch.mods.log ', ch.mods.log);
       return ch.mods.log;
       // return !!ch.mods.log;
     }
 
     if ( (typeof ch.oldObj === 'object') && ('log' in ch.oldObj)) {
+      console.log(logPrefix + '#497 return ch.oldObj.log ', ch.oldObj.log);
       return ch.oldObj.log;
       // return !!ch.oldObj.log;
     }
