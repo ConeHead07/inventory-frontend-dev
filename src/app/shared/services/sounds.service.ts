@@ -130,11 +130,11 @@ export class SoundsService {
     this.error.load();
   }
 
-  getSuccessSrc(): string {
+  public getSuccessSrc(): string {
     return this.success.src;
   }
 
-  getErrorSrc(): string {
+  public getErrorSrc(): string {
     return this.error.src;
   }
 

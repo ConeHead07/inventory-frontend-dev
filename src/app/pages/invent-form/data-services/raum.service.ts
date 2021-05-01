@@ -208,7 +208,7 @@ export class RaumService {
       });
 
       if (raum.code) {
-        this.dexie.barcodeLookup.put({
+        await this.dexie.barcodeLookup.put({
           code: raum.code,
           for_jobid: jobid,
           key: 'uuid',
@@ -232,7 +232,7 @@ export class RaumService {
     }
 
     console.log('#205 raum.service.ts update raum', { uuid, raum });
-    const numChanges = await this.dexie.raeume.update(uuid, raum);
+    const numChanges = await this.dexie.raeume.update(uuid, { ...raum, ...{ log: true }});
     const savedData = await this.dexie.raeume.get(uuid);
     console.log('#208 raum.service.ts get updated raumItem', { uuid, savedData, return: {
         success: numChanges > 0,

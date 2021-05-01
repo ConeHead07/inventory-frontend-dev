@@ -227,7 +227,8 @@
       </div>
   </div>
   <ngb-alert *ngIf="waitingForInventarData" type="danger" (close)="clearFormInventar()">
-    Warte auf Artikelzuweisung für neuen Inventar-Barcode: {{ formInventar.Barcode }}
+    Warte auf Artikelzuweisung für neuen Inventar-Barcode: <b>{{ formInventar.Barcode }}</b><br>
+    <i>Sollte der Barcode bekannt sein, können Sie die Funktion reIndexBarcodeLookup in den Einstellungen nutzen!</i>
   </ngb-alert>
   <ngb-alert *ngIf="waitingForNewInventarBarcode" type="danger">
     Warte auf neuen Inventar-Barcode für {{ formInventar.Bezeichnung }}

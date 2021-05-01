@@ -9,6 +9,7 @@ import {
   DBDIInventar,
   DBDIInventuren,
   DBDIJobLockStatus,
+  DBDIObjektKatalogImages,
   DBDIMandanten,
   DBDIRaeume,
   DBDIRaumEditStatus,
@@ -299,7 +300,6 @@ export class InventFormComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
-
     this.inventoryProgress.getCurrentInventurLockStatus().then( (status) => {
       this.jobLockStatus = status;
     });
@@ -390,16 +390,24 @@ export class InventFormComponent implements OnInit, OnDestroy {
     this.raumEditStatus = this.raum.current_jobstatus;
     this.raumBilder = [];
     this.raumPlaene = [];
-    this.reloadRaumImages();
-    this.raumService.getRaumPlaene(this.raum.uuid).then( (images) => {
-      console.log('InventFormComponent.raumService.getRaumPlaene #376 images: ', images);
-      this.raumPlaene = images;
-    });
+    this.loadRaumImages();
     console.log('InventFormComponente #356  loadRaumByData refreshRaumProgress');
-
-
-
     this.refreshRaumProgress();
+  }
+
+  async loadRaumImages(): Promise<number> {
+    return Promise.all([
+      this.raumService.getRaumBilder(this.raum.uuid).then( (images) => {
+        console.log('InventFormComponent.raumService.getRaumBilder #376 images: ', images);
+        this.raumBilder = images;
+        return images.length;
+      }),
+      this.raumService.getRaumPlaene(this.raum.uuid).then( (images) => {
+        console.log('InventFormComponent.raumService.getRaumPlaene #376 images: ', images);
+        this.raumPlaene = images;
+        return images.length;
+      })
+    ]).then( results => results[0] + results[1]);
   }
 
   clearFormInventar() {
@@ -628,6 +636,10 @@ export class InventFormComponent implements OnInit, OnDestroy {
       .catch( () => false);
   }
 
+  async reloadRaumImageExistsStatus(): Promise<boolean> {
+    return this.loadRaumImages().then(numImgs => numImgs > 0);
+  }
+
   async reloadRaumImages(): Promise<number> {
     return this.raumService.getRaumBilder(this.raum.uuid).then( (images) => {
       console.log('InventFormComponent.raumService.getRaumBilder #376 images: ', images);
@@ -635,6 +647,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
       return images.length;
     });
   }
+
 
   get kundeName(): string {
     return this.kunde ? this.kunde.Mandant : '';
@@ -677,6 +690,9 @@ export class InventFormComponent implements OnInit, OnDestroy {
       this.modalWatch(modalRef, 'Imagebox');
       modalRef.componentInstance.setTitel('Raumbilder');
       modalRef.componentInstance.setImagesUuids(imgUuids, idx);
+      modalRef.result.finally( () => {
+        this.loadRaumImages();
+      });
     }
   }
 
@@ -735,8 +751,8 @@ export class InventFormComponent implements OnInit, OnDestroy {
       name,
       desc: rb
     });
-    modalRef.result.then( () => {
-      this.reloadRaumImages();
+    modalRef.result.finally( () => {
+      this.reloadRaumImageExistsStatus();
     });
   }
 
@@ -1146,9 +1162,9 @@ export class InventFormComponent implements OnInit, OnDestroy {
 
     event.barcode = this.bcTrimZero(event.barcode);
     this.rawInputBarcodes.nativeElement.value = '';
-    if (event.rawInput) {
+    if (('rawInput' in event) && event.rawInput) {
       this.rawInputBarcodes.nativeElement.value = event.rawInput;
-      if (event.debugData && event.debugData.keyDownEvents) {
+      if ( ('debugData' in event) && event.debugData && event.debugData.keyDownEvents) {
         this.rawInputBarcodes.nativeElement.value += '\n\nkeyDownEvents:\n' + JSON.stringify(event.debugData.keyDownEvents);
       }
     }
@@ -1165,7 +1181,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
       }
       if (batchError) {
         alert(batchError + '\n' +
-          'Es wurden aber ' + numBatchCodes + ' Barcodes im Batchmodus übermittelt!'
+          'Es wurden ' + numBatchCodes + ' Barcodes im Batchmodus übermittelt!'
         );
         return;
       }
@@ -1299,6 +1315,14 @@ export class InventFormComponent implements OnInit, OnDestroy {
     switch (bcResult.lookupResultTable) {
       case LookupResultTable.None:
         console.log('InventFormComponente #990 handleScanData LookupResultTable.None');
+        if (!bcResult.barcode.match(/^(\d{10}|L\d{9,10})$/) ) {
+          console.log('InventFormComponent.handleScanData() #1163', { bcResult });
+          if (!confirm(
+            'Der Barcode besteht nicht wie erwartet aus 10 Zahlen!\n' +
+            'Möchten Sie ihn dennoch für die Neuaufnahme verwenden?')) {
+            return;
+          }
+        }
         this.clearFormInventar();
         this.formInventar.Barcode = bcResult.barcode;
         this.waitingForInventarData = true;
@@ -1311,7 +1335,9 @@ export class InventFormComponent implements OnInit, OnDestroy {
         // User soll daraufhin einen Artikel zuweisen können
         this.toastr.warning(
           'Barcode: ' + barcode + '<br>' +
-          'Für eine Neuaufnahme weisen sie bitte einen Artikel zu!',
+          'Für eine Neuaufnahme weisen sie bitte einen Artikel zu!<br>\n' +
+          '<i>Oder nutzen Sie unter Einstellungen die Funktion reIndexBarcodeLookup, ' +
+          'falls neu aufgenommene Elemente nicht erkannt werden.</i>',
           'Unbekannter Barcode'
         );
         break;

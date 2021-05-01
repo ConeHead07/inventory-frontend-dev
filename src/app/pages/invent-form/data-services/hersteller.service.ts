@@ -61,16 +61,21 @@ export class HerstellerService {
     const jobid = this.baseData.getCurrentJobid();
     const uid = this.baseData.getCurrentUid();
     const uuid = Guid.create().toString();
-
-    await this.dexie.hersteller.add({
+    const item = {
       Hersteller: name,
       uuid,
       for_jobid: jobid,
       created_at: new Date(),
       created_uid: uid,
       created_jobid: jobid
-    });
-    return uuid;
+    };
+
+    return this.dexie.hersteller.add(item)
+      .then( insertUuid => insertUuid)
+      .catch( reason => {
+        console.error(reason, 'HerstellerService.create #75', { item });
+        return '';
+      });
   }
 
   async createAndGetData(name: string): Promise<DBDIHersteller> {

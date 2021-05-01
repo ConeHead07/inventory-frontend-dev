@@ -260,9 +260,11 @@ export class DBSyncClientService implements OnDestroy {
   public processStarted = new EventEmitter<SyncJobResult>();
   public processFinished = new EventEmitter<SyncJobResult>();
   private syncIntervalTimer = null;
+  private syncIntervalTime = 1 * 60 * 1000;
   private fullImportJobid = 0;
   private currentJobSyncStatus: CurrentJobSyncStatus;
   private subscriptionClientLogsChanged: Subscription;
+  private dbgLog = false;
   private subscriptionNetworkChanged: Subscription;
   private aLastServerChangesByJobid: ServerChangesStatusInfoCache[] = [];
   private serverChangesCacheLifetime = 60 * 1000;
@@ -322,7 +324,7 @@ export class DBSyncClientService implements OnDestroy {
     return this.syncIntervalTimer !== null;
   }
 
-  setFullImportJobiId(jobid: number) {
+  setFullImportJobId(jobid: number) {
     this.fullImportJobid = jobid;
   }
 
@@ -331,15 +333,28 @@ export class DBSyncClientService implements OnDestroy {
   }
 
   autoSyncStart(startNow: boolean = false) {
+    const logTi = 'DbsyncClientService.autoSyncStart(' + (startNow ? 'true' : 'false') + ')';
     if (this.syncIntervalTimer) {
       this.autoSyncStop();
     }
 
     // Sync im 1-Minuten-Takt
-    this.syncIntervalTimer = setInterval( this.sync.bind(this), 1 * 60 * 1000);
+    if (this.dbgLog) {
+      console.log(logTi + (new Date()).toTimeString() + ' setInterval this.sync, ' + this.syncIntervalTime + 'ms');
+    }
+    const syncFunction = this.sync.bind(this);
+    this.syncIntervalTimer = setInterval( () => {
+      if (this.dbgLog) {
+        console.log(logTi + (new Date()).toTimeString() + ' interval execute this.sync.bind');
+      }
+      syncFunction();
+    }, this.syncIntervalTime);
     this.autoSyncChange.emit( true );
 
     if (startNow) {
+      if (this.dbgLog) {
+        console.log(logTi + (new Date()).toTimeString() + ' startNow before interval starts in ' + this.syncIntervalTime + 'ms');
+      }
       this.sync();
     }
   }
@@ -355,15 +370,16 @@ export class DBSyncClientService implements OnDestroy {
   }
 
   async sync() {
+    const logTi = 'DbsyncClientService.sync()';
     if (!this.networkService.getCurrentState().hasServerAccess) {
       return;
     }
     const isDBSyncService = (this instanceof DBSyncClientService);
     if (this.isInDebugMode) {
-      console.log('DBSyncClientService.sync() #358 this is DBSyncClientService', { isDBSyncService });
+      console.log(logTi + ' #376 this is DBSyncClientService', { isDBSyncService });
     }
     if (!isDBSyncService) {
-      console.error('DBSyncClientService.sync() #361 this is not correct binded to Instance of DBSyncClientService');
+      console.error(logTi + ' #379 this is not correct binded to Instance of DBSyncClientService');
       return;
     }
 
@@ -372,7 +388,7 @@ export class DBSyncClientService implements OnDestroy {
     if (this.isInDebugMode) {
       console.log('DBSyncClientService.sync() #368 call getIncompleteInventuren()');
     }
-    const incompleteInventurLogs = await this.getIncompleteInventuren();
+    let incompleteInventurLogs = await this.getIncompleteInventuren();
 
     const currJobIdx = incompleteInventurLogs.map( itm => itm.jobid ).indexOf( currJobId );
     if (this.isInDebugMode) {
@@ -384,7 +400,7 @@ export class DBSyncClientService implements OnDestroy {
         console.log('DBSyncClientService.sync() #379');
       }
       const currJob = incompleteInventurLogs[ currJobIdx ];
-      incompleteInventurLogs.slice( currJobIdx, 1);
+      incompleteInventurLogs = incompleteInventurLogs.slice( currJobIdx, 1);
       if (this.isInDebugMode) {
         console.log('DBSyncClientService.sync() #384 call sendByJobId(', currJob.jobid, currJob.changes, ')');
       }
@@ -392,6 +408,9 @@ export class DBSyncClientService implements OnDestroy {
     }
 
     for (const logs of incompleteInventurLogs) {
+      if (logs.jobid === currJobId) {
+        continue;
+      }
       if (this.isInDebugMode) {
         console.log('DBSyncClientService.sync() #391 call sendByJobId(', logs.jobid, logs.changes, ')');
       }
@@ -500,15 +519,28 @@ export class DBSyncClientService implements OnDestroy {
     }
     this.clearFinishedProcesses();
     this.processFinished.emit( proc );
-    // await this.bcLookupService.rebuildOnRunningSystemByJobid(proc.jobid);
     return proc;
   }
 
   async sendByJobId(useJobid: number, useLogs?: DBDIClientChangeLog[], useJobResult?: SyncJobResult): Promise<SyncJobResult> {
-    console.log('DBSyncClientService.sendByJobId(useJobid:', useJobid, 'useLogs: ', typeof useJobResult, ') #440');
+    const logTi = 'DbsyncClientService.sendByJobId(' + useJobid +
+      ', logs[' + (Array.isArray(useLogs) ? useLogs.length : 0) + '], ' +
+      (typeof useJobResult) + ')';
+    console.log(logTi + ' #448 at ', (new Date()).toLocaleTimeString());
     this.clearFinishedProcesses();
     const jobid = useJobid;
     const syncJobResult = useJobResult || new SyncJobResult(jobid);
+    const jobInProcess = this.processes.find(proc => proc.jobid === jobid);
+
+    if (jobInProcess && !jobInProcess.finished) {
+      if (this.isInDebugMode) {
+        console.log(`DBSyncClientService.sendByJobId(${jobid}) #537. Abbruch. Sync läuft bereits`);
+      }
+      syncJobResult.alreadyStartedProcess = jobInProcess;
+      return syncJobResult.finish(SyncJobStatus.AlreadyStarted);
+    }
+    this.processingJobids.push(jobid);
+    this.processes.push(syncJobResult);
 
     if (this.getFullImportJobId() === useJobid ) {
       return this.finishProcess(
@@ -535,15 +567,6 @@ export class DBSyncClientService implements OnDestroy {
     const lastRevIdVar = `jobid-${jobid}-revision-id`;
 
     let lastRevId = (await this.settings.get(lastRevIdVar)) || 0;
-    const jobInProcess = this.processes.find(proc => proc.jobid === jobid);
-
-    if (jobInProcess && !jobInProcess.finished) {
-      if (this.isInDebugMode) {
-        console.log(`DBSyncClientService.sendByJobId(${jobid}) #537. Abbruch. Sync läuft bereits`);
-      }
-      syncJobResult.alreadyStartedProcess = jobInProcess;
-      return syncJobResult.finish(SyncJobStatus.AlreadyStarted);
-    }
 
     syncJobResult.setStatus(SyncJobStatus.Pending);
     this.processStarted.emit(syncJobResult);
@@ -749,6 +772,7 @@ export class DBSyncClientService implements OnDestroy {
                 case 2: // Update
                   tableLogs[chg.table].modified++;
                   const objUpdateData = { ...(JSON.parse(chg.mods)), ...{ log: false }};
+                  const hasCodeMod = ('code' in objUpdateData);
                   if (this.isInDebugMode) {
                     console.log(`DBSyncClientService.sendByJobId(${jobid}) UPDATE #737. ${ci}/${chgLen}` +
                       ' this.dexieService.table( ' + chg.table + ' )' +
@@ -757,12 +781,22 @@ export class DBSyncClientService implements OnDestroy {
                   await this.dexieService.table(chg.table)
                     .where({uuid: chg.uuid})
                     .modify(objUpdateData);
-                  if ('code' in objUpdateData && ['inventar', 'raeume', 'objektKatalogMandant'].indexOf(chg.table) > -1) {
-                    const chgItem = objUpdateData as DBDIBarcodeLookupCompatibleItem;
-
-                    this.bcLookupService.chgBarcode(
-                      chg.table, chgItem.for_jobid, chgItem.uuid, chgItem.code, false
-                    );
+                  if (['inventar', 'raeume', 'objektKatalogMandant'].indexOf(chg.table) > -1
+                    && ('code' in objUpdateData)) {
+                    const updItem = objUpdateData as DBDIBarcodeLookupCompatibleItem;
+                    console.log(logTi + ' #682 Run Barcode-Update ', hasCodeMod, objUpdateData);
+                    const replaceSuccess = await this.bcLookupService.replaceBarcodeByUuid(chg.uuid, {
+                      code: updItem.code,
+                      for_jobid: jobid,
+                      key: 'uuid',
+                      table: chg.table,
+                      uuid: chg.uuid
+                    });
+                    console.log(logTi + ' #690', { replaceSuccess });
+                  } else {
+                    console.log(logTi + ' #692 No-Barcode-Update ', hasCodeMod,
+                      { chg, objUpdateData }
+                     );
                   }
                   break;
 

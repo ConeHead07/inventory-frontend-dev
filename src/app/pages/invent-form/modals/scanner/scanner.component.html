@@ -36,13 +36,6 @@
     </div>
   </div>
 
-  <section *ngIf="false" class="results" [hidden]="!scannedBarcode">
-    <div>
-      <small>Result</small>
-      <span>{{ scannedUnchangedPart }}</span><span id="barcodeChangedPart" #barcodeChangedPart>{{ scannedChangedPart }}</span><br>
-    </div>
-  </section>
-
   <div class="card" *ngIf="scanResultCurrent">
     <div class="card-body">
       <h5 class="card-title">{{ scanResultCurrent.barcode }}</h5>

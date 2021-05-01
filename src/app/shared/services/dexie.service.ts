@@ -338,12 +338,15 @@ export class DexieService extends Dexie {
   }
 
   async addChangeLog(change: IDatabaseChange) {
-    const log = this.getChangeLogFlag(change);
+    const logFlag = this.getChangeLogFlag(change);
     // if (log === undefined || !log) {
     //   console.log('#152 addChangeLog Skip DB-Change-Logging - No Log-Flag', { change });
     //   return;
     // }
-    if (log !== undefined && log !== null && log === false) {
+    const logPrefix = 'DexieService.addChangeLog(change[' + change.table + ',' + change.type + ',' + change.key + '] ';
+    console.log(logPrefix + '#322');
+    if (logFlag !== undefined && logFlag !== null && logFlag === false) {
+      console.log(logPrefix + '#324 ABORT log:', logFlag, {change});
       return;
     }
     let uuid = this.getChangeLogUuid(change);
@@ -452,8 +455,9 @@ export class DexieService extends Dexie {
         break;
     }
 
-    this.clientChangeLog.add(chlog).catch( (e) => {
-      console.error('DexieService addChangeLog #400', { e });
+    this.clientChangeLog.add(chlog)
+      .catch( reason => {
+        console.error(reason, logPrefix + ' #443 clientChangeLog.add', { chlog });
     });
   }
 
@@ -488,7 +492,7 @@ export class DexieService extends Dexie {
   getChangeLogFlag(change: IDatabaseChange): boolean|undefined {
     const ch = change as any;
     if ( typeof ch !== 'object') {
-      console.error('#192 dexie.service getChangeLog(change) change is not a object: ', change);
+      console.error('DexieService.getChangeLogFlag(change) #192 change is not a object: ', change);
       return false;
     }
 
