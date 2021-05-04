@@ -281,6 +281,7 @@ export class DexieService extends Dexie {
     const validLogTables = [
       'hersteller',
       'inventar',
+      'inventurenUserStatus',
       'images',
       'objektKatalogGlobal',
       'objektKatalogMandant',

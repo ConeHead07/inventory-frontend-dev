@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import {BasedataService} from './basedata.service';
+import {environment} from '../../../environments/environment';
 
 @Injectable({
   providedIn: 'root'
@@ -9,6 +10,7 @@ import {BasedataService} from './basedata.service';
 export class ApiService {
 
   private apiBaseUrl = '';
+  private currentApplicationVersion = environment.appVersion;
 
   constructor(private http: HttpClient, private baseData: BasedataService) {
     this.apiBaseUrl = this.baseData.getCurrentApiBaseUrlOrSetDefault( this.getDefaultApiUrl );

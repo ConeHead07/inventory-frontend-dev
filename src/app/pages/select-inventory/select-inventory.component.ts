@@ -10,7 +10,7 @@ import { faSyncAlt } from '@fortawesome/free-solid-svg-icons';
 import {ConnectionService, ConnectionState} from '../../shared/services/connection-service.service';
 import {Subscription} from 'rxjs';
 import {DbsyncLogService, LoadingMetaData, LoadingMetaMessage} from '../../shared/services/dbsync-log.service';
-import {BarcodeService} from "../invent-form/data-services/barcode.service";
+import {BarcodeService} from '../invent-form/data-services/barcode.service';
 
 enum StatusLoadingInventories {
   None,

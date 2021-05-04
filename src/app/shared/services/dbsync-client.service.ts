@@ -14,6 +14,7 @@ import {DbsyncLogService, TableSyncProgress} from './dbsync-log.service';
 import {DatabaseChangeType} from 'dexie-observable/api';
 import {Subscription} from 'rxjs';
 import {BarcodeService} from '../../pages/invent-form/data-services/barcode.service';
+import {environment} from '../../../environments/environment';
 
 export interface TableSyncProgressList {
   [key: string]: TableSyncProgress;
@@ -269,6 +270,7 @@ export class DBSyncClientService implements OnDestroy {
   private aLastServerChangesByJobid: ServerChangesStatusInfoCache[] = [];
   private serverChangesCacheLifetime = 60 * 1000;
   private isInDebugMode = false;
+  private appVersion = environment.appVersion;
 
   @Output() autoSyncChange = new EventEmitter<boolean>();
   @Output() updateStatusChanges = new EventEmitter<any>();
@@ -639,6 +641,7 @@ export class DBSyncClientService implements OnDestroy {
             jobid,
             devid,
             lastRevId,
+            appVersion: this.appVersion,
             changes: logs
           })
         .toPromise()
