@@ -78,7 +78,7 @@ import {DBInsertArtikelResult} from './data-services/artikel.service';
 import {ImageboxComponent} from './modals/imagebox/imagebox.component';
 import {ShowRaumImageComponent} from './modals/show-raum-image/show-raum-image.component';
 import {CreateRaumImageComponent} from './modals/create-raum-image/create-raum-image.component';
-import {BatchBarcodesComponent, LookupResultItem} from "./modals/batch-barcodes/batch-barcodes.component";
+import {BatchBarcodesComponent, LookupResultItem} from './modals/batch-barcodes/batch-barcodes.component';
 
 interface ScannerConfiguration {
   minLength?: number; // 7
@@ -1143,8 +1143,6 @@ export class InventFormComponent implements OnInit, OnDestroy {
     this.openRaumListRest();
   }
 
-  onBarcodeInput(): void {}
-
   bcTrimZero(barcode: string) {
     barcode = barcode.trim();
     while (barcode.charAt(0) === '0') {
@@ -1153,7 +1151,10 @@ export class InventFormComponent implements OnInit, OnDestroy {
     return barcode;
   }
 
+  onBarcodeInput(): void {}
+
   async handleScanData(event: ScanDetectData) {
+    const enableBatchInput = false;
     event.barcode = this.bcTrimZero(event.barcode);
 
     if (this.kunde.mid === 5 && event.barcode.length > 10) {
@@ -1161,6 +1162,47 @@ export class InventFormComponent implements OnInit, OnDestroy {
         event.barcode = event.barcode.substr(0, 10);
       }
     }
+
+    if (this.rawInputBarcodes && this.rawInputBarcodes.nativeElement && 'value' in this.rawInputBarcodes.nativeElement) {
+      this.rawInputBarcodes.nativeElement.value = '';
+      if (('rawInput' in event) && event.rawInput) {
+        this.rawInputBarcodes.nativeElement.value = event.rawInput;
+        if (('debugData' in event) && event.debugData && event.debugData.keyDownEvents) {
+          this.rawInputBarcodes.nativeElement.value += '\n\nkeyDownEvents:\n' + JSON.stringify(event.debugData.keyDownEvents);
+        }
+      }
+    }
+
+    if (event.barcode.indexOf('\n') > -1) {
+      const numBatchCodes = event.barcode.split('\n').length;
+      let batchError = '';
+      if (!this.raum) {
+        batchError = 'Wählen Sie erst einen Raum aus!';
+      } else if (this.waitingForNewInventarBarcode) {
+        batchError = 'Aktueller Vorgang erwartet einzelnen neuen Inventar-Barcode!';
+      } else if (this.waitingForInventarData) {
+        batchError = 'Aktueller Vorgang erwartet einzelne Artikelzuweisung!';
+      }
+      if (batchError) {
+        alert(batchError + '\n' +
+          'Es wurden ' + numBatchCodes + ' Barcodes im Batchmodus übermittelt!'
+        );
+        return;
+      }
+      const barcodes = event.barcode.split('\n').map( (c) => {
+        let bc = this.bcTrimZero( c.trim() );
+        if (this.kunde.mid === 5 && bc.length > 10 && !bc.startsWith('A') && !bc.startsWith('R')) {
+          bc = bc.substr(0, 10);
+        }
+        return bc;
+      });
+      if (enableBatchInput) {
+        return this.openBatchScans(barcodes, event.target);
+      }
+      alert('Auslesen mehrerer Barcodes pro Scan ist deaktiviert.\nBarcodes müssen einzeln gescannt werden!');
+      return;
+    }
+
     console.log('InventFormComponente #865 handleScanData', { waitingForNewInventarBarcode: this.waitingForNewInventarBarcode, event });
     const bcResult = await this.bcLookup.fullLookup(event.barcode, this.jobid);
     console.log('InventFormComponente #867 handleScanData', { bcResult });

@@ -147,6 +147,7 @@ persist();
     , ImageboxComponent
     , ShowRaumImageComponent
     , CreateRaumImageComponent
+    , BatchBarcodesComponent
   ],
   providers: [
     {

@@ -21,6 +21,7 @@
     "startpwa-dev": "http-server -p 4255 -c-1 dist/dev -S -C ssl/public_crt.pem -K ssl/private_key.pem -o",
     "startpwa-prod": "http-server -p 4265 -c-1 dist/prod -S -C ssl/public_crt.pem -K ssl/private_key.pem -o",
     "buildpwa": "yarn run prebuild && ng build --prod --project frontend",
+    "rebuild": "ng build --prod --project frontend",
     "test": "ng test",
     "lint": "ng lint",
     "e2e": "ng e2e",
