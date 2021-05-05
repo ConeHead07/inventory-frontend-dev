@@ -123,13 +123,21 @@ export class ScannerdetectionComponent implements OnInit {
 
     if (!isScanInput) {
       this.input = key;
-      console.log('#101 scannerDetection Start, input', this.input);
+      this.rawInput = key;
+      if (this.isInDebugMode) {
+        console.log('#101 scannerDetection Start, input', this.input);
+      }
     } else {
-      console.log('#109 scannerDetection isScanInput', { target, key, 'this.input': this.input, 'event.type': event.type, event});
+      this.rawInput += '|' + key;
+      if (this.isInDebugMode) {
+        console.log('#109 scannerDetection isScanInput', { target, key, 'this.input': this.input, 'event.type': event.type, event});
+      }
       if (key.length === 1 ) {
         this.input += !isShiftKey ? key : key.toUpperCase();
         const barcode = this.input;
-        console.log('#106 scannerDetection add Char to Barcode', { key, barcode });
+        if (this.isInDebugMode) {
+          console.log('#106 scannerDetection add Char to Barcode', { key, barcode });
+        }
       } else if (key === 'Tab') {
         this.input += '\t';
       } else if (key === 'Enter') {
@@ -147,6 +155,8 @@ export class ScannerdetectionComponent implements OnInit {
         input = input.split('ß').join('-');
       }
       const barcode = input;
+      const rawInput = this.rawInput;
+      const keyDownEvents = this.keyDownEvents;
       if (this.isInDebugMode) {
         console.log('#138 scannerDetection Emit After Timeout', { key, barcode });
       }
@@ -154,8 +164,12 @@ export class ScannerdetectionComponent implements OnInit {
       if (barcode.length >= 5) {
         this.scanned.emit({
           barcode,
+          rawInput,
           length: barcode.length,
-          valid: true
+          valid: true,
+          debugData: {
+            keyDownEvents
+          }
         });
       }
     }, this.detectorConfig.scanTimeout);
