@@ -11,7 +11,8 @@ import {
   faBatteryHalf,
   faBatteryThreeQuarters,
   faBatteryFull,
-  faSignOutAlt
+  faSignOutAlt,
+  faExchangeAlt
 } from '@fortawesome/free-solid-svg-icons';
 
 interface RaumStatusProgressWithIconName extends RaumStatusProgress {
@@ -37,6 +38,7 @@ export class GesamtListDoneComponent implements OnInit {
   faThreeQuarter = faBatteryThreeQuarters;
   faFull = faBatteryFull;
   faSignOutAlt = faSignOutAlt;
+  faExchangeAlt = faExchangeAlt;
 
   @Output() raumSelected = new EventEmitter<string>();
 

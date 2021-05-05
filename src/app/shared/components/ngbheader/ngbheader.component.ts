@@ -1,5 +1,5 @@
 import {Component, Input} from '@angular/core';
-import { faCog } from '@fortawesome/free-solid-svg-icons';
+import { faCog, faHome, faPlayCircle, faPowerOff, faSync, faUser } from '@fortawesome/free-solid-svg-icons';
 import {BasedataService} from '../../services/basedata.service';
 import {Router} from '@angular/router';
 
@@ -11,6 +11,12 @@ import {Router} from '@angular/router';
 export class NgbheaderComponent {
   collapsed = true;
   faCog = faCog;
+  faHome = faHome;
+  faPlayCircle = faPlayCircle;
+  faPowerOff = faPowerOff;
+  faSync = faSync;
+  faUser = faUser;
+
   @Input() isLoginPage = false;
 
   constructor(private baseData: BasedataService, private router: Router) {

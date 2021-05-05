@@ -1,19 +1,21 @@
-import { EventEmitter, Injectable, Output} from '@angular/core';
+import {EventEmitter, Injectable, Output} from '@angular/core';
 import {
   DBDIHersteller,
   DBDIInventar,
   DBDIObjektKatalogGlobal,
-  DBDIObjektKatalogMandant
+  DBDIObjektKatalogMandant,
+  DBDIRaumEditStatus
 } from '../../../shared/interfaces/dexie.interfaces';
-import { DexieService } from '../../../shared/services/dexie.service';
-import { InventarData } from '../../../shared/services/data.service';
-import { Guid} from 'guid-typescript';
-import { BasedataService} from '../../../shared/services/basedata.service';
-import { DatabaseChangeType} from 'dexie-observable/api';
-import { AuthService} from '../../auth/auth.service';
-import { ArtikelService } from './artikel.service';
+import {DexieService} from '../../../shared/services/dexie.service';
+import {InventarData} from '../../../shared/services/data.service';
+import {Guid} from 'guid-typescript';
+import {BasedataService} from '../../../shared/services/basedata.service';
+import {DatabaseChangeType} from 'dexie-observable/api';
+import {AuthService} from '../../auth/auth.service';
+import {ArtikelService} from './artikel.service';
 import {HerstellerService} from './hersteller.service';
-import {VariablesService} from "../../../shared/services/variables.service";
+import {VariablesService} from '../../../shared/services/variables.service';
+import {RaumService} from './raum.service';
 
 export interface InventarFoundResult {
   success: boolean;
@@ -100,7 +102,8 @@ export class InventarService {
               private baseData: BasedataService,
               private herstellerService: HerstellerService,
               private artikelService: ArtikelService,
-              private variablesService: VariablesService
+              private variablesService: VariablesService,
+              private raumService: RaumService
   ) { }
 
   returnResultSuccess<T extends InventarEditResult>(data: InventarEditResultPresets): T {
@@ -231,7 +234,6 @@ export class InventarService {
       created_jobid: inventar.created_jobid || jobid
     };
     const log = { log: true };
-
     const insertUuid = await this.dexie.inventar
       .add( { ...item, ...log})
       .then( id => id)
@@ -239,6 +241,7 @@ export class InventarService {
         console.error( reason, 'InventarService.insertInventar() #239 inventar.add', { item });
         return '';
       });
+
     console.log('InventarService #207 insertInventar: ', { insertUuid, data: {...item, ...log} });
     const saved = await this.dexie.inventar.get(insertUuid);
     console.log('InventarService #207 insertInventar: ', { insertUuid, saved, data: {...item, ...log} });
@@ -619,6 +622,10 @@ export class InventarService {
             obj: { ...inv, ...changes },
             mods: changes
           });
+
+          if (raum.current_jobstatus === 0) {
+            this.raumService.setRaumStatus(DBDIRaumEditStatus.Started, ruuid, jobid);
+          }
 
           return this.returnResultSuccess<InventarEditResult>({
             type: InventarChangeType.Update

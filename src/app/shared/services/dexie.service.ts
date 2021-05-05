@@ -71,7 +71,7 @@ export class DexieService extends Dexie {
     console.log('clear db');
     return Promise.all(this.tables.map( (t) => t.clear() ))
       .then( () => {
-        console.log('clear db finished');
+        console.log('Datenbank wurde geleert!');
         return true;
       }).catch( (r) => {
         console.error(r);
@@ -96,7 +96,6 @@ export class DexieService extends Dexie {
       return false;
     });
   }
-
 
   init() {
     Dexie.Syncable.registerSyncProtocol('inventorySync', this.syncClient );
@@ -253,10 +252,36 @@ export class DexieService extends Dexie {
       this.nextDbVersion += 1;
     }
 
+    if (true) {
+      const v10 = this.nextDbVersion;
+      this.version(v10).stores({
+        barcodeLookup:
+          '&[code+for_jobid],table,for_jobid,[table+for_jobid],[table+for_jobid+updateHelper],updateHelper,[table+updateHelper]',
+      });
+      this.nextDbVersion += 1;
+    }
+    if (true) {
+      const v11 = this.nextDbVersion;
+      this.version(v11).stores({
+        objektKatalogImages:
+          '$$uuid,id,for_jobid,RefTable,RefUuid,ImgUuid,Kategorie,[RefTable+RefUuid+Kategorie]',
+      });
+      this.nextDbVersion += 1;
+    }
+    if (true) {
+      const v12 = this.nextDbVersion;
+      this.version(v12).stores({
+        objektKatalogImages:
+          '$$uuid,id,for_jobid,RefTable,RefUuid,ImgUuid,Kategorie,[RefTable+RefUuid+Kategorie],[RefTable+RefUuid]',
+      });
+      this.nextDbVersion += 1;
+    }
+
 
     const validLogTables = [
       'hersteller',
       'inventar',
+      'inventurenUserStatus',
       'images',
       'objektKatalogGlobal',
       'objektKatalogMandant',
@@ -322,19 +347,17 @@ export class DexieService extends Dexie {
     const logPrefix = 'DexieService.addChangeLog(change[' + change.table + ',' + change.type + ',' + change.key + '] ';
     console.log(logPrefix + '#322');
     if (logFlag !== undefined && logFlag !== null && logFlag === false) {
-      console.log(logPrefix + '#324 ABORT log:', logFlag, { change });
+      console.log(logPrefix + '#324 ABORT log:', logFlag, {change});
       return;
     }
     let uuid = this.getChangeLogUuid(change);
 
     if (change.type !== 3) {
-      console.log(logPrefix + '#330');
       const obj: any = await this.table( change.table ).get( change.key );
       uuid = ('uuid' in obj) ? obj.uuid : '';
 
       delete obj.log;
       await this.table( change.table ).put( obj, change.key);
-      console.log(logPrefix + '#336 put');
     }
 
     const chlog = {
@@ -382,7 +405,6 @@ export class DexieService extends Dexie {
         break;
 
       case DatabaseChangeType.Update:
-        console.log(logPrefix + '#384 update');
         const updateChange = change as IUpdateChange;
         chlog.mods = updateChange.mods;
         if ('log' in chlog.mods) {
@@ -434,14 +456,13 @@ export class DexieService extends Dexie {
         break;
     }
 
-    console.log(logPrefix + '#436 add');
     this.clientChangeLog.add(chlog)
       .then( (n) => {
         console.log(logPrefix + '#439 added number:', n);
       })
       .catch( reason => {
-      console.error(reason, logPrefix + ' #443 clientChangeLog.add', { chlog });
-    });
+        console.error(reason, logPrefix + ' #443 clientChangeLog.add', { chlog });
+      });
   }
 
   getChangeLogUuid(change: IDatabaseChange): string|undefined {
@@ -474,27 +495,36 @@ export class DexieService extends Dexie {
 
   getChangeLogFlag(change: IDatabaseChange): boolean|undefined {
     const ch = change as any;
+    const showFlagLog = false;
     if ( typeof ch !== 'object') {
-      console.error('DexieService.getChangeLogFlag(change) #192 change is not a object: ', change);
+      if (showFlagLog) {
+        console.error('DexieService.getChangeLogFlag(change) #192 change is not a object: ', change);
+      }
       return false;
     }
     const logPrefix = 'DexieService.getChangeLogFlag(change[' + ch.table + ',' + ch.type + ',' + ch.key + ']) ';
     console.log(logPrefix + '#482 change', {...change});
 
     if ( (typeof ch.obj === 'object') && ('log' in ch.obj) ) {
-      console.log(logPrefix + '#485 return ch.obj.log ', ch.obj.log);
+      if (showFlagLog) {
+        console.log(logPrefix + '#485 return ch.obj.log ', ch.obj.log);
+      }
       return ch.obj.log;
       // return !!ch.obj.log;
     }
 
     if ( (typeof ch.mods === 'object') && ('log' in ch.mods)) {
-      console.log(logPrefix + '#491 return ch.mods.log ', ch.mods.log);
+      if (showFlagLog) {
+        console.log(logPrefix + '#491 return ch.mods.log ', ch.mods.log);
+      }
       return ch.mods.log;
       // return !!ch.mods.log;
     }
 
     if ( (typeof ch.oldObj === 'object') && ('log' in ch.oldObj)) {
-      console.log(logPrefix + '#497 return ch.oldObj.log ', ch.oldObj.log);
+      if (showFlagLog) {
+        console.log(logPrefix + '#497 return ch.oldObj.log ', ch.oldObj.log);
+      }
       return ch.oldObj.log;
       // return !!ch.oldObj.log;
     }
@@ -502,7 +532,10 @@ export class DexieService extends Dexie {
   }
 
   stopChangeLogForImport( stop: boolean) {
-    console.log('#199 stopClientLogForServerLoad => ', stop);
+    const showFlagLog = false;
+    if (showFlagLog) {
+      console.log('#199 stopClientLogForServerLoad => ', stop);
+    }
     this.stopClientLogForServerLoad = stop;
   }
 }

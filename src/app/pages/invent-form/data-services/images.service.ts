@@ -71,30 +71,33 @@ export class ImagesService {
       created_jobid: image.created_jobid || jobid
     };
 
-    return this.dexie.images.add(item).then( (imgUuid) => {
-      this.addImageKatalogRef({
-        for_jobid: image.for_jobid,
-        RefTable: 'ObjektKatalogMandant',
-        RefUuid: image.mcuuid,
-        ImgUuid: imgUuid,
-        RefText: image.desc || image.name,
-        Pos: 1,
-        Kategorie: ''
-      });
-      return imgUuid;
-    }).catch( reason => {
-      console.error(reason, 'ImageService.insertArtikelImage() #86 add ',
-        {
-          uuid: item.uuid,
-          mcuuid: item.mcuuid,
-          gcuuid: item.gcuuid,
-          name: item.name,
-          size: item.size,
-          width: item.width,
-          height: item.height
+    return this.dexie.images
+      .add(item)
+      .then( (imgUuid) => {
+        this.addImageKatalogRef({
+          for_jobid: image.for_jobid,
+          RefTable: 'ObjektKatalogMandant',
+          RefUuid: image.mcuuid,
+          ImgUuid: imgUuid,
+          RefText: image.desc || image.name,
+          Pos: 1,
+          Kategorie: ''
         });
-      return null;
-    });
+        return imgUuid;
+      })
+      .catch( reason => {
+        console.error(reason, 'ImageService.insertArtikelImage() #86 add ',
+          {
+            uuid: item.uuid,
+            mcuuid: item.mcuuid,
+            gcuuid: item.gcuuid,
+            name: item.name,
+            size: item.size,
+            width: item.width,
+            height: item.height
+          });
+        return null;
+      });
   }
 
   async addImageKatalogRef(data: ImageRefData): Promise<string> {
@@ -114,6 +117,7 @@ export class ImagesService {
       created_jobid: jobid,
       created_device_id: devID
     };
+
     return this.dexie.objektKatalogImages.add(item)
       .then( uuid => uuid)
       .catch( reason => {
@@ -196,7 +200,6 @@ export class ImagesService {
       created_uid: image.created_uid || uid,
       created_jobid: image.created_jobid || jobid
     };
-
     return this.dexie.images.add(item)
       .then( (imgUuid) => {
         this.addImageKatalogRef({
@@ -225,15 +228,15 @@ export class ImagesService {
   async deleteByUuid(uuid: string): Promise<number> {
     return this.dexie.images.where({uuid}).delete()
       .then( (num) => {
-      return this.dexie.objektKatalogImages
-        .where({ImgUuid: uuid})
-        .delete()
-        .then( (numLinks) => num + numLinks)
-        .catch( () => {
-          console.error('ERROR: Can not delete links in objektKatalogImages for uuid: '  + uuid);
-          return num;
-        });
-    })
+        return this.dexie.objektKatalogImages
+          .where({ImgUuid: uuid})
+          .delete()
+          .then( (numLinks) => num + numLinks)
+          .catch( () => {
+            console.error('ERROR: Can not delete links in objektKatalogImages for uuid: '  + uuid);
+            return num;
+          });
+      })
       .catch( () => {
         console.error('ERROR: Cannot Delete Image with uuid: ' + uuid);
         return 0;

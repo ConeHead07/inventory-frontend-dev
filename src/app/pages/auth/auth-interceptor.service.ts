@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+import {environment} from '../../../environments/environment';
 
 import {
   HttpInterceptor,
@@ -19,6 +20,8 @@ import {Router} from '@angular/router';
 })
 export class AuthInterceptorService implements HttpInterceptor {
 
+  private applicationVersion = environment.appVersion;
+
   constructor(private authService: AuthService, private router: Router) { }
 
   private addAuthHeader(request: HttpRequest<any>): HttpRequest<any> {
@@ -30,7 +33,8 @@ export class AuthInterceptorService implements HttpInterceptor {
     return request.clone({
       setHeaders: {
         Authorization: `Bearer ${user.token}`,
-        'Client-Device-Id': `${this.authService.getClientDeviceId()}`
+        'Client-Device-Id': `${this.authService.getClientDeviceId()}`,
+        'Client-App-Version': this.applicationVersion
       }
     });
   }

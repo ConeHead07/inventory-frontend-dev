@@ -55,30 +55,25 @@ export class AuthComponent implements OnInit, OnDestroy {
   }
 
   onLoginSubmit() {
-    console.log('onLoginSubmit #32', this.form);
-
-    let authObs: Observable<AuthResponseData>;
+    let auth: Promise<any>;
 
     const email = this.form.email;
     const password = this.form.password;
 
-    authObs = this.authService.login(email, password);
-
     this.isLoading = true;
-    authObs.subscribe(
-      resData => {
-        console.log(resData);
-        this.isLoading = false;
-        this.router.navigate(['/select-inventory']);
-        this.form.email = '';
-        this.form.password = '';
-      },
-      errorMessage => {
-        console.log( errorMessage );
-        this.error = errorMessage;
-        this.isLoading = false;
-      }
-    );
+    auth = this.authService.login(email, password);
+    auth.then( (resData) => {
+      console.log(resData);
+      this.isLoading = false;
+      this.router.navigate(['/select-inventory']);
+      this.form.email = '';
+      this.form.password = '';
+    });
+    auth.catch( (errorMessage) => {
+      console.error('AuthComponent.onLoginSubmit() #73', errorMessage );
+      this.error = errorMessage;
+      this.isLoading = false;
+    });
   }
 
 }

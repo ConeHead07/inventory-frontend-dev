@@ -65,10 +65,12 @@
 
 <div class="card">
   <div class="card-body">
-    <h5 class="card-title">Datenbank leeren</h5>
+    <h5 class="card-title">Browser(Handy)-Datenbank leeren</h5>
     <p class="card-text">
-      Mit dieser Funktion werden 'alle' Datenbank-Inhalte gelöscht.
-      Benutzen Sie diese Funktion nur wenn alle Daten bereits synchronisiert sind.
+      Mit dieser Funktion werden 'alle' Datenbank-Inhalte des Browsers/Handy gelöscht.<br>
+      Unsynchronisierte Änderungen gehen hierbei verloren!<br>
+      Benutzen Sie diese Funktion nur wenn alle Daten bereits synchronisiert sind!<br>
+      Datenbank: {{ dbName }} Version {{ dbVersion }}
     </p>
     <button class="btn btn-danger" [disabled]="buildBcLookup" (click)="dbClear()">Datenbank leeren</button>
   </div>
@@ -88,4 +90,3 @@
     <button class="btn btn-danger" [disabled]="buildBcLookup" (click)="dbDelete()">Datenbank löschen</button>
   </div>
 </div>
-

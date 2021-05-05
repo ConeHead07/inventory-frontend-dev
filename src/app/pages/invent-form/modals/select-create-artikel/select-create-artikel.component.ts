@@ -283,6 +283,11 @@ export class SelectCreateArtikelComponent implements OnInit {
       // this.checkIfArtikelExistsGlobal();
       // this.checkIfArtikelExistsMandant();
       this.delegateListArticleMatches(500);
+      if (this.artikelDaten.Kategorie === 'Kunst' && this.formType !== ArtikelFormType.Kunst) {
+        this.setKunstFormLabels();
+      } else if (this.artikelDaten.Kategorie !== 'Kunst' && this.formType === ArtikelFormType.Kunst) {
+        this.setInventarFormLabels();
+      }
     });
   }
 

@@ -4,6 +4,8 @@ export interface ScanDetectData {
   barcode: string;
   length: number;
   valid: boolean;
+  rawInput?: string;
+  debugData?: any;
   target?: HTMLElement;
 }
 
@@ -27,9 +29,12 @@ export interface ScanDetectConfig {
 export class ScannerdetectionComponent implements OnInit {
 
   private input = '';
+  private rawInput = '';
+  private keyDownEvents: any[] = [];
   private lastKeyEventTime = 0;
   private lastTimer = null;
   private lastTimerTime = null;
+  private isInDebugMode = false;
 
   private detectorConfig: ScanDetectConfig = {
     minLength: 5,
@@ -39,7 +44,7 @@ export class ScannerdetectionComponent implements OnInit {
     scanTimeout: 100,
     ignoreChars: '',
     ignoreEndsWith: true,
-    ignoreOverElements: [], // [ 'INPUT' ],
+    ignoreOverElements: ['.scanner-detect-ignore'], // [ 'INPUT' ],
     barcodeType: 'code128'
   };
 
@@ -52,7 +57,9 @@ export class ScannerdetectionComponent implements OnInit {
 
   @HostListener('window:keydown', ['$event', '$event.target'])
   onKeyDown(event: KeyboardEvent, useTarget?: HTMLElement) {
-    console.log('#55 scannerDetection Key-Down-Event', { event, useTarget });
+    if (this.isInDebugMode) {
+      console.log('#55 scannerDetection Key-Down-Event', { event, useTarget });
+    }
 
     const target: HTMLElement = useTarget;
     const targetTagName = target.tagName;
@@ -97,7 +104,7 @@ export class ScannerdetectionComponent implements OnInit {
       emitScanData = false;
     }
 
-    if (!emitScanData) {
+    if (!emitScanData && this.isInDebugMode) {
       console.log('#89 scannerDetection target is not our target: ', {
         useTarget,
         isEditableTextInput,
@@ -123,9 +130,10 @@ export class ScannerdetectionComponent implements OnInit {
         this.input += !isShiftKey ? key : key.toUpperCase();
         const barcode = this.input;
         console.log('#106 scannerDetection add Char to Barcode', { key, barcode });
-      } else if (key === 'Tab' || key === 'Enter') {
-        // Nothing
-        event.preventDefault();
+      } else if (key === 'Tab') {
+        this.input += '\t';
+      } else if (key === 'Enter') {
+        this.input += '\n';
       }
     }
 
@@ -139,7 +147,9 @@ export class ScannerdetectionComponent implements OnInit {
         input = input.split('ß').join('-');
       }
       const barcode = input;
-      console.log('#138 scannerDetection Emit After Timeout', { key, barcode });
+      if (this.isInDebugMode) {
+        console.log('#138 scannerDetection Emit After Timeout', { key, barcode });
+      }
       this.input = '';
       if (barcode.length >= 5) {
         this.scanned.emit({
@@ -149,7 +159,6 @@ export class ScannerdetectionComponent implements OnInit {
         });
       }
     }, this.detectorConfig.scanTimeout);
-    console.log('#147 scannerDetection LAST-LINE');
   }
 
   constructor() { }

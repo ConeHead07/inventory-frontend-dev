@@ -6,3 +6,8 @@ nav.navbar .navbar-brand img.logo {
   width: 40vw;
   max-width:221px;
 }
+
+.rowed-inline {
+  justify-content: space-between;
+  flex-direction: row;
+}

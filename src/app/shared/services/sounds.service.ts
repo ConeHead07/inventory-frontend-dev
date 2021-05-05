@@ -118,19 +118,33 @@ export class SoundsService {
 
   constructor() {
     this.success = new Audio();
+    this.success.muted = true;
+    this.success.autoplay = true;
     this.success.src = '../assets/googlesounds/notification_simple-01.mp3';
     this.success.load();
 
     this.error = new Audio();
+    this.error.muted = true;
+    this.error.autoplay = true;
     this.error.src = '../assets/googlesounds/alert_error-01.mp3';
     this.error.load();
   }
 
+  public getSuccessSrc(): string {
+    return this.success.src;
+  }
+
+  public getErrorSrc(): string {
+    return this.error.src;
+  }
+
   async playSuccess(): Promise<void> {
+    this.success.muted = false;
     this.success.play();
   }
 
   async playError(): Promise<void> {
+    this.error.muted = false;
     this.error.play();
   }
 }

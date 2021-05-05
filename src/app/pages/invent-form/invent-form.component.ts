@@ -3,11 +3,14 @@ import {ActivatedRoute} from '@angular/router';
 import {Location} from '@angular/common';
 import {DataService, InventarData} from '../../shared/services/data.service';
 import {
+  BarcodeLookupSimpleResult,
   DBDIArtikel,
   DBDIGebaeude,
-  DBDIInventar, DBDIInventuren,
+  DBDIInventar,
+  DBDIInventuren,
   DBDIJobLockStatus,
-  DBDIMandanten, DBDIObjektKatalogImages,
+  DBDIObjektKatalogImages,
+  DBDIMandanten,
   DBDIRaeume,
   DBDIRaumEditStatus,
   DBDIRaumGebaeude,
@@ -23,8 +26,10 @@ import {
   faDoorClosed,
   faDoorOpen,
   faEdit,
+  faEye,
   faImage,
   faLock,
+  faPlus,
   faSearch,
   faUnlockAlt
 } from '@fortawesome/free-solid-svg-icons';
@@ -32,14 +37,16 @@ import {InventoryProgress, InventoryProgressService} from '../../shared/inventor
 
 import {ScanDetectData} from '../../shared/components/scannerdetection/scannerdetection.component';
 
-import {ArtikelFormType} from './modals/select-create-artikel/select-create-artikel.component';
+import {
+  ArtikelFormType,
+  SelectCreateArtikelComponent
+} from './modals/select-create-artikel/select-create-artikel.component';
 
 import {NgbModal, NgbModalRef} from '@ng-bootstrap/ng-bootstrap';
 // Dialogs
 import {ScannerBarcodeData, ScannerComponent} from './modals/scanner/scanner.component';
 import {CreateArtikelImageComponent} from './modals/create-artikel-image/create-artikel-image.component';
 import {ShowArtikelImageComponent} from './modals/show-artikel-image/show-artikel-image.component';
-import {SelectCreateArtikelComponent} from './modals/select-create-artikel/select-create-artikel.component';
 import {
   ArtikelOption,
   SelectSearchArtikelComponent
@@ -69,8 +76,9 @@ import {VariablesService} from '../../shared/services/variables.service';
 import {EditInventarComponent} from './modals/edit-inventar/edit-inventar.component';
 import {DBInsertArtikelResult} from './data-services/artikel.service';
 import {ImageboxComponent} from './modals/imagebox/imagebox.component';
-import {ShowRaumImageComponent} from "./modals/show-raum-image/show-raum-image.component";
-import {CreateRaumImageComponent} from "./modals/create-raum-image/create-raum-image.component";
+import {ShowRaumImageComponent} from './modals/show-raum-image/show-raum-image.component';
+import {CreateRaumImageComponent} from './modals/create-raum-image/create-raum-image.component';
+import {BatchBarcodesComponent, LookupResultItem} from "./modals/batch-barcodes/batch-barcodes.component";
 
 interface ScannerConfiguration {
   minLength?: number; // 7
@@ -142,9 +150,11 @@ export class InventFormComponent implements OnInit, OnDestroy {
 
   faBarcode = faBarcode;
   faSearch = faSearch;
+  faEye = faEye;
   faCamera = faCamera;
   faEdit = faEdit;
   faImage = faImage;
+  faPlus = faPlus;
   faCheck = faCheck;
   faDoorOpen = faDoorOpen;
   faDoorClosed = faDoorClosed;
@@ -154,6 +164,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
 
   @ViewChild('input2', { static: true }) input2: ElementRef;
   @ViewChild('inputSimulateBarcode', { static: true }) inputSimulateBarcode: ElementRef;
+  @ViewChild('rawInputBarcodes', { static: true }) rawInputBarcodes: ElementRef;
 
   scanDetectorConfig: ScannerConfiguration = {
     minLength: 5,
@@ -225,6 +236,8 @@ export class InventFormComponent implements OnInit, OnDestroy {
     total: 0,
     done: 0,
   };
+  beepSuccessSrc = '';
+  beepErrorSrc = '';
 
   private currentModal: CurrentModal = {
     modalRef: null,
@@ -258,6 +271,8 @@ export class InventFormComponent implements OnInit, OnDestroy {
     private sounds: SoundsService,
     private variables: VariablesService,
     private toastr: ToastrService) {
+    this.beepSuccessSrc = this.sounds.getSuccessSrc();
+    this.beepErrorSrc = this.sounds.getErrorSrc();
   }
 
   showBlobAlertSuccess() {
@@ -621,8 +636,17 @@ export class InventFormComponent implements OnInit, OnDestroy {
   }
 
   async reloadRaumImageExistsStatus(): Promise<boolean> {
-    return this.loadRaumImages().then( numImgs => numImgs > 0);
+    return this.loadRaumImages().then(numImgs => numImgs > 0);
   }
+
+  async reloadRaumImages(): Promise<number> {
+    return this.raumService.getRaumBilder(this.raum.uuid).then( (images) => {
+      console.log('InventFormComponent.raumService.getRaumBilder #376 images: ', images);
+      this.raumBilder = images;
+      return images.length;
+    });
+  }
+
 
   get kundeName(): string {
     return this.kunde ? this.kunde.Mandant : '';
@@ -690,7 +714,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
   }
 
   openCreateArtikelImage() {
-    const modalRef = this.modalService.open(CreateArtikelImageComponent);
+    const modalRef = this.modalService.open(CreateArtikelImageComponent, { size: 'xl' } );
     this.modalWatch(modalRef, 'CreateArtikelImage');
     modalRef.componentInstance.name = this.formInventar.Bezeichnung + '/' + this.formInventar.Typ;
     modalRef.componentInstance.gcuuid = this.formInventar.gcuuid;
@@ -716,8 +740,8 @@ export class InventFormComponent implements OnInit, OnDestroy {
     } else {
       name = rb.split('/').join('.').split(' ').join('_');
     }
-    const modalRef = this.modalService.open(CreateRaumImageComponent);
-    this.modalWatch(modalRef, 'CreateArtikelImage');
+    const modalRef = this.modalService.open(CreateRaumImageComponent, { size: 'xl' } );
+    this.modalWatch(modalRef, 'CreateRaumImage');
     modalRef.componentInstance.name = this.formInventar.Bezeichnung + '/' + this.formInventar.Typ;
     modalRef.componentInstance.gcuuid = this.formInventar.gcuuid;
     modalRef.componentInstance.setMetaData({
@@ -732,7 +756,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
   }
 
   openEditArtikelImage() {
-    const modalRef = this.modalService.open(CreateArtikelImageComponent);
+    const modalRef = this.modalService.open(CreateArtikelImageComponent, { size: 'xl', scrollable: true } );
     this.modalWatch(modalRef, 'CreateArtikelImage');
     modalRef.componentInstance.name = this.formInventar.Bezeichnung + '/' + this.formInventar.Typ;
     modalRef.componentInstance.setMetaData({
@@ -748,7 +772,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
   }
 
   openShowArtikelImage() {
-    const modalRef = this.modalService.open(ShowArtikelImageComponent);
+    const modalRef = this.modalService.open(ShowArtikelImageComponent, { size: 'xl', scrollable: true } );
     this.modalWatch(modalRef, 'ShowArtikelImage');
     modalRef.componentInstance.name = 'World';
     console.log('openShowArtikelImage #642 setMcuuid: ', this.formInventar.mcuuid);
@@ -759,7 +783,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
   }
 
   openScanner(inputElm?: HTMLElement) {
-    const modalRef = this.modalService.open(ScannerComponent);
+    const modalRef = this.modalService.open(ScannerComponent, { size: 'xl' } );
     this.modalWatch(modalRef, 'Scanner');
     modalRef.componentInstance.name = 'World';
     const sub = modalRef.componentInstance.onScan.subscribe((data: ScannerBarcodeData) => {
@@ -773,6 +797,77 @@ export class InventFormComponent implements OnInit, OnDestroy {
       console.log('InventFormComponente #588 call handleScanData', { data, scan });
       this.handleScanData( scan );
     });
+    modalRef.result.then( () => {
+      sub.unsubscribe();
+    }).catch( () => {});
+  }
+
+  openBatchScans(barcodes: string[], inputElm?: HTMLElement): void {
+    console.log('InventFormComponent.openBatchScans(', barcodes, ') #778', { barcodes, inputElm });
+    const modalRef = this.modalService.open( BatchBarcodesComponent, { size: 'xl', scrollable: true } );
+    this.modalWatch(modalRef, 'BatchBarcodes');
+    if (!modalRef.componentInstance.jobid) {
+      modalRef.componentInstance.setJobid(this.jobid);
+    }
+    modalRef.componentInstance.setRaum(this.raum);
+    modalRef.componentInstance.setBarcodes(barcodes);
+    const sub = modalRef.componentInstance.onScan.subscribe((data: ScannerBarcodeData) => {
+      console.log('InventFormComponent.openBatchScans subscribe response #785', { data });
+      const scan: ScanDetectData = {
+        barcode: data.barcode,
+        length: data.length,
+        valid: data.valid,
+        target: inputElm
+      };
+      modalRef.close();
+      console.log('InventFormComponente #588 call handleScanData', { data, scan });
+      this.handleScanData( scan );
+    });
+    const sub2 = modalRef.componentInstance.onLookupResultApply.subscribe( (data: LookupResultItem) => {
+      let modalIsClosed = false;
+      if (data.ModalRaumUuid !== this.raum.uuid) {
+        modalRef.close();
+        modalIsClosed = true;
+        alert('Fehler: Raumangabe in Hauptfenster und Dialog stimmen nicht mehr überein!\n' +
+          'ModalRaumUuid: ' + data.ModalRaumUuid + '\n' +
+          'Main-Raum-UUID: ' + this.raum.uuid);
+        return;
+      }
+
+      if (modalRef.componentInstance.closeOnApplyBarcode) {
+        modalRef.close();
+        modalIsClosed = true;
+      }
+
+      if (data.result.lookupResultTable === LookupResultTable.Inventar) {
+
+        const inventarData: InventarData = {
+          inventar: data.result.inventar,
+          artikelRef: data.result.artikelRef,
+          artikelData: data.result.artikelData
+        };
+        this.assignInventarToRaum(inventarData)
+          .then( () => {
+            this.playSuccess();
+            if (!modalIsClosed && modalRef && modalRef.componentInstance) {
+              modalRef.componentInstance.showBlobAlertSuccess();
+              modalRef.componentInstance.setAssignedInventar(data.barcode);
+            }
+          })
+          .catch( (reason) => {
+            this.playError();
+            if (!modalIsClosed && modalRef && modalRef.componentInstance) {
+              modalRef.componentInstance.showBlobAlertError();
+            }
+          });
+      }
+    });
+
+
+    modalRef.result.then( () => {
+      sub.unsubscribe();
+      sub2.unsubscribe();
+    }, () => {});
   }
 
   getModalRefByName(name: string): NgbModalRef {
@@ -818,14 +913,15 @@ export class InventFormComponent implements OnInit, OnDestroy {
           isOpen: false
         };
       }
-      console.log('InventFormComponente #635 After dismiss resolved: ', this.currentModal, this.currentModals);
     })
       .catch( (err) => {
         if (name === 'SelectCreateRaum') {
           this.openedCreateRaum = false;
         }
         this.currentModals = this.currentModals.filter( mod => undefined !== mod.modalRef.componentInstance);
-        console.error('InventFormComponente #642 Error on Closing Modal ', { mName, err} );
+        if (typeof err !== 'string' || err.indexOf('Cross click') === -1) {
+          console.error('InventFormComponente #902 Error on Closing Modal ', {mName, err});
+        }
         if (this.currentModals.length) {
           this.currentModal = this.currentModals[ this.currentModals.length - 1];
         } else {
@@ -840,7 +936,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
   }
 
   openSelectCreateArtikel(settings: any = null): SelectCreateArtikelComponent {
-    const modalRef = this.modalService.open(SelectCreateArtikelComponent);
+    const modalRef = this.modalService.open(SelectCreateArtikelComponent, { size: 'xl', scrollable: true } );
     this.modalWatch(modalRef, 'SelectCreateArtikel');
     modalRef.componentInstance.name = 'World';
     modalRef.componentInstance.clientId = this.clientID;
@@ -859,7 +955,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
   }
 
   openSelectSearchArtikel() {
-    const modalRef = this.modalService.open(SelectSearchArtikelComponent);
+    const modalRef = this.modalService.open(SelectSearchArtikelComponent, { size: 'xl', scrollable: true } );
     this.modalWatch(modalRef, 'SelectSearchArtikel');
     modalRef.componentInstance.clientId = this.clientID;
     modalRef.componentInstance.artikelSelected.subscribe((item: ArtikelOption) => {
@@ -873,7 +969,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
   }
 
   openSelectSearchRaum() {
-    const modalRef = this.modalService.open(SelectSearchRaumComponent);
+    const modalRef = this.modalService.open(SelectSearchRaumComponent, { size: 'xl', scrollable: true } );
     this.modalWatch(modalRef, 'SelectSearchRaum');
     modalRef.componentInstance.gebaeudeId = this.buildingID;
     modalRef.componentInstance.raumSelected.subscribe( (raum: DBDIRaeume) => {
@@ -886,7 +982,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
   }
 
   openEditRaum() {
-    const modalRef = this.modalService.open(EditRaumComponent);
+    const modalRef = this.modalService.open(EditRaumComponent, { size: 'xl', scrollable: true } );
     this.modalWatch(modalRef, 'EditRaum');
     modalRef.componentInstance.raumUuid = this.roomUuiD;
     modalRef.componentInstance.raumChanged.subscribe( (raum: DBDIRaeume) => {
@@ -898,7 +994,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
   }
 
   openEditInventar() {
-    const modalRef = this.modalService.open(EditInventarComponent);
+    const modalRef = this.modalService.open(EditInventarComponent, { size: 'xl', scrollable: true } );
     this.modalWatch(modalRef, 'EditInventar');
     console.log('InventFormComponente #715 this.inventarData ' + this.inventarData.inventar.uuid);
     modalRef.componentInstance.inventarUuid = this.inventarData.inventar.uuid;
@@ -913,7 +1009,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
   }
 
   openSelectCreateRaum() {
-    const modalRef = this.modalService.open(SelectCreateRaumComponent);
+    const modalRef = this.modalService.open(SelectCreateRaumComponent, { size: 'xl', scrollable: true } );
     this.modalWatch(modalRef, 'SelectCreateRaum');
     this.openedCreateRaum = true;
     modalRef.componentInstance.gebaeudeId = this.buildingID;
@@ -951,7 +1047,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
         gebaeude: this.gebaeude
       });
     }
-    const modalRef = this.modalService.open( GesamtListRestComponent );
+    const modalRef = this.modalService.open( GesamtListRestComponent, { size: 'xl', scrollable: true } );
     this.modalWatch(modalRef, 'GesamtListRest');
     modalRef.componentInstance.gebaeude = gebaeude;
     modalRef.componentInstance.raumSelected.subscribe( (ruuid: string) => {
@@ -964,7 +1060,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
 
   openRaumListDone(useRaum?: DBDIRaeume) {
     const raum = useRaum || this.raum;
-    const modalRef = this.modalService.open( RaumListDoneComponent );
+    const modalRef = this.modalService.open( RaumListDoneComponent, { size: 'xl', scrollable: true } );
     this.modalWatch(modalRef, 'RaumListDone');
     modalRef.componentInstance.raum = raum;
     modalRef.componentInstance.requestRestList.subscribe( (r: DBDIRaeume) => {
@@ -974,7 +1070,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
 
   openRaumListRest(useRaum?: DBDIRaeume) {
     const raum = useRaum || this.raum;
-    const modalRef = this.modalService.open( RaumListRestComponent );
+    const modalRef = this.modalService.open( RaumListRestComponent, { size: 'xl', scrollable: true } );
     this.modalWatch(modalRef, 'RaumListRest');
     modalRef.componentInstance.raum = raum;
     modalRef.componentInstance.requestDoneList.subscribe( (r: DBDIRaeume) => {
@@ -1049,10 +1145,19 @@ export class InventFormComponent implements OnInit, OnDestroy {
 
   onBarcodeInput(): void {}
 
+  bcTrimZero(barcode: string) {
+    barcode = barcode.trim();
+    while (barcode.charAt(0) === '0') {
+      barcode = barcode.substr(1).trim();
+    }
+    return barcode;
+  }
+
   async handleScanData(event: ScanDetectData) {
+    event.barcode = this.bcTrimZero(event.barcode);
+
     if (this.kunde.mid === 5 && event.barcode.length > 10) {
-      const bcFirstChr = event.barcode.substr(0, 1);
-      if (bcFirstChr !== 'A' && bcFirstChr !== 'R') {
+      if (!event.barcode.startsWith('A') && !event.barcode.startsWith('R')) {
         event.barcode = event.barcode.substr(0, 10);
       }
     }
@@ -1287,17 +1392,30 @@ export class InventFormComponent implements OnInit, OnDestroy {
   // dummy
   simulateScanner() {
 
-    if (!this.inputSimulateBarcode.nativeElement.value) {
-      this.inputSimulateBarcode.nativeElement.value = 'A-1-3-1-78eae45';
+    if (!this.inputSimulateBarcode
+      || !this.inputSimulateBarcode.nativeElement
+      || !this.inputSimulateBarcode.nativeElement.value
+      || !(typeof this.inputSimulateBarcode.nativeElement.value === 'string')
+    ) {
+      return;
     }
-    const s = this.inputSimulateBarcode.nativeElement.value;
+    const input = this.inputSimulateBarcode.nativeElement.value;
+    const s = input.replace('\r\n', '\n').replace('\r', '\n');
     for (const character of s) {
-    // for (let i = 0; i < s.length; i++) {
-      const shiftKey = (s !== s.toLowerCase() && s === s.toUpperCase());
-      if (shiftKey) {
-        const shift = new KeyboardEvent('keydown', {bubbles : true, cancelable : true,
+      let key = character;
+      let shiftKey = false;
+
+      if (character === '\t') {
+        key = 'Tab';
+
+      } else if (character === '\n') {
+        key = 'Enter';
+
+      } else if (character !== character.toLowerCase() && character === character.toUpperCase()) {
+        shiftKey = true;
+        const shiftEvent = new KeyboardEvent('keydown', {bubbles : true, cancelable : true,
           key : 'Shift', code: 'ShiftLeft', shiftKey });
-        document.dispatchEvent( shift );
+        document.dispatchEvent( shiftEvent );
       }
       const e = new KeyboardEvent('keydown', {bubbles : true, cancelable : true, key : character, shiftKey });
       setTimeout(() => document.dispatchEvent(e));

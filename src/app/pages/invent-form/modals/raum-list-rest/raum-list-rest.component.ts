@@ -4,7 +4,7 @@ import {InventarService} from '../../data-services/inventar.service';
 import {InventarData} from '../../../../shared/services/data.service';
 import {NgbActiveModal} from '@ng-bootstrap/ng-bootstrap';
 import {BasedataService} from '../../../../shared/services/basedata.service';
-import { faSignOutAlt } from '@fortawesome/free-solid-svg-icons';
+import { faSignOutAlt, faExchangeAlt } from '@fortawesome/free-solid-svg-icons';
 
 interface RaumInventarRest {
   mcuuid: string;
@@ -23,6 +23,7 @@ export class RaumListRestComponent implements OnInit {
   @Output() requestDoneList = new EventEmitter<DBDIRaeume>();
 
   faSignOutAlt = faSignOutAlt;
+  faExchangeAlt = faExchangeAlt;
 
   inventarListRest: RaumInventarRest[] = [];
   inventarListGrouped: RaumInventarRest[] = [];
@@ -45,6 +46,10 @@ export class RaumListRestComponent implements OnInit {
 
   set raum(raum: DBDIRaeume) {
     this.raumDaten = raum;
+    if (raum === null || raum === undefined || (typeof raum === 'object' && !('uuid' in raum))) {
+      // Do Nothing
+      return;
+    }
     this.loadInventarByRuuid(raum.uuid).then( () => {
       this.setPage(1);
     });

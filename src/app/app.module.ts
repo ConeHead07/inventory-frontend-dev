@@ -55,6 +55,7 @@ import { AuthGuardService as AuthGuard } from './pages/auth/auth-guard.service';
 import { ImageboxComponent } from './pages/invent-form/modals/imagebox/imagebox.component';
 import { ShowRaumImageComponent } from './pages/invent-form/modals/show-raum-image/show-raum-image.component';
 import { CreateRaumImageComponent } from './pages/invent-form/modals/create-raum-image/create-raum-image.component';
+import { BatchBarcodesComponent } from './pages/invent-form/modals/batch-barcodes/batch-barcodes.component';
 
 const appRoutes: Routes = [
   { path: '', component: AuthComponent },
@@ -102,7 +103,7 @@ persist();
     DbsyncComponent,
     SettingsComponent,
     EditRaumComponent
-    , EditInventarComponent, ImageboxComponent, ShowRaumImageComponent, CreateRaumImageComponent
+    , EditInventarComponent, ImageboxComponent, ShowRaumImageComponent, CreateRaumImageComponent, BatchBarcodesComponent
 ],
   imports: [
     BrowserModule,

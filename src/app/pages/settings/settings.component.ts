@@ -6,9 +6,8 @@ import {DBDIVariables} from '../../shared/interfaces/dexie.interfaces';
 import {DexieService} from '../../shared/services/dexie.service';
 import {SoundsService} from '../../shared/services/sounds.service';
 import {ScanDetectData} from '../../shared/components/scannerdetection/scannerdetection.component';
-import Dexie from "dexie";
-import {Router} from "@angular/router";
-
+import Dexie from 'dexie';
+import {Router} from '@angular/router';
 
 @Component({
   selector: 'app-settings',
@@ -36,7 +35,6 @@ export class SettingsComponent implements OnInit {
     private router: Router) {
     this.dbName = this.dexieService.name;
     this.dbVersion = this.dexieService.verno;
-
   }
 
   ngOnInit() {

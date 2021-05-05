@@ -12,8 +12,8 @@ import {DexieService} from '../../../../shared/services/dexie.service';
 import {NgbActiveModal} from '@ng-bootstrap/ng-bootstrap';
 import {ImagesService} from '../../data-services/images.service';
 import {DomSanitizer, SafeUrl} from '@angular/platform-browser';
-import {VariablesService} from "../../../../shared/services/variables.service";
-import {ToastrService} from "ngx-toastr";
+import {VariablesService} from '../../../../shared/services/variables.service';
+import {ToastrService} from 'ngx-toastr';
 
 enum HtmlImageLoadingStatus {
   Pending,

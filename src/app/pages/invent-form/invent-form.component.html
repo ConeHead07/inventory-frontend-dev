@@ -272,9 +272,23 @@
             <span class="input-group-text">Bild</span>
           </div>
           <div class="input-group-append">
-            <button type="button" class="btn btn-info"    *ngIf="artikelImageExists" (click)="openShowArtikelImage()"><fa-icon [icon]="faImage"></fa-icon> anzeigen</button>
-            <button type="button" class="btn btn-success" *ngIf="artikelImageExists" [disabled]="!formInventar.gcuuid" (click)="openEditArtikelImage()"><fa-icon [icon]="faCamera"></fa-icon> bearbeiten </button>
-            <button type="button" class="btn btn-success" *ngIf="!artikelImageExists" [disabled]="!formInventar.gcuuid" (click)="openCreateArtikelImage()"><fa-icon [icon]="faCamera"></fa-icon> anlegen </button>
+            <button type="button" class="btn btn-info"
+                    *ngIf="artikelImageExists"
+                    (click)="openShowArtikelImage()"><fa-icon [icon]="faImage"></fa-icon>
+              <span class="d-none d-md-inline"> anzeigen </span>
+            </button>
+            <button type="button" class="btn btn-success"
+                    *ngIf="artikelImageExists"
+                    [disabled]="!formInventar.gcuuid"
+                    (click)="openEditArtikelImage()"><fa-icon [icon]="faEdit"></fa-icon>
+              <span class="d-none d-md-inline"> bearbeiten </span>
+            </button>
+            <button type="button" class="btn btn-success"
+                    *ngIf="!artikelImageExists"
+                    [disabled]="!formInventar.gcuuid"
+                    (click)="openCreateArtikelImage()"><fa-icon [icon]="faCamera"></fa-icon>
+              <span class="d-none d-md-inline"> anlegen </span>
+            </button>
           </div>
         </div>
 
@@ -283,7 +297,8 @@
             <div class="input-group-text" id="btnGroupAddon2">Kunst</div>
           </div>
           <div class="input-group-append">
-            <button type="button" class="btn btn-dark" (click)="createKunstwerk()">anlegen</button>
+            <button type="button" class="btn btn-dark" (click)="createKunstwerk()"><fa-icon [icon]="faPlus"></fa-icon>
+              <span class="d-none d-md-inline"> anlegen </span></button>
           </div>
         </div>
       </div>
@@ -306,18 +321,26 @@
 <div [hidden]="!manualBCInputEnabled">
   <h5>Barcode-Scanning Test</h5>
   <div class="row">
-  <div class="col">
-    <h6>Scanner Simulator</h6>
-    <textarea #inputSimulateBarcode></textarea><br>
-    <button (click)="simulateScanner()">Barcode senden</button><br>
+    <div class="col">
+      <h6>Scanner Simulator</h6>
+      <textarea class="scanner-detect-ignore" #inputSimulateBarcode></textarea><br>
+      <button (click)="simulateScanner()">Barcode senden</button><br>
+    </div>
+    <div class="col">
+      <app-scannerdetection (scanned)="handleScanData($event)" [config]="scanDetectorConfig">
+        <h6>Scan-Detector Barcode</h6>
+        <textarea #input2 [ngClass]="lastScanDetectClass"></textarea><br>
+        (Zeit: {{ lastScanDetectTime | date:'hh:mm:ss' }})
+      </app-scannerdetection>
+    </div>
+    <div class="d-none">{{ formInventar | json }}</div>
   </div>
-  <div class="col">
-    <app-scannerdetection (scanned)="handleScanData($event)" [config]="scanDetectorConfig">
-      <h6>Scan-Detector Barcode</h6>
-      <textarea #input2 [ngClass]="lastScanDetectClass"></textarea><br>
-      (Zeit: {{ lastScanDetectTime | date:'hh:mm:ss' }})
-    </app-scannerdetection>
+  <div class="row">
+    <div class="col-12">
+      <textarea style="height:90vh;width:90vw" class="bcRawInput" #rawInputBarcodes></textarea><br>
+    </div>
   </div>
-  <div class="d-none">{{ formInventar | json }}</div>
 </div>
-</div>
+
+<audio *ngIf="beepSuccessSrc" id="beepSuccess" [src]="beepSuccessSrc" autoPlay="autoplay" [muted]="'muted'"></audio>
+<audio *ngIf="beepErrorSrc" id="beepError" [src]="beepErrorSrc" autoPlay="autoplay" [muted]="'muted'"></audio>

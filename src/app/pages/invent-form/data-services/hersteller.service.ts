@@ -70,13 +70,12 @@ export class HerstellerService {
       created_jobid: jobid
     };
 
-    await this.dexie.hersteller.add(item)
+    return this.dexie.hersteller.add(item)
       .then( insertUuid => insertUuid)
       .catch( reason => {
         console.error(reason, 'HerstellerService.create #75', { item });
         return '';
       });
-    return uuid;
   }
 
   async createAndGetData(name: string): Promise<DBDIHersteller> {

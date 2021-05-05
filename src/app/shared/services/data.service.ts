@@ -5,7 +5,7 @@ import {
   DBDIGebaeude, DBDIHersteller, DBDIImages,
   DBDIInventar,
   DBDIInventuren, DBDIInventurenGebaeude,
-  DBDIInventurenUser,
+  DBDIInventurenUser, DBDIInventurenUserStatus,
   DBDIMandanten, DBDIObjektbuchBarcodesLookup,
   DBDIObjektKatalogGlobal, DBDIObjektKatalogImages,
   DBDIObjektKatalogMandant,
@@ -26,7 +26,7 @@ import Dexie, {IndexableType } from 'dexie';
 import {DBSyncClientService, SyncJobResult} from './dbsync-client.service';
 import {BarcodeService} from '../../pages/invent-form/data-services/barcode.service';
 import {DbsyncLogService} from './dbsync-log.service';
-import {Subscription} from "rxjs";
+import {Subscription} from 'rxjs';
 
 export interface LoadApiDataResult {
   success: boolean;
@@ -272,7 +272,9 @@ export class DataService implements OnDestroy {
           return Promise.all(list.map((item: DBDIInventuren) => db.inventuren.put(item)));
         }),
 
-      api.get<DBDIInventurenGebaeude[]>( 'api/inventur/inventurenGebaeudeByAuthUser').toPromise()
+      api.get<DBDIInventurenGebaeude[]>( 'api/inventur/inventurenGebaeudeByAuthUser').toPromise(),
+
+      api.get<DBDIInventurenUserStatus[]>( 'api/inventur/inventurenStatusByAuthUser').toPromise()
 
     ])
       .then( async (results) => {
@@ -504,7 +506,7 @@ export class DataService implements OnDestroy {
     this.dexie.stopChangeLogForImport( true );
     if (reset) {
       syncLogMsg( 'Reset: Daten werden für kompletten Neu-Import zurückgesetzt!');
-      console.log('#352 loadInventurDataByInventurId');
+      console.log('DataService.loadInventurDataByInventurId(', jobid, reset, ')  #473');
       const numRaeume = await this.dexie.raeume.where( { for_jobid: jobid}).count().catch( (reason) => {
         console.error('#354 ', { reason });
       });
