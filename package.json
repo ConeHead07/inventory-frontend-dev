@@ -7,7 +7,7 @@
     "startssl": "ng serve --aot --port 4235 --host inventory.local --disable-host-check --ssl true --sslCert=./ssl/localhost.crt --sslKey=./ssl/localhost.key --open",
     "startssl_test": "ng serve --host inventory.local --publicHost inventory.local:4200/sockjs-node --disable-host-check --ssl true --sslCert=./ssl/localhost.crt --sslKey=./ssl/localhost.key",
     "prebuild": "yarn version --patch",
-    "build": "yarn run prebuild && ng build",
+    "build": "ng build",
     "build-prod": "ng build --output-path=dist/prod --configuration=production",
     "build-rc": "ng build --output-path=dist/rc --configuration=rc",
     "build-dev": "ng build --output-path=dist/dev --configuration=dev",
