@@ -18,8 +18,8 @@ import {VariablesService} from '../../../../shared/services/variables.service';
 import {
   InventoryProgress,
   InventoryProgressService
-} from "../../../../shared/inventory-progress/inventory-progress.service";
-import {InventarService} from "../../data-services/inventar.service";
+} from '../../../../shared/inventory-progress/inventory-progress.service';
+import {InventarService} from '../../data-services/inventar.service';
 
 export interface ScannerBarcodeData {
   barcode?: string;
@@ -55,10 +55,7 @@ export class BatchBarcodesComponent implements OnInit, OnDestroy {
   faCheck = faCheck;
   faRemove = faTrashAlt;
 
-  typeofLookupInventar = bcLookupTyp[bcLookupTyp.Inventar];
-  typeofLookupRaum = bcLookupTyp[bcLookupTyp.Raum];
-  typeofLookupArtikel = bcLookupTyp[bcLookupTyp.Artikel];
-  typeofLookupNeu = bcLookupTyp[bcLookupTyp.Neu];
+  bcLookupTypInventar = bcLookupTyp.Inventar;
 
   onScan = new EventEmitter<ScannerBarcodeData>();
   onLookupResultApply = new EventEmitter<LookupResultItem>();
@@ -243,7 +240,7 @@ export class BatchBarcodesComponent implements OnInit, OnDestroy {
         if (result.raum.Etage) {
           bezeichnung += ' :: ' + result.raum.Etage;
         }
-        bezeichnung = (result.gebaeude.Gebaeude || result.gebaeude.Adresse);
+        bezeichnung += '::' + (result.gebaeude.Gebaeude || result.gebaeude.Adresse);
         bcObjectType = bcLookupTyp.Raum;
         bcObjectInfos = bezeichnung;
 
@@ -350,18 +347,19 @@ export class BatchBarcodesComponent implements OnInit, OnDestroy {
   }
 
   addHistoryResult(result: LookupResultItem): number {
-    if (result) {
-      this.scanResultHistory.unshift(result);
-      while (this.scanResultHistory.length > 10) {
-        this.scanResultHistory.pop();
-      }
-    }
+    this.scanResultHistory.push(result);
     return this.scanResultHistory.length;
   }
 
   removeResult(result: any): void {
     this.scanResultHistory = this.scanResultHistory.filter( r => r !== result);
     console.log('remove Result', { result });
+    // alert(JSON.stringify(result));
+  }
+
+  removeByBarcode(barcode: string): void {
+    this.scanResultHistory = this.scanResultHistory.filter( r => r.barcode !== barcode);
+    console.log('remove Result by Barcode', barcode);
     // alert(JSON.stringify(result));
   }
 

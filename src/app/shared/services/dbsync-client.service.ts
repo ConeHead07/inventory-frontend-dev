@@ -265,11 +265,10 @@ export class DBSyncClientService implements OnDestroy {
   private fullImportJobid = 0;
   private currentJobSyncStatus: CurrentJobSyncStatus;
   private subscriptionClientLogsChanged: Subscription;
-  private dbgLog = false;
+  private isInDebugMode = false;
   private subscriptionNetworkChanged: Subscription;
   private aLastServerChangesByJobid: ServerChangesStatusInfoCache[] = [];
   private serverChangesCacheLifetime = 60 * 1000;
-  private isInDebugMode = false;
   private appVersion = environment.appVersion;
 
   @Output() autoSyncChange = new EventEmitter<boolean>();
@@ -310,6 +309,18 @@ export class DBSyncClientService implements OnDestroy {
     this.subscriptionClientLogsChanged.unsubscribe();
   }
 
+  enableLogging() {
+    this.isInDebugMode = true;
+  }
+
+  disableLogging() {
+    this.isInDebugMode = false;
+  }
+
+  isLoggingEnabled() {
+    return this.isInDebugMode;
+  }
+
   initCurrentJobSyncStatus() {
     this.currentJobSyncStatus = {
       jobid: 0,
@@ -341,20 +352,18 @@ export class DBSyncClientService implements OnDestroy {
     }
 
     // Sync im 1-Minuten-Takt
-    if (this.dbgLog) {
+    if (this.isInDebugMode) {
       console.log(logTi + (new Date()).toTimeString() + ' setInterval this.sync, ' + this.syncIntervalTime + 'ms');
     }
     const syncFunction = this.sync.bind(this);
     this.syncIntervalTimer = setInterval( () => {
-      if (this.dbgLog) {
-        console.log(logTi + (new Date()).toTimeString() + ' interval execute this.sync.bind');
-      }
+      console.log(logTi + (new Date()).toTimeString() + ' interval execute this.sync.bind');
       syncFunction();
     }, this.syncIntervalTime);
     this.autoSyncChange.emit( true );
 
     if (startNow) {
-      if (this.dbgLog) {
+      if (this.isInDebugMode) {
         console.log(logTi + (new Date()).toTimeString() + ' startNow before interval starts in ' + this.syncIntervalTime + 'ms');
       }
       this.sync();
@@ -373,40 +382,36 @@ export class DBSyncClientService implements OnDestroy {
 
   async sync() {
     const logTi = 'DbsyncClientService.sync()';
+    const currJobId = this.baseData.getCurrentJobid();
+    console.log(logTi + ' #385 STARTED with jobid: ', currJobId, (new Date()).toLocaleString());
     if (!this.networkService.getCurrentState().hasServerAccess) {
+      console.error(logTi + ' #388 ABORTED NO-SERVER-ACCESS');
       return;
     }
     const isDBSyncService = (this instanceof DBSyncClientService);
-    if (this.isInDebugMode) {
-      console.log(logTi + ' #376 this is DBSyncClientService', { isDBSyncService });
-    }
+
     if (!isDBSyncService) {
       console.error(logTi + ' #379 this is not correct binded to Instance of DBSyncClientService');
       return;
     }
 
-    const currJobId = this.baseData.getCurrentJobid();
-    console.log('DBSyncClientService.sync() #366 currJobId:', currJobId);
     if (this.isInDebugMode) {
-      console.log('DBSyncClientService.sync() #368 call getIncompleteInventuren()');
+      console.log(logTi + ' #368 call getIncompleteInventuren()');
     }
     let incompleteInventurLogs = await this.getIncompleteInventuren();
 
     const currJobIdx = incompleteInventurLogs.map( itm => itm.jobid ).indexOf( currJobId );
-    if (this.isInDebugMode) {
-      console.log('DBSyncClientService.sync() #374 currJobIdx: ', currJobIdx);
-    }
 
     if (currJobIdx !== -1) {
-      if (this.isInDebugMode) {
-        console.log('DBSyncClientService.sync() #379');
-      }
+      console.log(logTi + ' #406 Found Changes for currJobId ', currJobId);
       const currJob = incompleteInventurLogs[ currJobIdx ];
       incompleteInventurLogs = incompleteInventurLogs.slice( currJobIdx, 1);
       if (this.isInDebugMode) {
         console.log('DBSyncClientService.sync() #384 call sendByJobId(', currJob.jobid, currJob.changes, ')');
       }
       await this.sendByJobId( currJob.jobid, currJob.changes);
+    } else {
+      console.log(logTi + ' #414 Found No Changes for currJobId ', currJobId);
     }
 
     for (const logs of incompleteInventurLogs) {
@@ -457,6 +462,7 @@ export class DBSyncClientService implements OnDestroy {
         {})
       .toPromise()
       .then(async (data) => {
+        this.refreshServerChangeCache(jobid, data);
         if ( ('errorMsg' in data) && data.errorMsg) {
           console.error( data.errorMsg );
           return { success: false };
@@ -465,7 +471,7 @@ export class DBSyncClientService implements OnDestroy {
       });
   }
 
-  async refreshServerChangeCache(jobid, timestamp, data): Promise<void> {
+  async refreshServerChangeCache(jobid, data): Promise<void> {
     const sc = this.aLastServerChangesByJobid.find( ch => ch.jobid === jobid);
     if (sc) {
       sc.timestamp = Date.now();
@@ -528,7 +534,7 @@ export class DBSyncClientService implements OnDestroy {
     const logTi = 'DbsyncClientService.sendByJobId(' + useJobid +
       ', logs[' + (Array.isArray(useLogs) ? useLogs.length : 0) + '], ' +
       (typeof useJobResult) + ')';
-    console.log(logTi + ' #448 at ', (new Date()).toLocaleTimeString());
+    console.log(logTi + ' #537 STARTED at ', (new Date()).toLocaleTimeString());
     this.clearFinishedProcesses();
     const jobid = useJobid;
     const syncJobResult = useJobResult || new SyncJobResult(jobid);
@@ -545,6 +551,7 @@ export class DBSyncClientService implements OnDestroy {
     this.processes.push(syncJobResult);
 
     if (this.getFullImportJobId() === useJobid ) {
+      console.error(logTi + ' #554 ABORT, FullImport is running at ', (new Date()).toLocaleTimeString());
       return this.finishProcess(
         syncJobResult,
         SyncJobStatus.AlreadyStarted,
@@ -553,15 +560,16 @@ export class DBSyncClientService implements OnDestroy {
     }
 
     if (!this.networkService.hasServerAccess) {
+      console.error(logTi + ' #554 ABORT, No-Server-Access ', (new Date()).toLocaleTimeString());
       return this.finishProcess(
         syncJobResult,
         SyncJobStatus.Offline,
-        'Synchronisatioon wurde abgebrochen wegen fehlender Serververbindung!'
+        'Synchronisation wurde abgebrochen wegen fehlender Serververbindung!'
       );
     }
 
     if (this.isInDebugMode) {
-      console.log(`DbsyncClientServer.sendByJobId(${jobid}) #525 call askServerForChanges`, (new Date()).toString());
+      console.log(logTi + ` #572 call askServerForChanges`, (new Date()).toString());
     }
     const ServerInfo = await this.askServerForChanges();
 
@@ -582,9 +590,7 @@ export class DBSyncClientService implements OnDestroy {
     }
 
     if (!useLogs && !ServerInfo.NumChanges) {
-      if (this.isInDebugMode) {
-        console.log(`DBSyncClientService.sendByJobId(${jobid}) #556; Abbruch. Keine Änderungen!`);
-      }
+      console.log(logTi + ' #596 ABORT, No Client and No Server-Changes ', (new Date()).toLocaleTimeString());
       return this.finishProcess(syncJobResult, SyncJobStatus.AbortedEmptyChangeLogs);
     }
     let logs = useLogs;
@@ -593,9 +599,6 @@ export class DBSyncClientService implements OnDestroy {
     syncJobResult.committedIds = logs.map<number>((itm) => itm.id);
 
     // ASK for Server-Changes
-    if (this.isInDebugMode) {
-      console.log(`DBSyncClientService.sendByJobId(${jobid}) #567`);
-    }
     this.processingJobids.push(jobid);
     this.processes.push(syncJobResult);
 
@@ -809,6 +812,7 @@ export class DBSyncClientService implements OnDestroy {
                     console.log(`DBSyncClientService.sendByJobId(${jobid}) DELETE #749 ${ci}/${chgLen}` +
                       ' table ' + chg.table + ' by uuid ' + chg.uuid );
                   }
+                  this.dexieService.preventDeleteSyncLog(chg.table, chg.uuid);
                   await this.dexieService.table(chg.table)
                     .where({uuid: chg.uuid})
                     .delete();

@@ -54,6 +54,8 @@ export class DexieService extends Dexie {
   nextDbVersion = 0;
   stopClientLogForServerLoad = false;
 
+  aPreventDeleteLogs: { table: string, uuid: string, time: number }[] = [];
+
   constructor(private syncClient: DexieSyncClientService, private baseData: BasedataService) {
     super( database );
     this.nextDbVersion = this.dbVersion + 1;
@@ -288,6 +290,14 @@ export class DexieService extends Dexie {
       'objektKatalogImages',
       'raeume'
     ];
+    validLogTables.forEach( (name) => {
+      console.log('DexieService #292 validLogTable '
+        + name +
+        ' primKey.keyPath: ' +
+        this.table( name ).schema.primKey.keyPath,
+        this.table( name ).schema.primKey.keyPath === 'uuid',
+        typeof this.table( name ).schema.primKey.keyPath);
+    });
 
     let lastClientChangeLogTimestamp = 0;
     const lastClientChangeLogDelay = 2000;
@@ -312,7 +322,7 @@ export class DexieService extends Dexie {
     };
 
     this.on( 'changes', (changes, partial) => {
-      // console.log('#145 dexie.service on changes: changes.length', changes.length, partial, { changes});
+      console.log('#315 dexie.service on changes: changes.length: ', changes.length, 'partial: ', partial, { changes});
       changes.forEach( (change: IDatabaseChange) => {
         if (change.table === 'clientChangeLog') {
           if (change.type === DatabaseChangeType.Update && !('sync_done' in change.mods)) {
@@ -338,27 +348,58 @@ export class DexieService extends Dexie {
     });
   }
 
+  preventDeleteSyncLog(table: string, uuid: string) {
+    this.aPreventDeleteLogs.push({ table, uuid, time: Date.now() });
+  }
+
   async addChangeLog(change: IDatabaseChange) {
     const logFlag = this.getChangeLogFlag(change);
-    // if (log === undefined || !log) {
-    //   console.log('#152 addChangeLog Skip DB-Change-Logging - No Log-Flag', { change });
-    //   return;
-    // }
+    const changeType = change.type;
+    const changeTable = change.table;
+    const changeKey = change.key;
     const logPrefix = 'DexieService.addChangeLog(change[' + change.table + ',' + change.type + ',' + change.key + '] ';
-    console.log(logPrefix + '#322');
-    if (logFlag !== undefined && logFlag !== null && logFlag === false) {
-      console.log(logPrefix + '#324 ABORT log:', logFlag, {change});
-      return;
-    }
-    let uuid = this.getChangeLogUuid(change);
+    const isInDebugMode = false;
 
-    if (change.type !== 3) {
-      const obj: any = await this.table( change.table ).get( change.key );
-      uuid = ('uuid' in obj) ? obj.uuid : '';
-
-      delete obj.log;
-      await this.table( change.table ).put( obj, change.key);
+    if (changeType < 3 && 'obj' in change && 'log' in (change as any).obj) {
+      // If Log-Flag is set, reset log-Setting for next Operation of this record
+      const objWithoutLog = (change as any).obj;
+      delete objWithoutLog.log;
+      await this.table( changeTable ).put(objWithoutLog, changeKey).catch( (err) => {
+        console.error(err, logPrefix + '#368 ', { objWithoutLog });
+      });
+      if (logFlag === false) {
+        console.log(logPrefix + '#324 ABORT log:', logFlag, {change});
+        return;
+      }
     }
+    if (change.type === 3) {
+      if (this.aPreventDeleteLogs.length > 0) {
+        const preventLogs = this.aPreventDeleteLogs.find( (item) => {
+          return item.table === changeTable && item.uuid === changeKey;
+        });
+        this.aPreventDeleteLogs = this.aPreventDeleteLogs.filter((item) => {
+          return item.time > Date.now() - (1000 * 60 * 2);
+        });
+        if (preventLogs) {
+          this.aPreventDeleteLogs = this.aPreventDeleteLogs.filter((item) => {
+            return item.table !== changeTable && item.uuid !== changeKey;
+          });
+          return;
+        }
+      }
+      if (changeTable === 'inventurenUserStatus') {
+        // Do not log
+        return;
+      }
+    }
+    if (change.type === 2) {
+      const updateChange = change as IUpdateChange;
+      const changeCols: string[] = Object.keys( updateChange.mods );
+      if ( 1 === changeCols.length && 'log' in changeCols) {
+        return;
+      }
+    }
+    const uuid = (this.table( changeTable ).schema.primKey.keyPath === 'uuid') ? change.key : '';
 
     const chlog = {
       timestamp: new Date(),
@@ -379,29 +420,8 @@ export class DexieService extends Dexie {
         if ('log' in change.obj) {
           delete change.obj.log;
         }
+
         chlog.obj = change.obj;
-        switch (change.table) {
-          case 'objektKatalogGlobal':
-            if (!('huuid' in chlog.obj)) {
-              chlog.obj.huuid = this.getChangeLogProp<string>(change, 'huuid');
-            }
-            break;
-
-          case 'objektKatalogMandant':
-            if (!('gcuuid' in chlog.obj)) {
-              chlog.obj.gcuuid = this.getChangeLogProp<string>(change, 'gcuuid');
-            }
-            break;
-
-          case 'inventar':
-            if (!('mcuuid' in chlog.obj)) {
-              chlog.obj.mcuuid = this.getChangeLogProp<string>(change, 'mcuuid');
-            }
-            if (!('ruuid' in chlog.obj)) {
-              chlog.obj.ruuid = this.getChangeLogProp<string>(change, 'ruuid');
-            }
-            break;
-        }
         break;
 
       case DatabaseChangeType.Update:
@@ -410,49 +430,43 @@ export class DexieService extends Dexie {
         if ('log' in chlog.mods) {
           delete chlog.mods.log;
         }
-
-        switch (change.table) {
-          case 'objektKatalogGlobal':
-            if (!('huuid' in chlog.mods)) {
-              chlog.mods.huuid = this.getChangeLogProp<string>(change, 'huuid');
-            }
-            if (!('hid' in chlog.mods)) {
-              chlog.mods.hid = this.getChangeLogProp<number>(change, 'hid');
-            }
-            break;
-
-          case 'objektKatalogMandant':
-            if (!('gcuuid' in chlog.mods)) {
-              chlog.mods.gcuuid = this.getChangeLogProp<string>(change, 'gcuuid');
-            }
-            if (!('gcid' in chlog.mods)) {
-              chlog.mods.gcid = this.getChangeLogProp<number>(change, 'gcid');
-            }
-            break;
-
-          case 'inventar':
-            if (!('mcuuid' in chlog.mods)) {
-              chlog.mods.mcuuid = this.getChangeLogProp<string>(change, 'mcuuid');
-            }
-            if (!('ruuid' in chlog.mods)) {
-              chlog.mods.ruuid = this.getChangeLogProp<string>(change, 'ruuid');
-            }
-            break;
-
-          default:
-            // Nothing
+        if (!Object.keys(change.mods).length) {
+          return;
         }
+        const contentCols = Object.keys(change.mods).filter( (col, idx) => {
+          const noContentCols = [ 'log', 'modified_at', 'modified_uid', 'modified_device_id', 'modified_jobid' ];
+          const isContent = noContentCols.indexOf(col) === -1 &&
+            change.mods[col] !== undefined &&
+            change.mods[col] !== null
+            ;
+          if (isInDebugMode) {
+            const indexOfNoContent = noContentCols.indexOf(col);
+            console.log('DexieService.addChangeLog() #421 contentCols filter ',
+              { col, idx, indexOfNoContent, isContent });
+          }
+          return isContent;
+        });
+
+        if (isInDebugMode && contentCols.length === 0) {
+          console.log('DexieService.addChangeLog() #430 no contentCols after Filtering, No-Change-Log!', {
+            changeMods: {...change.mods}
+          });
+          return;
+        }
+
         const colNames = Object.keys(chlog.mods);
 
         if (colNames.length === 0 || (colNames.length === 1 && colNames[0].startsWith('modified_'))) {
           return;
         }
-        console.log('#211  addChangeLog on changes: An object was updated: ', change.table, change.key, change.mods, { chlog } );
+        if (isInDebugMode) {
+          console.log('#211  addChangeLog on changes: An object was updated: ',
+            change.table, change.key, change.mods, { chlog } );
+        }
         break;
 
       case DatabaseChangeType.Delete:
         const deleteChange = change as IDeleteChange;
-        return;
         break;
     }
 
@@ -462,55 +476,37 @@ export class DexieService extends Dexie {
     });
   }
 
-  getChangeLogUuid(change: IDatabaseChange): string|undefined {
-    const ch = change as any;
-    if ( ('obj' in ch) && ('uuid' in ch.obj)) {
-      return ch.obj.uuid;
-    }
-    if ( ('mods' in ch) && ('uuid' in ch.mods)) {
-      return ch.mods.uuid;
-    }
-    if ( ('oldObj' in ch) && ('uuid' in ch.oldObj)) {
-      return ch.oldObj.uuid;
-    }
-    return undefined;
-  }
-
-  getChangeLogProp<T>(change: IDatabaseChange, propName: string): T|null {
-    const ch = change as any;
-    if ( (propName in ch) && (propName in ch.obj)) {
-      return ch.obj.uuid;
-    }
-    if ( (propName in ch) && (propName in ch.mods)) {
-      return ch.mods.uuid;
-    }
-    if ( (propName in ch) && (propName in ch.oldObj)) {
-      return ch.oldObj.uuid;
-    }
-    return undefined;
-  }
-
   getChangeLogFlag(change: IDatabaseChange): boolean|undefined {
     const ch = change as any;
+    const changeType = change.type;
+
     if ( typeof ch !== 'object') {
       console.error('DexieService.getChangeLogFlag(change) #192 change is not a object: ', change);
       return false;
     }
 
-    if ( (typeof ch.obj === 'object') && ('log' in ch.obj) ) {
-      return ch.obj.log;
-      // return !!ch.obj.log;
+    if (changeType === 1) {
+      const createChange = change as ICreateChange;
+      return ('log' in createChange.obj) ? createChange.obj.log : undefined;
     }
 
-    if ( (typeof ch.mods === 'object') && ('log' in ch.mods)) {
-      return ch.mods.log;
-      // return !!ch.mods.log;
+    if (changeType === 2) {
+      const updateChange = change as IUpdateChange;
+      if ('log' in updateChange.mods) {
+        return updateChange.mods.log;
+      }
+      if ('log' in ch.obj) {
+        return ch.obj.log;
+      }
+      return undefined;
     }
 
-    if ( (typeof ch.oldObj === 'object') && ('log' in ch.oldObj)) {
-      return ch.oldObj.log;
-      // return !!ch.oldObj.log;
+    if (changeType === 3) {
+      if ('oldObj' in ch && 'log' in ch.oldObj) {
+        return ch.oldObj.log;
+      }
     }
+
     return undefined;
   }
 
