@@ -411,43 +411,15 @@ export class DexieService extends Dexie {
           delete chlog.mods.log;
         }
 
-        switch (change.table) {
-          case 'objektKatalogGlobal':
-            if (!('huuid' in chlog.mods)) {
-              chlog.mods.huuid = this.getChangeLogProp<string>(change, 'huuid');
-            }
-            if (!('hid' in chlog.mods)) {
-              chlog.mods.hid = this.getChangeLogProp<number>(change, 'hid');
-            }
-            break;
-
-          case 'objektKatalogMandant':
-            if (!('gcuuid' in chlog.mods)) {
-              chlog.mods.gcuuid = this.getChangeLogProp<string>(change, 'gcuuid');
-            }
-            if (!('gcid' in chlog.mods)) {
-              chlog.mods.gcid = this.getChangeLogProp<number>(change, 'gcid');
-            }
-            break;
-
-          case 'inventar':
-            if (!('mcuuid' in chlog.mods)) {
-              chlog.mods.mcuuid = this.getChangeLogProp<string>(change, 'mcuuid');
-            }
-            if (!('ruuid' in chlog.mods)) {
-              chlog.mods.ruuid = this.getChangeLogProp<string>(change, 'ruuid');
-            }
-            break;
-
-          default:
-            // Nothing
-        }
         const colNames = Object.keys(chlog.mods);
 
         if (colNames.length === 0 || (colNames.length === 1 && colNames[0].startsWith('modified_'))) {
           return;
         }
         const iNumContentCols = colNames.filter( (col) => {
+          if (['mcuuid', 'ruuid', 'gcuuid', 'huuid'].indexOf(col) !== -1 && undefined === change.mods[col]) {
+            return false;
+          }
           return col !== 'log' && !col.startsWith('modified');
         });
         if (!iNumContentCols) {
