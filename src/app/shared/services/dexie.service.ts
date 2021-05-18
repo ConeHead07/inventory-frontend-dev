@@ -346,18 +346,18 @@ export class DexieService extends Dexie {
     // }
     const logPrefix = 'DexieService.addChangeLog(change[' + change.table + ',' + change.type + ',' + change.key + '] ';
     console.log(logPrefix + '#322');
+
     if (logFlag !== undefined && logFlag !== null && logFlag === false) {
       console.log(logPrefix + '#324 ABORT log:', logFlag, {change});
+      if (change.type !== 3) {
+        await this.table(change.table).update(change.key, {log: undefined});
+      }
       return;
     }
-    let uuid = this.getChangeLogUuid(change);
+    const uuid = this.getChangeLogUuid(change);
 
-    if (change.type !== 3) {
-      const obj: any = await this.table( change.table ).get( change.key );
-      uuid = ('uuid' in obj) ? obj.uuid : '';
-
-      delete obj.log;
-      await this.table( change.table ).put( obj, change.key);
+    if (change.type !== 3 && 'obj' in change && 'log' in change.obj && change.obj.log !== undefined) {
+      await this.table(change.table).update(change.key, {log: undefined});
     }
 
     const chlog = {
@@ -447,12 +447,17 @@ export class DexieService extends Dexie {
         if (colNames.length === 0 || (colNames.length === 1 && colNames[0].startsWith('modified_'))) {
           return;
         }
+        const iNumContentCols = colNames.filter( (col) => {
+          return col !== 'log' && !col.startsWith('modified');
+        });
+        if (!iNumContentCols) {
+          return;
+        }
         console.log(logPrefix + '#384 update', change.mods, { chlog });
         break;
 
       case DatabaseChangeType.Delete:
         const deleteChange = change as IDeleteChange;
-        return;
         break;
     }
 
@@ -467,6 +472,9 @@ export class DexieService extends Dexie {
 
   getChangeLogUuid(change: IDatabaseChange): string|undefined {
     const ch = change as any;
+    if (typeof change.key === 'string' && change.key.match(/([a-z0-9]+-){2,}[a-z0-9]/)) {
+      return change.key;
+    }
     if ( ('obj' in ch) && ('uuid' in ch.obj)) {
       return ch.obj.uuid;
     }

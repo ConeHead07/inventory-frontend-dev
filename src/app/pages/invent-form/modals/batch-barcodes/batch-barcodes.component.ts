@@ -208,7 +208,7 @@ export class BatchBarcodesComponent implements OnInit, OnDestroy {
         this.showResult(rslt);
       });
     }).catch(() => {
-      console.error('BatchBarcodesComponent.setBarcodes #121: Fehler bei Index-Barcode-Anfrage fuer', { arguments });
+      console.error('BatchBarcodesComponent.setBarcodes #121: Fehler bei Index-Barcode-Anfrage fuer', { barcodes });
       alert('BatchBarcodesComponent.setBarcodes #121\nFehler bei Index-Barcode-Anfrage.');
     });
   }
