@@ -272,9 +272,9 @@ export class DataService implements OnDestroy {
           return Promise.all(list.map((item: DBDIInventuren) => db.inventuren.put(item)));
         }),
 
-      api.get<DBDIInventurenGebaeude[]>( 'api/inventur/inventurenGebaeudeByAuthUser').toPromise(),
+      api.get<DBDIInventurenGebaeude[]>( 'api/inventur/inventurenGebaeudeByAuthUser').toPromise()
 
-      api.get<DBDIInventurenUserStatus[]>( 'api/inventur/inventurenStatusByAuthUser').toPromise()
+      // ,api.get<DBDIInventurenUserStatus[]>( 'api/inventur/inventurenStatusByAuthUser').toPromise()
 
     ])
       .then( async (results) => {
