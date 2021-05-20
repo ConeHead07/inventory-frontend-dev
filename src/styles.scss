@@ -150,13 +150,11 @@ app-root > .app-content {
   flex: 1;
 }
 
-ngb-modal-window .modal-content,
-ngb-modal-window .modal-body,
-ngb-modal-window .modal-content .modal-body,
-app-select-search-raum, app-select-search-raum .component-host-scrollable,
-app-select-search-artikel, app-select-search-artikel .component-host-scrollable,
-ngb-modal-window .component-host-scrollable,
-ngb-modal-window app-select-search-raum .component-host-scrollable .modal-body,
-ngb-modal-window app-select-search-artikel .component-host-scrollable .modal-body {
+/*
+*/
+app-select-search-raum, app-select-search-raum,
+app-select-search-artikel, app-select-search-artikel,
+ngb-modal-window app-select-search-raum .modal-body,
+ngb-modal-window app-select-search-artikel .modal-body {
   overflow: visible !important;
 }

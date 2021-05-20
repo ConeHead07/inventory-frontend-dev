@@ -341,22 +341,16 @@ export class DBSyncClientService implements OnDestroy {
     }
 
     // Sync im 1-Minuten-Takt
-    if (this.dbgLog) {
-      console.log(logTi + (new Date()).toTimeString() + ' setInterval this.sync, ' + this.syncIntervalTime + 'ms');
-    }
+    console.log(logTi + (new Date()).toTimeString() + ' setInterval this.sync, ' + this.syncIntervalTime + 'ms');
     const syncFunction = this.sync.bind(this);
     this.syncIntervalTimer = setInterval( () => {
-      if (this.dbgLog) {
-        console.log(logTi + (new Date()).toTimeString() + ' interval execute this.sync.bind');
-      }
+      console.log(logTi + (new Date()).toTimeString() + ' interval execute this.sync.bind');
       syncFunction();
     }, this.syncIntervalTime);
     this.autoSyncChange.emit( true );
 
     if (startNow) {
-      if (this.dbgLog) {
-        console.log(logTi + (new Date()).toTimeString() + ' startNow before interval starts in ' + this.syncIntervalTime + 'ms');
-      }
+      console.log(logTi + (new Date()).toTimeString() + ' startNow before interval starts in ' + this.syncIntervalTime + 'ms');
       this.sync();
     }
   }
@@ -373,40 +367,42 @@ export class DBSyncClientService implements OnDestroy {
 
   async sync() {
     const logTi = 'DbsyncClientService.sync()';
+    const currJobId = this.baseData.getCurrentJobid();
+    console.log('DBSyncClientService.sync() #377 STARTED currJobId(', currJobId, ') at ' + (new Date()).toLocaleString());
     if (!this.networkService.getCurrentState().hasServerAccess) {
+      console.error(logTi + ' #379 ABORT No-Internet-Access');
       return;
     }
     const isDBSyncService = (this instanceof DBSyncClientService);
     if (this.isInDebugMode) {
-      console.log(logTi + ' #376 this is DBSyncClientService', { isDBSyncService });
+      console.log(logTi + ' #384 this is DBSyncClientService', { isDBSyncService });
     }
     if (!isDBSyncService) {
-      console.error(logTi + ' #379 this is not correct binded to Instance of DBSyncClientService');
+      console.error(logTi + ' #387 this is not correct binded to Instance of DBSyncClientService');
       return;
     }
 
-    const currJobId = this.baseData.getCurrentJobid();
-    console.log('DBSyncClientService.sync() #366 currJobId:', currJobId);
     if (this.isInDebugMode) {
-      console.log('DBSyncClientService.sync() #368 call getIncompleteInventuren()');
+      console.log(logTi + ' #392 call getIncompleteInventuren()');
     }
     let incompleteInventurLogs = await this.getIncompleteInventuren();
+    console.log(logTi + ' #389 no changes of currJobId(' + currJobId + ')', { incompleteInventurLogs })
 
     const currJobIdx = incompleteInventurLogs.map( itm => itm.jobid ).indexOf( currJobId );
     if (this.isInDebugMode) {
-      console.log('DBSyncClientService.sync() #374 currJobIdx: ', currJobIdx);
+      console.log(logTi + ' #398 currJobIdx: ', currJobIdx);
     }
 
     if (currJobIdx !== -1) {
       if (this.isInDebugMode) {
-        console.log('DBSyncClientService.sync() #379');
+        console.log(logTi + ' #403');
       }
       const currJob = incompleteInventurLogs[ currJobIdx ];
       incompleteInventurLogs = incompleteInventurLogs.slice( currJobIdx, 1);
-      if (this.isInDebugMode) {
-        console.log('DBSyncClientService.sync() #384 call sendByJobId(', currJob.jobid, currJob.changes, ')');
-      }
+      console.log(logTi + ' #407 call sendByJobId(', currJob.jobid, currJob.changes, ')');
       await this.sendByJobId( currJob.jobid, currJob.changes);
+    } else {
+      console.log(logTi + ' #410 no changes of currJobId(' + currJobId + ')');
     }
 
     for (const logs of incompleteInventurLogs) {
@@ -414,12 +410,11 @@ export class DBSyncClientService implements OnDestroy {
         continue;
       }
       if (this.isInDebugMode) {
-        console.log('DBSyncClientService.sync() #391 call sendByJobId(', logs.jobid, logs.changes, ')');
+        console.log(logTi + ' #418 call sendByJobId(', logs.jobid, logs.changes, ')');
       }
       await this.sendByJobId( logs.jobid, logs.changes );
     }
-
-    console.log('DBSyncClientService.sync() # 395 END');
+    console.log(logTi + ' #423 END');
   }
 
   async getCurrentClientRevId(): Promise<number> {
@@ -1076,39 +1071,31 @@ export class DBSyncClientService implements OnDestroy {
   }
 
   private async getIncompleteInventuren(): Promise<SyncIncompleteInventuren[]> {
+    const currJobId = this.baseData.getCurrentJobid();
     const numPending = await this.dexieService.clientChangeLog.where({ sync_done: 0 }).count();
-    return this.dexieService.clientChangeLog
-      .where({ sync_done: 0 })
-      .toArray()
-      .then( async list => {
-        const currJobId = this.baseData.getCurrentJobid();
-        const listGroupedByJobid: SyncIncompleteInventuren[] = [];
+    if (!numPending) {
+      return [];
+    }
 
-        listGroupedByJobid.push({
-          jobid: currJobId,
-          changes: []
-        });
-        const groupIds: number[] = [ currJobId ];
+    const uniqJobIds: number[] = [];
+    await this.dexieService.clientChangeLog.where({ sync_done: 0 }).each( (log) => {
+      if (-1 === uniqJobIds.indexOf(log.jobid)) {
+        if (log.jobid === currJobId) {
+          uniqJobIds.unshift(log.jobid);
+        } else {
+          uniqJobIds.push(log.jobid);
+        }
+      }
+    });
 
-        list.forEach( item => {
-          const jobid = item.jobid;
-          let groupIdx = groupIds.indexOf( jobid );
-          if (groupIdx === -1) {
-            groupIds.push( jobid );
-            listGroupedByJobid.push({
-              jobid,
-              changes: []
-            });
-            groupIdx = groupIds.indexOf( jobid );
-          }
-          listGroupedByJobid[ groupIdx ].changes.push( item );
-        });
-
-        return Promise.all( Object.keys(listGroupedByJobid).map( (groupIdx) => {
-          listGroupedByJobid[groupIdx].changes = this.sortAndFixChangeLogs(listGroupedByJobid[groupIdx].changes);
-          return groupIdx;
-        })).then( () => listGroupedByJobid);
-      });
+    return Promise.all( uniqJobIds.map( async jobid => {
+      const changes = await this.dexieService.clientChangeLog
+        .where({ jobid, sync_done: 0 }).sortBy('id');
+      return {
+        jobid,
+        changes
+      };
+    }));
   }
 
   private async saveLastSyncErrorEvent(event: SyncServerErrorEvent): Promise<void> {

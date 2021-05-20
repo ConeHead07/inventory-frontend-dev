@@ -756,7 +756,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
   }
 
   openEditArtikelImage() {
-    const modalRef = this.modalService.open(CreateArtikelImageComponent, { size: 'xl', scrollable: true } );
+    const modalRef = this.modalService.open(CreateArtikelImageComponent, { size: 'xl' } );
     this.modalWatch(modalRef, 'CreateArtikelImage');
     modalRef.componentInstance.name = this.formInventar.Bezeichnung + '/' + this.formInventar.Typ;
     modalRef.componentInstance.setMetaData({
@@ -772,7 +772,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
   }
 
   openShowArtikelImage() {
-    const modalRef = this.modalService.open(ShowArtikelImageComponent, { size: 'xl', scrollable: true } );
+    const modalRef = this.modalService.open(ShowArtikelImageComponent, { size: 'xl' } );
     this.modalWatch(modalRef, 'ShowArtikelImage');
     modalRef.componentInstance.name = 'World';
     console.log('openShowArtikelImage #642 setMcuuid: ', this.formInventar.mcuuid);
@@ -804,7 +804,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
 
   openBatchScans(barcodes: string[], inputElm?: HTMLElement): void {
     console.log('InventFormComponent.openBatchScans(', barcodes, ') #778', { barcodes, inputElm });
-    const modalRef = this.modalService.open( BatchBarcodesComponent, { size: 'xl', scrollable: true } );
+    const modalRef = this.modalService.open( BatchBarcodesComponent, { size: 'xl' } );
     this.modalWatch(modalRef, 'BatchBarcodes');
     if (!modalRef.componentInstance.jobid) {
       modalRef.componentInstance.setJobid(this.jobid);
@@ -936,7 +936,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
   }
 
   openSelectCreateArtikel(settings: any = null): SelectCreateArtikelComponent {
-    const modalRef = this.modalService.open(SelectCreateArtikelComponent, { size: 'xl', scrollable: true } );
+    const modalRef = this.modalService.open(SelectCreateArtikelComponent, { size: 'xl'}); // , scrollable: true } );
     this.modalWatch(modalRef, 'SelectCreateArtikel');
     modalRef.componentInstance.name = 'World';
     modalRef.componentInstance.clientId = this.clientID;
@@ -955,7 +955,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
   }
 
   openSelectSearchArtikel() {
-    const modalRef = this.modalService.open(SelectSearchArtikelComponent, { size: 'xl', scrollable: true } );
+    const modalRef = this.modalService.open(SelectSearchArtikelComponent, { size: 'xl' } );
     this.modalWatch(modalRef, 'SelectSearchArtikel');
     modalRef.componentInstance.clientId = this.clientID;
     modalRef.componentInstance.artikelSelected.subscribe((item: ArtikelOption) => {
@@ -969,7 +969,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
   }
 
   openSelectSearchRaum() {
-    const modalRef = this.modalService.open(SelectSearchRaumComponent, { size: 'xl', scrollable: true } );
+    const modalRef = this.modalService.open(SelectSearchRaumComponent, { size: 'xl' } );
     this.modalWatch(modalRef, 'SelectSearchRaum');
     modalRef.componentInstance.gebaeudeId = this.buildingID;
     modalRef.componentInstance.raumSelected.subscribe( (raum: DBDIRaeume) => {
@@ -982,7 +982,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
   }
 
   openEditRaum() {
-    const modalRef = this.modalService.open(EditRaumComponent, { size: 'xl', scrollable: true } );
+    const modalRef = this.modalService.open(EditRaumComponent, { size: 'xl' } );
     this.modalWatch(modalRef, 'EditRaum');
     modalRef.componentInstance.raumUuid = this.roomUuiD;
     modalRef.componentInstance.raumChanged.subscribe( (raum: DBDIRaeume) => {
@@ -994,7 +994,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
   }
 
   openEditInventar() {
-    const modalRef = this.modalService.open(EditInventarComponent, { size: 'xl', scrollable: true } );
+    const modalRef = this.modalService.open(EditInventarComponent, { size: 'xl' } );
     this.modalWatch(modalRef, 'EditInventar');
     console.log('InventFormComponente #715 this.inventarData ' + this.inventarData.inventar.uuid);
     modalRef.componentInstance.inventarUuid = this.inventarData.inventar.uuid;
@@ -1009,7 +1009,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
   }
 
   openSelectCreateRaum() {
-    const modalRef = this.modalService.open(SelectCreateRaumComponent, { size: 'xl', scrollable: true } );
+    const modalRef = this.modalService.open(SelectCreateRaumComponent, { size: 'xl' } );
     this.modalWatch(modalRef, 'SelectCreateRaum');
     this.openedCreateRaum = true;
     modalRef.componentInstance.gebaeudeId = this.buildingID;
