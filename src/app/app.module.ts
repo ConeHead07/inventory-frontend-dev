@@ -1,5 +1,5 @@
 
-import { NgModule } from '@angular/core';
+import {APP_INITIALIZER, NgModule} from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 import { FormsModule } from '@angular/forms';
 import {HTTP_INTERCEPTORS, HttpClientModule} from '@angular/common/http';
@@ -56,6 +56,7 @@ import { ImageboxComponent } from './pages/invent-form/modals/imagebox/imagebox.
 import { ShowRaumImageComponent } from './pages/invent-form/modals/show-raum-image/show-raum-image.component';
 import { CreateRaumImageComponent } from './pages/invent-form/modals/create-raum-image/create-raum-image.component';
 import { BatchBarcodesComponent } from './pages/invent-form/modals/batch-barcodes/batch-barcodes.component';
+import {ClientConfigLoadService} from "./shared/services/client-config-load.service";
 
 const appRoutes: Routes = [
   { path: '', component: AuthComponent },
@@ -154,6 +155,11 @@ persist();
       provide: HTTP_INTERCEPTORS,
       useClass: AuthInterceptorService,
       multi: true
+    }, {
+      provide: APP_INITIALIZER,
+      useFactory: ClientConfigLoadService.initializeClientConfig,
+      multi: true,
+      deps: [ClientConfigLoadService]
     },
     ApiService
   ],
