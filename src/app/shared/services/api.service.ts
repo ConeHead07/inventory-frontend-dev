@@ -36,6 +36,7 @@ export class ApiService {
         defaultUrl = 'https://mertens-inventory.bluebirdapp.de/';
         break;
 
+      case 'rheinenergie-app.mertens.services':
       case 'demo-rheinenergie-app.mertens.services':
       case 'demo-apo-app.mertens.services':
       case 'demo-pc-app.mertens.services':
