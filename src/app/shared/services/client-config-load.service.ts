@@ -1,14 +1,12 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Environment } from '../model/Environment';
-import { map, catchError } from 'rxjs/operators';
-import { Observable, of } from 'rxjs';
+import {BasedataService} from "./basedata.service";
+import {ApiService} from "./api.service";
 
 @Injectable({
   providedIn: 'root'
 })
 export class ClientConfigLoadService {
-
 
   static initializeClientConfig = (appConfig: ClientConfigLoadService) => {
     return () => {
@@ -16,7 +14,10 @@ export class ClientConfigLoadService {
     };
   }
 
-  constructor(private http: HttpClient) { }
+  constructor(
+    private http: HttpClient,
+    private baseData: BasedataService,
+    private apiService: ApiService) {}
 
   private localClientConfig(): Promise<boolean> {
     return this.http.get<any>('assets/client-config.local.json').toPromise()
@@ -25,15 +26,18 @@ export class ClientConfigLoadService {
           return false;
         }
 
-        if ('ApiUrl' in config && 'string' === typeof config.ApiUrl && config.ApiUrl ) {
-          localStorage.setItem('currentApiBaseUrl', JSON.stringify( config.ApiUrl ) );
-        }
-
-        for (const key of config) {
+        for (const key in config) {
           if (config.hasOwnProperty(key)) {
-            localStorage.setItem(key, JSON.stringify( config.ApiUrl ) );
+            localStorage.setItem(key, JSON.stringify( config[key] ) );
           }
         }
+
+        if ('ApiUrl' in config && 'string' === typeof config.ApiUrl && config.ApiUrl ) {
+          localStorage.setItem('currentApiBaseUrl', JSON.stringify( config.ApiUrl ) );
+          this.apiService.setBaseUrl(config.ApiUrl);
+        }
+
+        this.baseData.init();
         return true;
       })
       .catch( (err) => {

@@ -64,6 +64,11 @@ export class ApiService {
     return this.apiBaseUrl;
   }
 
+  setBaseUrl(apiBaseUrl: string): ApiService {
+    this.apiBaseUrl = apiBaseUrl;
+    return this;
+  }
+
   getUrlByPath(path: string) {
     while (path.startsWith('/')) {
       path = path.substr(1);

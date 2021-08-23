@@ -28,6 +28,10 @@ export class BasedataService {
   private currentApiBaseUrl: string;
 
   constructor() {
+    this.init();
+  }
+
+  public init() {
     this.currentMandant = JSON.parse( localStorage.getItem( 'currentMandant' ) );
     this.currentInventur = JSON.parse( localStorage.getItem( 'currentInventur' ) );
     this.currentUser = JSON.parse(localStorage.getItem('currentUser' ) );
