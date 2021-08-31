@@ -1,6 +1,6 @@
 {
   "name": "frontend",
-  "version": "1.0.95",
+  "version": "1.0.96",
   "scripts": {
     "ng": "ng",
     "start": "ng serve --aot --host 0.0.0.0 --disable-host-check",
@@ -48,7 +48,9 @@
     "@fortawesome/free-regular-svg-icons": "^5.5.0",
     "@fortawesome/free-solid-svg-icons": "^5.5.0",
     "@ng-bootstrap/ng-bootstrap": "^5.1.5",
+    "@progress/kendo-file-saver": "^1.1.0",
     "@types/crypto-js": "3.1.47",
+    "@types/jszip": "^3.4.1",
     "@zxing/ngx-scanner": "^3.0.0",
     "angular-cropperjs": "^1.0.2",
     "bootstrap": "^4.4.1",
@@ -69,6 +71,7 @@
     "global": "^4.4.0",
     "guid-typescript": "^1.0.9",
     "json-server": "^0.15.1",
+    "jszip": "^3.7.1",
     "ngx-toastr": "10.0.4",
     "ngx-webcam": "0.2.6",
     "rxjs": "~6.4.0",
