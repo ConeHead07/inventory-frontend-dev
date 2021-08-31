@@ -402,7 +402,8 @@ export class DBSyncClientService implements OnDestroy {
       console.log(logTi + ' #407 call sendByJobId(', currJob.jobid, currJob.changes, ')');
       await this.sendByJobId( currJob.jobid, currJob.changes);
     } else {
-      console.log(logTi + ' #410 no changes of currJobId(' + currJobId + ')');
+      console.log(logTi + ' #410 no own changes of currJobId(' + currJobId + ')');
+      await this.sendByJobId( currJobId, []);
     }
 
     for (const logs of incompleteInventurLogs) {
@@ -412,6 +413,7 @@ export class DBSyncClientService implements OnDestroy {
       if (this.isInDebugMode) {
         console.log(logTi + ' #418 call sendByJobId(', logs.jobid, logs.changes, ')');
       }
+      console.log('#415 . sendByJobId(', { jobid: logs.jobid, changes: logs.changes }, ')' );
       await this.sendByJobId( logs.jobid, logs.changes );
     }
     console.log(logTi + ' #423 END');
@@ -477,8 +479,11 @@ export class DBSyncClientService implements OnDestroy {
   async getLastServerChanges(jobid: number = 0, maxAge = 60 * 10 * 1000): Promise<ServerChangesStatusInfo> {
     const sc = this.aLastServerChangesByJobid.find( ch => ch.jobid === jobid);
     if (!sc || Date.now() - sc.timestamp > maxAge) {
-      return this.askServerForChanges(jobid);
+      const freshChanges = await this.askServerForChanges(jobid);
+      console.log('#481 getLastServerChanges(', { jobid, maxAge },  { freshChanges });
+      return freshChanges;
     }
+    console.log('#484 getLastServerChanges(', { jobid, maxAge },  { 'sc.data': sc.data });
     return sc.data;
   }
 
