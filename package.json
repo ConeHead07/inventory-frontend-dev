@@ -1,6 +1,6 @@
 {
   "name": "frontend",
-  "version": "1.0.96",
+  "version": "1.0.97",
   "scripts": {
     "ng": "ng",
     "start": "ng serve --aot --host 0.0.0.0 --disable-host-check",
@@ -20,7 +20,7 @@
     "startpwa-rc": "http-server -p 4245 -c-1 dist/rc -S -C ssl/public_crt.pem -K ssl/private_key.pem -o",
     "startpwa-dev": "http-server -p 4255 -c-1 dist/dev -S -C ssl/public_crt.pem -K ssl/private_key.pem -o",
     "startpwa-prod": "http-server -p 4265 -c-1 dist/prod -S -C ssl/public_crt.pem -K ssl/private_key.pem -o",
-    "buildpwa": "yarn run prebuild && ng build --prod --project frontend",
+    "buildpwa": "yarn run prebuild && ng build --prod --project frontend --configuration=production",
     "rebuild": "ng build --prod --project frontend",
     "test": "ng test",
     "lint": "ng lint",
