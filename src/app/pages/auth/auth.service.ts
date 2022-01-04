@@ -104,6 +104,12 @@ export class AuthService {
             remember_token: resData.access_token,
             created_at: new Date()
           });
+          this.apiService.get<any>( 'auth/me').toPromise().then( (me) => {
+            if ('password' in me) {
+              delete me.password;
+            }
+            this.userService.update(me.id, me);
+          });
           this.handleAuthentication(
             email,
             resData.auth_identifier,
