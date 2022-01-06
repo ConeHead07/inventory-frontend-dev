@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import {BasedataService} from './basedata.service';
+import {ConnectionService} from './connection-service.service';
 
 @Injectable({
   providedIn: 'root'
@@ -10,7 +11,7 @@ export class ApiService {
 
   private apiBaseUrl = '';
 
-  constructor(private http: HttpClient, private baseData: BasedataService) {
+  constructor(private http: HttpClient, private baseData: BasedataService, private connectionService: ConnectionService) {
     this.apiBaseUrl = this.baseData.getCurrentApiBaseUrlOrSetDefault( this.getDefaultApiUrl );
   }
 
@@ -30,6 +31,10 @@ export class ApiService {
       case '127.0.0.1':
       case 'localhost':
         defaultUrl = 'https://' + hostName + ':8040/';
+        break;
+
+      case 'loreal-app.mertens.services':
+        defaultUrl = 'https://loreal.mertens.services/';
         break;
 
       case 'mertens-inventory-client.bluebirdapp.de':

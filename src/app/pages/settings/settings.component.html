@@ -63,7 +63,52 @@
   </div>
 </div>
 
-<div class="card">
+<div class="card mt-1">
+  <div class="card-body">
+    <h5 class="card-title">Export Sync-Log-Data</h5>
+    <p class="card-text">
+      Mit dieser Funktion werden alle geloggten Änderungen in der Tabelle clientChangeLog,
+      die noch nicht übertragen wurden als Datei exportiert
+      für den händischen Versant per Mail, whatsapp, etc.<br>
+      Datenbank: {{ dbName }} Version {{ dbVersion }}
+    </p>
+    <button class="btn btn-danger" [disabled]="buildBcLookup" (click)="syncExport()">Sync exportieren</button>
+  </div>
+</div>
+
+<div class="card mt-1">
+  <div class="card-body">
+    <h5 class="card-title">Export Inventur</h5>
+    <div class="card-text">
+      Mit dieser Funktion werden alle aktuellen Inventurdaten exportiert.<br>
+      Inventur: {{ currentInventurTitle }}<br>
+      Datenbank: {{ dbName }} Version {{ dbVersion }}
+
+      <div *ngIf="exportProcessing"><ngb-progressbar type="success"
+                                                      [value]="exportCurrent"
+                                                      [max]="exportTotal"
+                                                      [striped]="!exportFinished"
+                                                      [animated]="!exportFinished">{{exportCurrent}} von {{exportTotal}}</ngb-progressbar>
+        <div>{{exportStatus}}</div>
+      </div>
+    </div>
+    <button class="btn btn-danger" [disabled]="exportProcessing" (click)="inventurExport()">Inventur exportieren</button>
+  </div>
+</div>
+
+<div class="card mt-1">
+  <div class="card-body">
+    <h5 class="card-title">App aktualisieren</h5>
+    <p class="card-text">
+      Mit dieser Funktion wird die Anwendung neu vom Server geladen.<br>
+      Wenn eine neue Version vorliegt, wird diese übernommen.<br>
+      Alle Daten bleiben dabei erhalten.
+    </p>
+    <button class="btn btn-danger" (click)="reloadApp()">App neu laden</button>
+  </div>
+</div>
+
+<div class="card mt-1">
   <div class="card-body">
     <h5 class="card-title">Browser(Handy)-Datenbank leeren</h5>
     <p class="card-text">
@@ -76,7 +121,7 @@
   </div>
 </div>
 
-<div class="card">
+<div class="card mt-1">
   <div class="card-body">
     <h5 class="card-title">Browser(Handy)-Datenbank löschen</h5>
     <p class="card-text">
