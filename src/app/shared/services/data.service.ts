@@ -741,7 +741,7 @@ export class DataService implements OnDestroy {
                 syncLogData( logData(inserts) );
               }
               return true;
-            });
+            }).catch( (err) => console.error('#744 Error putting data in DB: ', { err, table, item }));
           }));
         });
     }

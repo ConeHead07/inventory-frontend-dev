@@ -560,6 +560,10 @@ export class BarcodeService {
   }
 
   async addBarcode(item: DBDIBarcodeLookup, log: boolean = false): Promise<string> {
+    if (!('code' in item) || !item.code || item.code === '0') {
+      console.error('#564 BarcodeService.addBarcode Cannot add Barcode without code', { item });
+      return '';
+    }
     return this.db.barcodeLookup.add({...item, ...{log}})
       .then( (key) => key[0])
       .catch( reason => {

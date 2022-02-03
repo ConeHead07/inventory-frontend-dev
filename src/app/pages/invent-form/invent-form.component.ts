@@ -79,6 +79,7 @@ import {ImageboxComponent} from './modals/imagebox/imagebox.component';
 import {ShowRaumImageComponent} from './modals/show-raum-image/show-raum-image.component';
 import {CreateRaumImageComponent} from './modals/create-raum-image/create-raum-image.component';
 import {BatchBarcodesComponent, LookupResultItem} from './modals/batch-barcodes/batch-barcodes.component';
+import {ClientConfigLoadService} from "../../shared/services/client-config-load.service";
 
 interface ScannerConfiguration {
   minLength?: number; // 7
@@ -254,7 +255,10 @@ export class InventFormComponent implements OnInit, OnDestroy {
   private blobAlertTimer = null;
   private varChangeSubscription: Subscription = null;
   manualBCInputEnabled: boolean;
+  kunstInputEnabled: boolean;
   useOverlay = 0;
+
+  private specialClientBarcodes: RegExp[] = [];
 
   constructor(
     private route: ActivatedRoute,
@@ -270,6 +274,7 @@ export class InventFormComponent implements OnInit, OnDestroy {
     private bcLookup: BarcodeService,
     private sounds: SoundsService,
     private variables: VariablesService,
+    private configService: ClientConfigLoadService,
     private toastr: ToastrService) {
     this.beepSuccessSrc = this.sounds.getSuccessSrc();
     this.beepErrorSrc = this.sounds.getErrorSrc();
@@ -357,6 +362,25 @@ export class InventFormComponent implements OnInit, OnDestroy {
 
     this.variables.get('manualBarcodeInput', false).then( (status) => {
       this.manualBCInputEnabled = status;
+    });
+
+    this.configService.getClientConfig(this.clientID, 'SpecialBarcodes', []).then( (bcPatterns) => {
+      if (typeof bcPatterns === 'string') {
+        this.specialClientBarcodes.push( new RegExp(bcPatterns) );
+      } else if (Array.isArray(bcPatterns)) {
+        for (const rgx of bcPatterns) {
+          try {
+            this.specialClientBarcodes.push(new RegExp(rgx));
+          } catch (e) {
+            console.error('Invalid Special-Client-Barcode-Pattern: ', rgx);
+            alert('Ungültiges Format Special-Client-Barcode: ' + JSON.stringify(rgx));
+          }
+        }
+      }
+    });
+    this.configService.getClientConfig(this.clientID, 'EnableKunst', false).then( (permission) => {
+      console.log('Check Permission EnableKunst', { permission });
+      this.kunstInputEnabled = !!permission;
     });
 
     this.variables.watch('manualBarcodeInput');
@@ -1320,8 +1344,20 @@ export class InventFormComponent implements OnInit, OnDestroy {
         console.log('InventFormComponente #990 handleScanData LookupResultTable.None');
         if (!bcResult.barcode.match(/^(\d{10}|L\d{9,10})$/) ) {
           console.log('InventFormComponent.handleScanData() #1163', { bcResult });
-          if (!confirm(
-            'Der Barcode besteht nicht wie erwartet aus 10 Zahlen!\n' +
+          let bAskForUnexptectedBC = true;
+
+          if (this.specialClientBarcodes.length > 0) {
+            for (const scbRgx of this.specialClientBarcodes) {
+              if (scbRgx.test(bcResult.barcode)) {
+                console.log('Barcode-Format validated by specialClientBarcode', { scbRgx });
+                bAskForUnexptectedBC = false;
+                break;
+              }
+            }
+          }
+
+          if (bAskForUnexptectedBC && !confirm(
+            'Der Barcode entsrpicht nicht der erwarteten Struktur!\n' +
             'Möchten Sie ihn dennoch für die Neuaufnahme verwenden?')) {
             return;
           }
