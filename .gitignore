@@ -49,3 +49,4 @@ testem.log
 .DS_Store
 Thumbs.db
 src/assets/icon/barcode-to-pc-server.v3.7.0.win.setup.exe
+client-config.local.json
