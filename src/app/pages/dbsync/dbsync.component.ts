@@ -4,7 +4,7 @@ import {
   SyncJobResult,
   SyncJobStatus,
   SyncServerError, SyncServerErrorChange,
-  SyncServerErrorEvent
+  SyncServerErrorEvent, TableCounts
 } from '../../shared/services/dbsync-client.service';
 import {BasedataService} from '../../shared/services/basedata.service';
 import {DBDIInventuren, DBDIServerSyncErrors} from '../../shared/interfaces/dexie.interfaces';
@@ -24,6 +24,13 @@ import {DexieService} from '../../shared/services/dexie.service';
 
 interface TotalSyncProgressPct extends TotalSyncProgress {
   percent: number;
+}
+
+interface TableStat {
+  table: string;
+  numItems: number;
+  totalBytes: number;
+  totalBytesReadable?: string;
 }
 
 @Component({
@@ -58,6 +65,7 @@ export class DbsyncComponent implements OnInit, OnDestroy {
 
   syncTotal: TotalSyncProgressPct;
   syncTables: TableSyncProgress[] = [];
+  unsyncedTableCounts: TableStat[] = [];
 
   subscriptionAutoSyncChange: Subscription;
   subscriptionProcessStarted: Subscription;
@@ -115,6 +123,7 @@ export class DbsyncComponent implements OnInit, OnDestroy {
     this.jobid = this.baseData.getCurrentJobid();
     this.refreshStatusInfos();
     this.loadServerSyncErrors(this.jobid);
+    this.syncAutoRun = this.dbsyncClient.autoSyncIsRunning();
 
     this.subscriptionLastSyncErr = this.dbsyncClient.syncErrorChange.subscribe( (result: SyncServerErrorChange) => {
       this.lastServerSyncErrors = [];
@@ -186,6 +195,22 @@ export class DbsyncComponent implements OnInit, OnDestroy {
         this.syncInProcess = !proc.finished;
       }
     });
+  }
+
+  getBytesReadable(bytes: number): string {
+    if (bytes < 1024) {
+      return bytes.toString(10) + ' Bytes';
+    }
+    if (bytes < 1024 * 1024) {
+      return Math.round(bytes / 1024).toString(10) + ' KB';
+    }
+    const mb = Math.floor(bytes / (1024 * 1024));
+    const rest = (bytes % (1024 * 1024));
+    let restReadable = '';
+    if (rest) {
+      restReadable = ',' + Math.floor((999424 / 1024 / 1024) * 10).toString(10);
+    }
+    return mb.toString(10) + restReadable + ' MB';
   }
 
   async loadServerSyncErrors(jobid): Promise<number> {
@@ -268,6 +293,25 @@ export class DbsyncComponent implements OnInit, OnDestroy {
   checkForUnsyncedChanges() {
     this.dbsyncClient.numUnsyncedChangeLogsByJobId(this.jobid).then( num => {
       this.numUnsyncedChanges = num;
+    });
+
+    console.log('#299 call this.dbsyncClient.getUnsyncedTableCounts(jobid)', { jobid: this.jobid });
+    this.dbsyncClient.getUnsyncedTableCounts(this.jobid).then( tableCounts => {
+
+      this.unsyncedTableCounts.length = 0;
+
+      for (const tb in tableCounts ) {
+        if (!tableCounts.hasOwnProperty(tb)) {
+          continue;
+        }
+
+        this.unsyncedTableCounts.push({
+          table: tb,
+          numItems: tableCounts[tb].numItems,
+          totalBytes: tableCounts[tb].totalBytes,
+          totalBytesReadable: this.getBytesReadable(tableCounts[tb].totalBytes)
+        });
+      }
     });
   }
 

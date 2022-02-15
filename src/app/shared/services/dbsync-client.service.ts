@@ -71,6 +71,14 @@ export interface SyncServerErrorChange {
   count: number;
 }
 
+export interface TableCounts {
+  [key: string]: {
+    table: string;
+    numItems: number,
+    totalBytes: number
+  };
+}
+
 interface SyncMappedIds {
   hersteller?: {[key: string]: number }[];
   objektKatalogGlobal?: {[key: string]: number }[];
@@ -539,6 +547,7 @@ export class DBSyncClientService implements OnDestroy {
     const jobid = useJobid;
     const syncJobResult = useJobResult || new SyncJobResult(jobid);
     const jobInProcess = this.processes.find(proc => proc.jobid === jobid);
+    const maxBytes = +(await this.settings.get( 'maxSyncSize', 1024 * 1024)) as number;
 
     if (jobInProcess && !jobInProcess.finished) {
       if (this.isInDebugMode) {
@@ -593,7 +602,7 @@ export class DBSyncClientService implements OnDestroy {
         console.log(`DBSyncClientService.sendByJobId(${jobid}) #548. Keine Client-Änderungen!`);
       }
       syncJobResult.setStatus(SyncJobStatus.QueryChangeLogs);
-      useLogs = await this.getUnsyncedChangeLogsByJobId(useJobid);
+      useLogs = await this.getUnsyncedChangeLogsByJobId(useJobid, maxBytes);
     }
 
     if (!useLogs && !ServerInfo.NumChanges) {
@@ -625,7 +634,7 @@ export class DBSyncClientService implements OnDestroy {
       syncJobLoop++;
       if (syncJobLoop > 1) {
         lastRevId = (await this.settings.get(lastRevIdVar)) || 0;
-        logs = await this.getUnsyncedChangeLogsByJobId(useJobid);
+        logs = await this.getUnsyncedChangeLogsByJobId(useJobid, maxBytes);
       }
       if (lastRevIdVar === 'jobid-2-revision-id' && lastRevId === 0 ) {
         const err = 'Fehlerhafter Wert für ' + name + ': ' + lastRevId;
@@ -935,7 +944,27 @@ export class DBSyncClientService implements OnDestroy {
       });
   }
 
-  public async getUnsyncedChangeLogsByJobId(jobid: number): Promise<DBDIClientChangeLog[]> {
+  public getPartialListByMaxBytes<T>(list: T[], maxBytes = 0): T[] {
+    if (!maxBytes) {
+      return list;
+    }
+    const partialList: T[] = [];
+    let currSize = 0;
+    let pckgSize = 0;
+    for (let i = 0; i < list.length; i++) {
+      pckgSize = JSON.stringify(list[i]).length;
+      if (i === 0 || maxBytes > currSize + pckgSize) {
+        partialList.push(list[i]);
+        currSize += pckgSize + 5;
+      } else {
+        break;
+      }
+    }
+    console.log('Reduce Sync-Packages from ' + list.length + ' to ' + partialList.length + ' Items');
+    return partialList;
+  }
+
+  public async getUnsyncedChangeLogsByJobId(jobid: number, maxBytes = 0): Promise<DBDIClientChangeLog[]> {
     const tablePrio = [ 'inventar', 'objektKatalogMandant', 'objektKatalogGlobal', 'hersteller' ];
     const db = this.dexieService;
 
@@ -945,6 +974,9 @@ export class DBSyncClientService implements OnDestroy {
       .toArray()
       .then( (list) => {
         return this.sortAndFixChangeLogs(list);
+      })
+      .then( (list) => {
+        return this.getPartialListByMaxBytes<DBDIClientChangeLog>(list, maxBytes);
       });
   }
 
@@ -1075,6 +1107,21 @@ export class DBSyncClientService implements OnDestroy {
     return rslt;
   }
 
+  public async getTotalBytesOfUnsyncedChanges(jobid: number): Promise<number> {
+    let totalBytes = 0;
+    await this.dexieService.clientChangeLog
+      .where('jobid' )
+      .equals( jobid )
+      .each( item => {
+        totalBytes += JSON.stringify(item).length;
+      })
+      .catch( err => {
+        console.error( err );
+        alert( (typeof err === 'string' ? err : JSON.stringify(err)));
+      });
+    return totalBytes;
+  }
+
   public async getCurrentSyncStatus(): Promise<any> {
     return Promise.all([
       this.numUnsyncedChangeLogs(),
@@ -1088,6 +1135,31 @@ export class DBSyncClientService implements OnDestroy {
         console.error(reason, 'DbsyncClientService.numUnsyncedChangeLogs() #1055');
         throw reason;
       });
+  }
+
+  public async getUnsyncedTableCounts(jobid: number): Promise<TableCounts> {
+    const tableCounts: TableCounts = {};
+    await this.dexieService.clientChangeLog
+      .where({sync_done: 0, jobid })
+      .each( (item) => {
+        const name = item.table;
+        if (!(name in tableCounts)) {
+          tableCounts[ name ] = {
+            table: name,
+            numItems: 1,
+            totalBytes: JSON.stringify(item).length
+          };
+        } else {
+          tableCounts[ name ].numItems += 1;
+          tableCounts[ name ].totalBytes += JSON.stringify(item).length;
+        }
+      })
+      .catch( reason => {
+        console.error(reason, 'DbsyncClientService.getUnsyncedTableCounts() #1135');
+        throw reason;
+      });
+
+    return tableCounts;
   }
 
   private async getIncompleteInventuren(): Promise<SyncIncompleteInventuren[]> {

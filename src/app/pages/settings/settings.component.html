@@ -65,11 +65,40 @@
 
 <div class="card mt-1">
   <div class="card-body">
+    <h5 class="card-title">Max. Paketgröße für Datensynchronisierung</h5>
+    <p class="card-text">
+      Aktueller Wert: {{ maxSyncSizeReadable}} ({{ maxSyncSize }} Bytes)
+    </p>
+
+    <div class="form-group">
+      <div class="row no-gutters input-group mb-1">
+        <div class="col-auto input-group-prepend">
+          <span class="input-group-text border-secondary">Max. Paketgröße</span>
+        </div>
+        <div ngbDropdown #syncMaxSize="ngbDropdown" class="col myDropdown">
+          <button (click)="$event.preventDefault(); $event.stopPropagation(); syncMaxSize.isOpen() ? syncMaxSize.close() : syncMaxSize.open();"
+                  class="col btn btn-outline-secondary" id="dropSyncSize" ngbDropdownAnchor>
+            <ng-container *ngIf="maxSyncSizeReadable"><span>{{ maxSyncSizeReadable }}</span></ng-container>
+          </button>
+
+          <div ngbDropdownMenu aria-labelledby="dropSyncSize" class="border-secondary rounded-bottom">
+            <button ngbDropdownItem *ngFor="let _size of maxSyncSizeOptions; let i = index"
+                    (click)="$event.preventDefault(); $event.stopPropagation(); syncSizeChanged(i)"
+                    [value]="_size.value">{{_size.title}}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card mt-1">
+  <div class="card-body">
     <h5 class="card-title">Export Sync-Log-Data</h5>
     <p class="card-text">
       Mit dieser Funktion werden alle geloggten Änderungen in der Tabelle clientChangeLog,
       die noch nicht übertragen wurden als Datei exportiert
-      für den händischen Versant per Mail, whatsapp, etc.<br>
+      für den händischen Versand per Mail, whatsapp, etc.<br>
       Datenbank: {{ dbName }} Version {{ dbVersion }}
     </p>
     <button class="btn btn-danger" [disabled]="buildBcLookup" (click)="syncExport()">Sync exportieren</button>
@@ -114,7 +143,7 @@
     <p class="card-text">
       Mit dieser Funktion werden 'alle' Datenbank-Inhalte des Browsers/Handy gelöscht.<br>
       Unsynchronisierte Änderungen gehen hierbei verloren!<br>
-      Benutzen Sie diese Funktion nur wenn alle Daten bereits synchronisiert sind!<br>
+      Benutzen Sie diese Funktion nur wenn alle Daten bereits synchronisiert oder händisch exportiert wurden!<br>
       Datenbank: {{ dbName }} Version {{ dbVersion }}
     </p>
     <button class="btn btn-danger" [disabled]="buildBcLookup" (click)="dbClear()">Datenbank leeren</button>
@@ -129,7 +158,7 @@
       Unsynchronisierte Änderungen gehen hierbei verloren!<br>
       Die Datenbank-Struktur wird nach einem Seiten-Reload neu aufgebaut.<br>
       Benutzen Sie diese Funktion nur wenn alle Daten bereits synchronisiert sind
-      oder schwerwiegende Fehler aufgetreten sind.<br>
+      oder schwerwiegende Fehler aufgetreten sind und die Daten händisch exportiert werden konnten.<br>
       Datenbank: {{ dbName }} Version {{ dbVersion }}
     </p>
     <button class="btn btn-danger" [disabled]="buildBcLookup" (click)="dbDelete()">Datenbank löschen</button>

@@ -15,6 +15,11 @@ import Dexie from 'dexie';
 import {Router} from '@angular/router';
 import {DbexportService} from '../../shared/services/dbexport.service';
 
+interface ByteSizes {
+  value: number;
+  title: string;
+}
+
 @Component({
   selector: 'app-settings',
   templateUrl: './settings.component.html',
@@ -37,6 +42,15 @@ export class SettingsComponent implements OnInit {
   exportCurrent = 0;
   exportTotal = 0;
   exportStatus = '';
+  maxSyncSize = 0;
+  maxSyncSizeReadable = 'Ohne Limit';
+  maxSyncSizeOptions: ByteSizes[]  = [
+    { value: 1024 * 1024, title: '1 MB' },
+    { value: 1024 * 1024 * 5, title: '5 MB' },
+    { value: 1024 * 1024 * 10, title: '10 MB' },
+    { value: 1024 * 1024 * 20, title: '20 MB' },
+    { value: 0, title: 'Ohne Limit' }
+];
 
   private blobAlertTimer = null;
 
@@ -63,10 +77,24 @@ export class SettingsComponent implements OnInit {
     this.variables.get('manualBarcodeInput', false).then( (val) => {
       this.enableManualBCInput = !!val;
     });
+
+    this.variables.get('maxSyncSize', 0).then( val => {
+      this.maxSyncSize = isNaN(val) ? 0 : +val;
+      this.maxSyncSizeReadable = (!val) ? 'Ohne Limit' : Math.round(val / 1024 / 1024) + ' MB';
+    });
   }
 
   async reloadVariableList() {
     this.variableList = await this.variables.getAll();
+  }
+
+  syncSizeChanged(i) {
+    const maxSyncSize = this.maxSyncSizeOptions[i].value;
+    const maxSyncSizeReadable = this.maxSyncSizeOptions[i].title;
+    this.variables.set( 'maxSyncSize', maxSyncSize).then( success => {
+      this.maxSyncSize = maxSyncSize;
+      this.maxSyncSizeReadable = maxSyncSizeReadable;
+    });
   }
 
   async changeManualBCInput(event) {
