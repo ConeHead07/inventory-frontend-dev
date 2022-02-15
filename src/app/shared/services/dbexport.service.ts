@@ -3,7 +3,6 @@ import { saveAs, encodeBase64 } from '@progress/kendo-file-saver';
 import JSZip from 'jszip';
 import {DexieService} from './dexie.service';
 import Dexie from 'dexie';
-import Collection = Dexie.Collection;
 
 @Injectable({
   providedIn: 'root'

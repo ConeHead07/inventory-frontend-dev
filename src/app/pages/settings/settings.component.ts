@@ -50,7 +50,7 @@ export class SettingsComponent implements OnInit {
     { value: 1024 * 1024 * 10, title: '10 MB' },
     { value: 1024 * 1024 * 20, title: '20 MB' },
     { value: 0, title: 'Ohne Limit' }
-];
+  ];
 
   private blobAlertTimer = null;
 
@@ -66,6 +66,7 @@ export class SettingsComponent implements OnInit {
     private dbexportService: DbexportService) {
     this.dbName = this.dexieService.name;
     this.dbVersion = this.dexieService.verno;
+    // console.log('typeof this.dbexportService.exportTable' + typeof this.dbexportService.exportTable);
   }
 
   ngOnInit() {
@@ -104,8 +105,7 @@ export class SettingsComponent implements OnInit {
   }
 
   async syncExport() {
-    this.dbexportService.exportTable('clientChangeLog');
-    // this.dbexportService.exportTable('inventar');
+    await this.dbexportService.exportTable('clientChangeLog');
   }
 
   async getHerstellerListByJobid(jobid: number): Promise<DBDIHersteller[]> {

@@ -2,7 +2,6 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import {BasedataService} from './basedata.service';
-import {ConnectionService} from './connection-service.service';
 
 @Injectable({
   providedIn: 'root'
@@ -11,7 +10,7 @@ export class ApiService {
 
   private apiBaseUrl = '';
 
-  constructor(private http: HttpClient, private baseData: BasedataService, private connectionService: ConnectionService) {
+  constructor(private http: HttpClient, private baseData: BasedataService) {
     this.apiBaseUrl = this.baseData.getCurrentApiBaseUrlOrSetDefault( this.getDefaultApiUrl );
   }
 
