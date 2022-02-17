@@ -164,3 +164,19 @@
     <button class="btn btn-danger" [disabled]="buildBcLookup" (click)="dbDelete()">Datenbank löschen</button>
   </div>
 </div>
+
+
+
+<div *ngIf="false" class="card mt-1">
+  <div class="card-body">
+    <h5 class="card-title">Dummie Raum und Raumbilder einfügen</h5>
+    <p class="card-text">
+      Mit dieser Funktion werden werden fiktive 500 Test-Räume mit ingesamt 500 Raum-Bildern angelegt.<br>
+      Als Raum-Name, -Bezeichnung und -Etage wird TEST vorangestellt.<br>
+      Die Test-Raumbilder werden nur den angelegten Testräumen zugeordnet und erhalten als Name
+      und Beschreibung ebenfalls das Prefix TEST.<br>
+      Datenbank: {{ dbName }} Version {{ dbVersion }}
+    </p>
+    <button class="btn btn-danger" [disabled]="buildBcLookup" (click)="createTestData()">Testdaten generieren</button>
+  </div>
+</div>

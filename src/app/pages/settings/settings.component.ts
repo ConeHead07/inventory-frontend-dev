@@ -14,6 +14,7 @@ import {ScanDetectData} from '../../shared/components/scannerdetection/scannerde
 import Dexie from 'dexie';
 import {Router} from '@angular/router';
 import {DbexportService} from '../../shared/services/dbexport.service';
+import {DummieSeederService} from "../../shared/services/dummie-seeder.service";
 
 interface ByteSizes {
   value: number;
@@ -63,7 +64,8 @@ export class SettingsComponent implements OnInit {
     private barcodeLookup: BarcodeService,
     private sounds: SoundsService,
     private router: Router,
-    private dbexportService: DbexportService) {
+    private dbexportService: DbexportService,
+    private dummieSeeder: DummieSeederService) {
     this.dbName = this.dexieService.name;
     this.dbVersion = this.dexieService.verno;
     // console.log('typeof this.dbexportService.exportTable' + typeof this.dbexportService.exportTable);
@@ -96,6 +98,14 @@ export class SettingsComponent implements OnInit {
       this.maxSyncSize = maxSyncSize;
       this.maxSyncSizeReadable = maxSyncSizeReadable;
     });
+  }
+
+  async createTestData() {
+    alert('Create Test-Data is disabled in production mode!');
+    return;
+    // const useJobid = this.baseData.getCurrentJobid();
+    // const result = await this.dummieSeeder.createRaeumeAndImages({}, 500, 500, useJobid);
+    // console.log('Einfügen der Dummie-Daten wurde abgeschlossen', { result });
   }
 
   async changeManualBCInput(event) {

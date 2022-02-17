@@ -394,7 +394,7 @@ export class DBSyncClientService implements OnDestroy {
       console.log(logTi + ' #392 call getIncompleteInventuren()');
     }
     let incompleteInventurLogs = await this.getIncompleteInventuren();
-    console.log(logTi + ' #389 no changes of currJobId(' + currJobId + ')', { incompleteInventurLogs })
+    console.log(logTi + ' #389 no changes of currJobId(' + currJobId + ')', { incompleteInventurLogs });
 
     const currJobIdx = incompleteInventurLogs.map( itm => itm.jobid ).indexOf( currJobId );
     if (this.isInDebugMode) {
@@ -946,6 +946,7 @@ export class DBSyncClientService implements OnDestroy {
 
   public getPartialListByMaxBytes<T>(list: T[], maxBytes = 0): T[] {
     if (!maxBytes) {
+      console.log('#949 called getPartialListByMaxBytes return full list', { 'list.lenght': list.length, maxBytes });
       return list;
     }
     const partialList: T[] = [];
@@ -960,11 +961,13 @@ export class DBSyncClientService implements OnDestroy {
         break;
       }
     }
-    console.log('Reduce Sync-Packages from ' + list.length + ' to ' + partialList.length + ' Items');
+    console.log('#964 called getPartialListByMaxBytes return reduced Sync-Packages from ' +
+      list.length + ' to ' + partialList.length + ' Items');
     return partialList;
   }
 
   public async getUnsyncedChangeLogsByJobId(jobid: number, maxBytes = 0): Promise<DBDIClientChangeLog[]> {
+    console.log('#970 DbSyncClientService.getUnsyncedChangeLogsByJobId', { jobid, maxBytes });
     const tablePrio = [ 'inventar', 'objektKatalogMandant', 'objektKatalogGlobal', 'hersteller' ];
     const db = this.dexieService;
 
@@ -1163,6 +1166,7 @@ export class DBSyncClientService implements OnDestroy {
   }
 
   private async getIncompleteInventuren(): Promise<SyncIncompleteInventuren[]> {
+    const maxBytes = +(await this.settings.get( 'maxSyncSize', 1024 * 1024)) as number;
     const currJobId = this.baseData.getCurrentJobid();
     const numPending = await this.dexieService.clientChangeLog.where({ sync_done: 0 }).count();
     if (!numPending) {
@@ -1185,7 +1189,7 @@ export class DBSyncClientService implements OnDestroy {
         .where({ jobid, sync_done: 0 }).sortBy('id');
       return {
         jobid,
-        changes
+        changes: this.getPartialListByMaxBytes(changes, maxBytes)
       };
     }));
   }
