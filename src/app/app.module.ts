@@ -56,7 +56,7 @@ import { ImageboxComponent } from './pages/invent-form/modals/imagebox/imagebox.
 import { ShowRaumImageComponent } from './pages/invent-form/modals/show-raum-image/show-raum-image.component';
 import { CreateRaumImageComponent } from './pages/invent-form/modals/create-raum-image/create-raum-image.component';
 import { BatchBarcodesComponent } from './pages/invent-form/modals/batch-barcodes/batch-barcodes.component';
-import {ClientConfigLoadService} from "./shared/services/client-config-load.service";
+import {ClientConfigLoadService} from './shared/services/client-config-load.service';
 
 const appRoutes: Routes = [
   { path: '', component: AuthComponent },

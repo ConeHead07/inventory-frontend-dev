@@ -21,10 +21,10 @@
                                 <fa-icon [icon]="['fa', 'user']"></fa-icon>
                             </span>
                         </div>
-                        <input type="text" class="form-control input_user lato-light" name="user" placeholder="Benutzername"
+                        <input type="text" class="form-control input_user lato-light" name="user" placeholder="Email oder Benutzername"
                             [(ngModel)]="form.email"
                             minlength="3"
-                            pattern="[a-zA-Z0-9.@-]{3,}"
+                            pattern="[a-zA-Z 0-9.@-]{3,}"
                             required
                         >
                     </div>
