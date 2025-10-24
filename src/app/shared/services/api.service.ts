@@ -1,66 +1,81 @@
-import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
-import {BasedataService} from './basedata.service';
+import { Injectable } from "@angular/core";
+import { HttpClient } from "@angular/common/http";
+import { Observable } from "rxjs";
+import { BasedataService } from "./basedata.service";
+import { environment } from "src/environments/environment";
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: "root",
 })
 export class ApiService {
+  private apiBaseUrl = "";
 
-  private apiBaseUrl = '';
-
-  constructor(private http: HttpClient, private baseData: BasedataService) {
-    this.apiBaseUrl = this.baseData.getCurrentApiBaseUrlOrSetDefault( this.getDefaultApiUrl );
+  constructor(
+    private readonly http: HttpClient,
+    private baseData: BasedataService
+  ) {
+    this.apiBaseUrl = this.baseData.getCurrentApiBaseUrlOrSetDefault(
+      this.getDefaultApiUrl
+    );
   }
 
   getDefaultApiUrl(): string {
     const hostName = window.location.hostname;
-    let defaultUrl = '';
+    let defaultUrl = "";
 
-    const rgx = /(demo-)(.*?)(-app)(.mertens.services)/;
-    if (rgx.test(hostName)) {
-      defaultUrl = 'https://' + hostName.replace(rgx, '$1$2-admin$4') + '/';
-      console.log('ApiService #24 getDefaultApiUrl()', { hostName, defaultUrl });
+    if (environment.appiBaseUrl && environment.appiBaseUrl.length > 0) {
+      console.log("ApiService:Env #18 getDefaultApiUrl()", {
+        hostName,
+        defaultUrl: environment.appiBaseUrl,
+      });
+      return environment.appiBaseUrl;
+    }
+
+    const rgxDemo = /(demo-)(.*?)(-app)(.mertens.services)/;
+    if (rgxDemo.test(hostName)) {
+      defaultUrl = "https://" + hostName.replace(rgxDemo, "$1$2-admin$4") + "/";
+      console.log("ApiService:Demo #24 getDefaultApiUrl()", {
+        hostName,
+        defaultUrl,
+      });
+      return defaultUrl;
+    }
+
+    const rgxProd = /(.*?)(-app)(.mertens.services)/;
+    if (rgxProd.test(hostName)) {
+      defaultUrl = "https://" + hostName.replace(rgxProd, "$1-admin$3") + "/";
+      console.log("ApiService:Prod #31 getDefaultApiUrl()", {
+        hostName,
+        defaultUrl,
+      });
       return defaultUrl;
     }
 
     switch (hostName) {
-      case 'inventory.local':
-      case '127.0.0.1':
-      case 'localhost':
-        defaultUrl = 'https://' + hostName + ':8040/';
+      case "inventory.local":
+      case "127.0.0.1":
+      case "localhost":
+        defaultUrl = "https://" + hostName + ":8040/";
         break;
 
-      case 'loreal-app.mertens.services':
-        defaultUrl = 'https://loreal.mertens.services/';
+      case "mertens-inventory-client.bluebirdapp.de":
+        defaultUrl = "https://mertens-inventory.bluebirdapp.de/";
         break;
 
-      case 'mertens-inventory-client.bluebirdapp.de':
-        defaultUrl = 'https://mertens-inventory.bluebirdapp.de/';
+      case "mertens-inventory-rc.web.app":
+      case "mertens-inventory-rc.firebaseapp.com":
+      case "mertens-inventory-dev.web.app":
+      case "mertens-inventory-dev.firebaseapp.com":
+      case "dev-inventory-app.mertens.services":
+        defaultUrl = "https://dev-inventory.mertens.services/";
         break;
 
-      case 'rheinenergie-app.mertens.services':
-      case 'demo-rheinenergie-app.mertens.services':
-      case 'demo-apo-app.mertens.services':
-      case 'demo-pc-app.mertens.services':
-        defaultUrl = 'https://' + hostName.replace('-app.mertens.services', '-admin.mertens.services') + '/';
-        break;
-
-      case 'mertens-inventory-rc.web.app':
-      case 'mertens-inventory-rc.firebaseapp.com':
-      case 'mertens-inventory-dev.web.app':
-      case 'mertens-inventory-dev.firebaseapp.com':
-      case 'dev-inventory-app.mertens.services':
-        defaultUrl = 'https://dev-inventory.mertens.services/';
-        break;
-
-      case 'mertens-inventory.firebaseapp.com':
-      case 'mertens-inventory.web.app':
+      case "mertens-inventory.firebaseapp.com":
+      case "mertens-inventory.web.app":
       default:
-        defaultUrl = 'https://inventory.mertens.services/';
+        defaultUrl = "https://inventory.mertens.services/";
     }
-    console.log('ApiService #50 getDefaultApiUrl()', { hostName, defaultUrl });
+    console.log("ApiService #65 getDefaultApiUrl()", { hostName, defaultUrl });
     return defaultUrl;
   }
 
@@ -74,48 +89,36 @@ export class ApiService {
   }
 
   getUrlByPath(path: string) {
-    while (path.startsWith('/')) {
+    while (path.startsWith("/")) {
       path = path.substr(1);
     }
     return this.apiBaseUrl + path;
   }
 
   getHealthPingUrl(): string {
-    return this.getUrlByPath('assets/ping.json');
+    return this.getUrlByPath("assets/ping.json");
   }
 
   getConnectedPingUrl(): string {
-    return this.getUrlByPath('auth/connected');
+    return this.getUrlByPath("auth/connected");
   }
 
-  private getUrl( url: string ): string {
-    if ( url.substr(0, 10).match(/^[a-zA-Z]:\/\//)) {
+  private getUrl(url: string): string {
+    if (url.substr(0, 10).match(/^[a-zA-Z]:\/\//)) {
       return url;
     }
     return this.getUrlByPath(url);
   }
 
   get<T>(path: string, options?: object): Observable<T> {
-    return this.http.get<T>(
-      this.getUrl( path ),
-      options
-    );
+    return this.http.get<T>(this.getUrl(path), options);
   }
 
   post<T>(path: string, body: any | null, options?: object): Observable<T> {
-    return this.http.post<T>(
-      this.getUrl( path ),
-      body,
-      options
-    );
+    return this.http.post<T>(this.getUrl(path), body, options);
   }
 
   put<T>(path: string, body: any | null, options?: object): Observable<T> {
-    return this.http.put<T>(
-      this.getUrl( path ),
-      body,
-      options
-    );
+    return this.http.put<T>(this.getUrl(path), body, options);
   }
-
 }
