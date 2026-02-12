@@ -1,0 +1,12 @@
+version: "3.9"
+
+services:
+  angular9-migration:
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    container_name: angular9-migration
+    volumes:
+      - ../..:/workspace
+    working_dir: /workspace
+    tty: true

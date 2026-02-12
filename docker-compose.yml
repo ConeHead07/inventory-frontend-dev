@@ -1,0 +1,17 @@
+version: "3.8"
+
+services:
+  angular-migration:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ng8-to-9-migration
+    volumes:
+      - .:/app
+      - /app/node_modules # Verhindert, dass lokale node_modules den Container überschreiben
+    ports:
+      - "4200:4200"
+    environment:
+      - NODE_ENV=development
+    stdin_open: true # Ermöglicht interaktive Migrationstools
+    tty: true
