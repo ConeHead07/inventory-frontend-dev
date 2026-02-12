@@ -1,12 +1,4 @@
-import {
-  AfterViewInit,
-  Component,
-  ElementRef,
-  HostListener,
-  OnInit,
-  ViewChild,
-} from "@angular/core";
-
+import { Component, HostListener } from "@angular/core";
 import { ConnectionService } from "./shared/services/connection-service.service";
 import { SwPush, SwUpdate } from "@angular/service-worker";
 import { ToastrService } from "ngx-toastr";
@@ -36,7 +28,7 @@ export class AppComponent {
     private router: Router,
     private swUpdate: SwUpdate,
     private swPush: SwPush,
-    private appService: AppService
+    private appService: AppService,
   ) {
     this.heartBeatState = this.connectionService.options.enableHeartbeat;
 
@@ -80,7 +72,6 @@ export class AppComponent {
         });
  */
   setupUpdates() {
-    return;
     this.swUpdate.available.subscribe((event) => {
       // Update wurde entdeckt
       console.log("current version is", event.current);
@@ -88,37 +79,23 @@ export class AppComponent {
       console.log("current version hash", event.current.hash);
       console.log("available version hash", event.available.hash);
 
-      const message =
-        "Aktuelle Version: " +
-        event.current +
-        "<br>Aktuelle Version" +
-        event.available;
-      const action = "New Version is available!";
       const appData = event.available.appData as any;
-      const newVersion = appData?.version || event.available.hash.substring(0, 6);
-      const updateInfo = appData?.info || 'Ein neues Update ist verfügbar.';
+      const newVersion =
+        appData?.version || event.available.hash.substring(0, 6);
+      const updateInfo = appData?.info || "Ein neues Update ist verfügbar.";
 
-      // Benutzer auf Update hinweisen und Seite neu laden
-      this.toastr
-        .info(message, action)
-        .onAction.subscribe(() => location.reload());
-    });
       this.appService.setFoundNewVersion(newVersion, updateInfo);
 
-    // Update herunterladen
-    this.swUpdate.activateUpdate().then((e) => {
-      // Update wurde heruntergeladen
-      const message = `Neue Version verfügbar: ${newVersion}<br>${updateInfo}`;
+      const message = `Neue Version ${newVersion} ist verfügbar.<br>${updateInfo}`;
       const action = "Aktualisieren";
 
-      const message = "Anwendung wurde aktualisert und wird neu geladen";
-      const action = "Reload!";
-
-      // Benutzer auf Update hinweisen und Seite neu laden
+      // Benutzer auf Update hinweisen und auf Interaktion warten
       this.toastr
-        .info(message, action)
-        .onAction.subscribe(() => location.reload());
-        .info(message, action, { disableTimeOut: true, closeButton: true })
+        .info(message, action, {
+          disableTimeOut: true,
+          closeButton: true,
+          enableHtml: true,
+        })
         .onAction.subscribe(() => {
           this.swUpdate.activateUpdate().then(() => document.location.reload());
         });

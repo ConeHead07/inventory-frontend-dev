@@ -36,6 +36,7 @@
     "@angular/core": "9",
     "@angular/fire": "5.4.2",
     "@angular/forms": "9",
+    "@angular/localize": "9.1.13",
     "@angular/platform-browser": "9",
     "@angular/platform-browser-dynamic": "9",
     "@angular/pwa": "^0.1000.5",
